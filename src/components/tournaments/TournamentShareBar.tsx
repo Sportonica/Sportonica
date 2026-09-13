@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Link2, Share2, Download, Check, ClipboardList } from "lucide-react";
+import { Share2, Download, Check, ClipboardList } from "lucide-react";
 import { useTheme } from "@/lib/hooks/useTheme";
 
 // Three separate, explicit actions rather than one smart "Share" button —
@@ -14,7 +14,6 @@ export default function TournamentShareBar({
   id, name, canRegister = false, accent = "#006241",
 }: { id: string; name: string; canRegister?: boolean; accent?: string }) {
   const [theme] = useTheme();
-  const [copied, setCopied] = useState(false);
   const [regCopied, setRegCopied] = useState(false);
   const [cardBusy, setCardBusy] = useState(false);
   const [cardDone, setCardDone] = useState(false);
@@ -23,11 +22,11 @@ export default function TournamentShareBar({
   const regUrl = () => `${window.location.origin}/tournaments/${id}?tab=register`;
   const title = `${name} · Sportonica`;
 
+  // No standalone "Copy link" button anymore — this only backs share()'s
+  // fallback for browsers without the Web Share API.
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(url());
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
     } catch {
       /* clipboard blocked (permissions/insecure context) — nothing more we can do here */
     }
@@ -92,10 +91,6 @@ export default function TournamentShareBar({
 
   return (
     <div className="ts-bar" style={{ "--ts-accent": accent } as React.CSSProperties}>
-      <button type="button" className="ts-btn" onClick={copyLink}>
-        <span className="ts-ico">{copied ? <Check size={13} /> : <Link2 size={13} />}</span>
-        {copied ? "Copied" : "Copy link"}
-      </button>
       {canRegister && (
         <button type="button" className="ts-btn" onClick={copyRegLink}>
           <span className="ts-ico">{regCopied ? <Check size={13} /> : <ClipboardList size={13} />}</span>
