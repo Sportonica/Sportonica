@@ -673,6 +673,30 @@ end;
 $$;
 grant execute on function public.close_tournament_registration(uuid) to authenticated;
 
+-- Undo an accidental close. registration_closed only ever precedes
+-- bracket/fixture generation (which flips status straight to 'live' in
+-- the same transaction — see generate_knockout_bracket / start_single_event
+-- / generate_league_fixtures / generate_group_fixtures), so this can never
+-- coexist with an already-generated bracket; the guard mirrors
+-- close_tournament_registration()'s own status check exactly, reversed.
+create or replace function public.reopen_tournament_registration(p_id uuid)
+returns public.tournaments
+language plpgsql security definer set search_path = public as $$
+declare v_row public.tournaments;
+begin
+  select * into v_row from public.tournaments where id = p_id for update;
+  if not found then raise exception 'NOT_FOUND'; end if;
+  if not (public.has_venue_access(v_row.venue_id, 'manager') or public.is_super_admin()) then
+    raise exception 'FORBIDDEN';
+  end if;
+  if v_row.status <> 'registration_closed' then raise exception 'INVALID_TRANSITION'; end if;
+
+  update public.tournaments set status = 'registration_open' where id = p_id returning * into v_row;
+  return v_row;
+end;
+$$;
+grant execute on function public.reopen_tournament_registration(uuid) to authenticated;
+
 -- Best-effort auto-close once the deadline passes (pg_cron, same
 -- pattern as expire_stale_play_together_requests) — registration is
 -- ALSO re-checked inline inside register_team() below, so a late
