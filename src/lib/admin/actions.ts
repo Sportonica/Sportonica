@@ -311,6 +311,20 @@ export async function togglePricingRule(id: string, venue_id: string, active: bo
 }
 
 // ── STAFF ────────────────────────────────────────────────────────
+// Turns an email into the user_id addStaff() needs — the invite form only
+// ever has the email an owner types in. Distinct from tournaments'
+// findUserByEmail() (super_admin-only, for granting tournament managers);
+// this one is gated to "owns at least one venue" (see
+// find_user_for_staff_invite() in RUN_ME_staff_invite_lookup.sql).
+export async function findUserForStaffInvite(email: string): Promise<{ id: string; full_name: string | null; email: string } | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("find_user_for_staff_invite", { p_email: email }).maybeSingle();
+  if (error) return actionError(error.message);
+  if (!data) return actionError("USER_NOT_FOUND");
+  return data as { id: string; full_name: string | null; email: string };
+}
+
 export async function addStaff(input: { venue_id: string; user_id: string; role: string }) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
@@ -320,6 +334,6 @@ export async function addStaff(input: { venue_id: string; user_id: string; role:
   const { data: canManage } = await sb.rpc("has_venue_access", { v_id: input.venue_id, min_role: "owner" });
   if (!canManage) return actionError("FORBIDDEN");
   const { error } = await sb.from("venue_staff").insert(input);
-  if (error) return actionError(error.message);
-  revalidatePath(`/admin/venues/${input.venue_id}/staff`);
+  if (error) return actionError(error.code === "23505" ? "That person is already on the team." : error.message);
+  revalidatePath("/admin/staff");
 }

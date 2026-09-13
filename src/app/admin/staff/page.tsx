@@ -3,6 +3,7 @@ import { Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getMyVenues } from "@/lib/admin/queries";
 import { Topbar } from "../ui";
+import StaffTeamCard from "./StaffTeamCard";
 
 export const dynamic = "force-dynamic";
 
@@ -54,28 +55,7 @@ export default async function StaffPage({
           </div>
         )}
 
-        <div className="adm-card">
-          <div className="adm-between" style={{ marginBottom: 16 }}>
-            <div>
-              <div className="adm-card-t">Team</div>
-              <div className="adm-card-sub" style={{ marginBottom: 0 }}>Who can access this venue&apos;s console</div>
-            </div>
-            <button className="adm-btn sm primary">Invite staff</button>
-          </div>
-
-          <table className="adm-table">
-            <thead><tr><th>Member</th><th>Role</th><th>Can do</th></tr></thead>
-            <tbody>
-              {(staff ?? []).map((s) => (
-                <tr key={s.id}>
-                  <td className="adm-mono" style={{ fontSize: 12 }}>{s.user_id.slice(0, 8)}…</td>
-                  <td><span className={`adm-badge ${s.role === "owner" ? "warn" : "neutral"}`}>{s.role}</span></td>
-                  <td className="adm-dim" style={{ fontSize: 12 }}>{ROLE_DESC[s.role]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <StaffTeamCard venueId={activeVenue.id} staff={staff ?? []} />
 
         <div className="adm-card" style={{ marginTop: 18 }}>
           <div className="adm-card-t">Roles explained</div>
