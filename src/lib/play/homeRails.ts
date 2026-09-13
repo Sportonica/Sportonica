@@ -130,7 +130,7 @@ export async function getHomeRails() {
       .eq("status", "live")
       .not("team_a_id", "is", null).not("team_b_id", "is", null)
       .order("starts_at", { ascending: true })
-      .limit(6),
+      .limit(10),
     sb.from("tournament_matches")
       .select(MATCH_COLS)
       .eq("status", "scheduled")
@@ -138,14 +138,14 @@ export async function getHomeRails() {
       .not("starts_at", "is", null)
       .gte("starts_at", nowIso)
       .order("starts_at", { ascending: true })
-      .limit(6),
+      .limit(10),
     sb.from("tournament_matches")
       .select(MATCH_COLS)
       .eq("status", "completed")
       .not("team_a_id", "is", null).not("team_b_id", "is", null)
       .not("score_a", "is", null).not("score_b", "is", null)
       .order("starts_at", { ascending: false })
-      .limit(6),
+      .limit(15),
   ]);
 
   // Confirmed-player count per game — needs the IDs from the query above,
@@ -248,7 +248,7 @@ export async function getHomeRails() {
     ...(liveMatchRes.data ?? []) as RawMatch[],
     ...(upcomingMatchRes.data ?? []) as RawMatch[],
     ...(completedMatchRes.data ?? []) as RawMatch[],
-  ].slice(0, 8);
+  ].slice(0, 18);
 
   const matchTournamentIds = [...new Set(rawMatches.map((m) => m.tournament_id))];
   const matchTeamIds = [...new Set(rawMatches.flatMap((m) => [m.team_a_id, m.team_b_id]))];
