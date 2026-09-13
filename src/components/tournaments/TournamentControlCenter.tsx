@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Plus, Trash2, X, Users, UserPlus, Pencil, Download } from "lucide-react";
 import {
-  openTournamentRegistration, closeTournamentRegistration, cancelTournament, approveTournament, completeTournament,
+  openTournamentRegistration, closeTournamentRegistration, reopenTournamentRegistration, cancelTournament, approveTournament, completeTournament,
   startSingleEvent, createWalkinTeam, markWalkinTeamPaid,
   getTeamRoster, searchPlayersForTeam, addTeamPlayer, removeTeamPlayerAdmin,
   addWalkinTeamPlayer, updateTeamPlayerGuest, updateTeamManager, updateTeamName, setTeamPlayerJerseyNumber, setTeamPlayerPosition,
@@ -169,6 +169,9 @@ export default function TournamentControlCenter({
             )}
             {tournament.status === "registration_open" && (
               <button className="tc-btn" disabled={pending} onClick={() => run(() => closeTournamentRegistration(tournament.id), "Registration is closed.")}>Close registration</button>
+            )}
+            {tournament.status === "registration_closed" && (
+              <button className="tc-btn" disabled={pending} onClick={() => run(() => reopenTournamentRegistration(tournament.id), "Registration is open again.")}>Reopen registration</button>
             )}
             {tournament.format === "single_event" && tournament.status === "registration_closed" && (
               <button className="tc-btn primary" disabled={pending} onClick={() => run(() => startSingleEvent(tournament.id), "The event has started.")}>Start event</button>

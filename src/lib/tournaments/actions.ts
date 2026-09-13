@@ -505,6 +505,20 @@ export async function closeTournamentRegistration(id: string): Promise<Tournamen
   return data as Tournament;
 }
 
+// Undo an accidental close — only valid straight from registration_closed
+// (see reopen_tournament_registration()), which can never coexist with an
+// already-generated bracket/fixtures since those flip status to 'live'.
+export async function reopenTournamentRegistration(id: string): Promise<Tournament | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("reopen_tournament_registration", { p_id: id });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  revalidatePath(`/admin/tournaments/${id}`);
+  revalidatePath(`/organize/tournaments/${id}`);
+  revalidatePath("/tournaments");
+  return data as Tournament;
+}
+
 export async function startSingleEvent(id: string): Promise<Tournament | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
