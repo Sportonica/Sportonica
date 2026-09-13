@@ -187,7 +187,10 @@ function buildSlots(
   for (let t = open; t + durationMins <= close; t += STEP) {
     const end = t + durationMins;
     const overlaps = busy.some(([bs, be]) => t < be && end > bs);
-    const past = isToday && t <= nowMins + 30;   // need 30 min lead time
+    // Matches book_court()'s own rule (starts_at <= now() → SLOT_IN_PAST) —
+    // no extra lead-time buffer here, or a slot starting a few minutes from
+    // now would show as "past" while the backend would still accept it.
+    const past = isToday && t <= nowMins;
     out.push({
       mins: t, label: label(t),
       available: !overlaps && !past,

@@ -19,9 +19,9 @@ const cache = new Map<string, { data: Slot[]; at: number }>();
 
 // availability.ts computes "past" once, at fetch time — fine for a slot
 // that's already past when the list loads, but a slot that was still
-// >=30min out at fetch time silently drifts into "too soon to book" the
-// longer the page sits open (no refetch just because time passes). Redo
-// the same check live, client-side, on every render.
+// in the future at fetch time silently drifts into "past" the longer the
+// page sits open (no refetch just because time passes). Redo the same
+// check live, client-side, on every render.
 const KTM_TZ = "Asia/Kathmandu";
 function nowKtmMins(): number {
   const t = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: KTM_TZ });
@@ -58,15 +58,15 @@ export default function SlotPicker({
   // someone else books or cancels a slot on this court.
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // Ticks every 30s so a slot that drifts within the 30-min lead-time
-  // window while this screen is just sitting open disappears on its own,
+  // Ticks every 30s so a slot that drifts into the past while this screen
+  // is just sitting open turns from clickable to disabled on its own,
   // instead of staying clickable until something else forces a re-render.
   const [nowMins, setNowMins] = useState(nowKtmMins);
   useEffect(() => {
     const id = setInterval(() => setNowMins(nowKtmMins()), 30_000);
     return () => clearInterval(id);
   }, []);
-  const isPastLive = (mins: number) => dateStr === todayKtmStr() && mins <= nowMins + 30;
+  const isPastLive = (mins: number) => dateStr === todayKtmStr() && mins <= nowMins;
 
   // If the already-picked time drifts into the past while this screen
   // just sits open, drop the selection instead of leaving a now-invalid
