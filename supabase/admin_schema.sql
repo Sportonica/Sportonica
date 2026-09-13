@@ -77,6 +77,32 @@ returns boolean language sql stable security definer set search_path = public as
   );
 $$;
 
+-- Turns an email into the user_id addStaff() needs — the invite form only
+-- ever has the email an owner types in. Distinct from
+-- find_user_by_email() in tournament_owner_access.sql (super_admin-only,
+-- for granting tournament managers); this one is gated to "owns at least
+-- one venue" instead, matching who's actually allowed to invite staff.
+create or replace function public.find_user_for_staff_invite(p_email text)
+returns table(id uuid, full_name text, email text)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not (
+    exists (select 1 from public.venues v where v.owner_id = auth.uid())
+    or public.is_super_admin()
+  ) then
+    raise exception 'FORBIDDEN';
+  end if;
+
+  return query
+    select u.id, p.full_name, u.email::text
+    from auth.users u
+    join public.profiles p on p.id = u.id
+    where lower(u.email) = lower(trim(p_email))
+    limit 1;
+end;
+$$;
+grant execute on function public.find_user_for_staff_invite(text) to authenticated;
+
 -- ── COURTS / GROUNDS (a venue has many) ──────────────────────────
 create table if not exists public.courts (
   id           uuid primary key default gen_random_uuid(),
