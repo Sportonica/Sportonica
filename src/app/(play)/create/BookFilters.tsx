@@ -62,6 +62,15 @@ function Stepper({
   );
 }
 
+function Group({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="bf-g">
+      <p className="bf-gt">{icon}{title}</p>
+      <div className="bf-go">{children}</div>
+    </div>
+  );
+}
+
 /**
  * Booking a court is a different question from finding a game — no skill
  * level, no "still open", just what sport, what kind of ground, and what
@@ -105,15 +114,6 @@ export default function BookFilters({
     if (next < TIME_MIN) onChange({ ...value, time: null });
     else if (next > TIME_MAX) return;
     else onChange({ ...value, time: next });
-  }
-
-  function Group({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-    return (
-      <div className="bf-g">
-        <p className="bf-gt">{icon}{title}</p>
-        <div className="bf-go">{children}</div>
-      </div>
-    );
   }
 
   const chips = [

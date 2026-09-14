@@ -23,6 +23,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Capacitor native shells — generated scaffolding + build output, not
+    // part of the web app's lint surface.
+    "android/**",
+    "ios/**",
   ]),
 ]);
 

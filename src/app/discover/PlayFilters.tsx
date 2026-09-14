@@ -12,6 +12,15 @@ import {
 import { TIME_MIN, TIME_MAX, TIME_STEP, timeLabel } from "@/lib/timeOfDay";
 import LocationPicker from "@/components/shared/LocationPicker";
 
+function Group({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
+  return (
+    <div className="pf-g">
+      <p className="pf-gt">{icon}{title}</p>
+      <div className="pf-go">{children}</div>
+    </div>
+  );
+}
+
 /**
  * Finding a game is a different question from booking a court, so this
  * asks about the game and the people: what format, what level, when,
@@ -74,15 +83,6 @@ export default function PlayFilters({
     value.dist   && { k: "dist",   label: DISTANCES.find((d) => d.key === value.dist)?.label ?? "", on: () => set("dist", null) },
     value.openOnly && { k: "open", label: "Has spots", on: () => onChange({ ...value, openOnly: false }) },
   ].filter(Boolean) as { k: string; label: string; on: () => void }[];
-
-  function Group({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-    return (
-      <div className="pf-g">
-        <p className="pf-gt">{icon}{title}</p>
-        <div className="pf-go">{children}</div>
-      </div>
-    );
-  }
 
   return (
     <div className="pf" ref={boxRef}>

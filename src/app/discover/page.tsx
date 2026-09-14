@@ -94,12 +94,6 @@ function DiscoverInner() {
   );
 
   // ── Apply the filter bar to the fetched events ──────────────────
-  const KTM = "Asia/Kathmandu";
-  const dayKey = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: KTM });
-  const todayKey = dayKey(new Date());
-  const tomorrowKey = dayKey(new Date(Date.now() + 86400000));
-  const weekAhead = Date.now() + 7 * 86400000;
-
   const filtered = events.filter((ev) => {
     // The day slider is the only date control on this page.
     const evDay = new Date(ev.event_date).toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" });
