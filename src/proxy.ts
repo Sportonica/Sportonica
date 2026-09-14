@@ -7,7 +7,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // checks auth itself where it matters. Skipping getUser() for public
 // navigations removes a network round-trip from the critical path of
 // almost every page load.
-const AUTH_PREFIXES = ['/profile', '/admin', '/welcome', '/platform']
+const AUTH_PREFIXES = ['/profile', '/admin', '/welcome', '/platform', '/my-games']
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
@@ -42,7 +42,7 @@ export async function proxy(request: NextRequest) {
   // instead of reaching a page with nothing to show for that user.
   const isRealUser = !!user && !user.is_anonymous
 
-  if (!isRealUser && (path.startsWith('/profile') || path.startsWith('/welcome'))) {
+  if (!isRealUser && (path.startsWith('/profile') || path.startsWith('/welcome') || path.startsWith('/my-games'))) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', path)
     return NextResponse.redirect(loginUrl)
