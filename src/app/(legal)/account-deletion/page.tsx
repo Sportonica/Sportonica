@@ -252,6 +252,8 @@ export default function AccountDeletionPage() {
         <div className="adp-foot">
           <Link href="/privacy">Privacy Policy</Link>
           <span className="adp-sep" aria-hidden />
+          <Link href="/terms">Terms of Service</Link>
+          <span className="adp-sep" aria-hidden />
           <a href="mailto:info@sportonica.com">info@sportonica.com</a>
           <span className="adp-sep" aria-hidden />
           <Link href="/">Back to Sportonica</Link>

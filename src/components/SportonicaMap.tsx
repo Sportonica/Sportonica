@@ -156,8 +156,8 @@ export default function SportonicaMap({
     return () => {
       mapRef.current?.remove();
       mapRef.current = null;
-      if (containerRef.current) {
-        (containerRef.current as HTMLElement & { _leafletClaimed?: boolean })._leafletClaimed = false;
+      if (el) {
+        (el as HTMLElement & { _leafletClaimed?: boolean })._leafletClaimed = false;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
