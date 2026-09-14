@@ -192,9 +192,16 @@ export async function listVendorTournamentBookings(): Promise<
 > {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+
+  const { data: venues, error: venuesError } = await sb.from("venues").select("id").eq("owner_id", user.id);
+  if (venuesError) return actionError(venuesError.message);
+  const venueIds = (venues ?? []).map((v) => v.id);
+  if (venueIds.length === 0) return [];
+
   const { data, error } = await sb
     .from("tournaments")
     .select("id, name, status, venue_booking_status, starts_at, venues(name)")
+    .in("venue_id", venueIds)
     .order("starts_at", { ascending: true });
   if (error) return actionError(error.message);
   return ((data ?? []) as unknown as { id: string; name: string; status: string; venue_booking_status: string; starts_at: string; venues: { name: string } | null }[])
