@@ -10,7 +10,7 @@ import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeEmail, isValidEmail, looksLikeEmail } from "@/lib/validation/identity";
 
-const SUPPORT = "support@sportonica.com";
+const SUPPORT = "info@sportonica.com";
 // Phone-only accounts have a synthetic @phone.sportonica.com address with
 // no real inbox — an email reset link can never reach them.
 const PHONE_HELP =

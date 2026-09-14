@@ -80,7 +80,7 @@ export default function PrivacyPolicyPage() {
           <Section title="Contact">
             <p>
               Questions about this policy or your data — reach us at{" "}
-              <a href="mailto:support@sportonica.com" style={{ color: "var(--sodium)" }}>support@sportonica.com</a>.
+              <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)" }}>info@sportonica.com</a>.
             </p>
           </Section>
 

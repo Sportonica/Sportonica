@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { safeActionError, type ActionError } from "@/lib/actionError";
 
-const SUPPORT_EMAIL = "support@sportonica.com";
+const SUPPORT_EMAIL = "info@sportonica.com";
 
 // Machine codes the UI switches on. Never leak raw Postgres/GoTrue text.
 export type DeleteAccountResult =
