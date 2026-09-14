@@ -117,7 +117,7 @@ export function bookingLabel(bookingType: BookingType, bookingId: string): strin
 // send. It opens the admin's own WhatsApp with the message pre-filled;
 // they still tap Send. Swap for a real provider call later without
 // touching any call site — everything here just builds a URL.
-const ADMIN_WHATSAPP_NUMBER = "9779805672621"; // +977 (Nepal) 9805672621
+const ADMIN_WHATSAPP_NUMBER = "9779714593865"; // +977 (Nepal) 9714593865
 
 export function whatsappNotifyUrl(message: string): string {
   return `https://api.whatsapp.com/send?phone=${ADMIN_WHATSAPP_NUMBER}&text=${encodeURIComponent(message)}`;
