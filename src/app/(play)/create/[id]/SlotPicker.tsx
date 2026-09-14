@@ -19,9 +19,9 @@ const cache = new Map<string, { data: Slot[]; at: number }>();
 
 // availability.ts computes "past" once, at fetch time — fine for a slot
 // that's already past when the list loads, but a slot that was still
-// >=30min out at fetch time silently drifts into "too soon to book" the
-// longer the page sits open (no refetch just because time passes). Redo
-// the same check live, client-side, on every render.
+// in the future at fetch time silently drifts into "past" the longer the
+// page sits open (no refetch just because time passes). Redo the same
+// check live, client-side, on every render.
 const KTM_TZ = "Asia/Kathmandu";
 function nowKtmMins(): number {
   const t = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: KTM_TZ });
@@ -58,15 +58,15 @@ export default function SlotPicker({
   // someone else books or cancels a slot on this court.
   const [refreshTick, setRefreshTick] = useState(0);
 
-  // Ticks every 30s so a slot that drifts within the 30-min lead-time
-  // window while this screen is just sitting open disappears on its own,
+  // Ticks every 30s so a slot that drifts into the past while this screen
+  // is just sitting open turns from clickable to disabled on its own,
   // instead of staying clickable until something else forces a re-render.
   const [nowMins, setNowMins] = useState(nowKtmMins);
   useEffect(() => {
     const id = setInterval(() => setNowMins(nowKtmMins()), 30_000);
     return () => clearInterval(id);
   }, []);
-  const isPastLive = (mins: number) => dateStr === todayKtmStr() && mins <= nowMins + 30;
+  const isPastLive = (mins: number) => dateStr === todayKtmStr() && mins <= nowMins;
 
   // If the already-picked time drifts into the past while this screen
   // just sits open, drop the selection instead of leaving a now-invalid
@@ -153,24 +153,25 @@ export default function SlotPicker({
     [slots, nowMins, dateStr]
   );
 
-  // Counts per band. Booked slots are now shown (as red "BOOKED" boxes,
-  // per the booking-UI spec) rather than hidden, so a band gets a tab if
-  // it has anything free *or* anything booked — but the tab label still
-  // reports only what's actually free. Past slots stay hidden.
+  // Counts per band. Booked and past slots are both shown (as red "BOOKED"
+  // and grey "PAST" boxes, respectively) rather than hidden, so a band gets
+  // a tab if it has anything free, booked, *or* past — but the tab label
+  // still reports only what's actually free.
   const counts = useMemo(() => {
-    const out: Record<string, { free: number; booked: number }> = {};
+    const out: Record<string, { free: number; booked: number; past: number }> = {};
     for (const b of BANDS) {
       const inBand = liveSlots.filter((s) => s.mins >= b.from && s.mins < b.to);
       out[b.key] = {
         free: inBand.filter((s) => s.available).length,
         booked: inBand.filter((s) => s.reason === "booked").length,
+        past: inBand.filter((s) => s.reason === "past").length,
       };
     }
     return out;
   }, [liveSlots]);
 
   const bandHasSomething = (k: string) =>
-    (counts[k]?.free ?? 0) > 0 || (counts[k]?.booked ?? 0) > 0;
+    (counts[k]?.free ?? 0) > 0 || (counts[k]?.booked ?? 0) > 0 || (counts[k]?.past ?? 0) > 0;
 
   // Open the first band that has something free; failing that, the first
   // band that has anything to show at all.
@@ -193,9 +194,9 @@ export default function SlotPicker({
 
   const free = liveSlots.filter((s) => s.available);
   const bookedSlots = liveSlots.filter((s) => s.reason === "booked");
-  // Only bail out entirely when there is genuinely nothing to render —
-  // no free slots *and* no booked ones (e.g. every slot is in the past).
-  if (free.length === 0 && bookedSlots.length === 0) {
+  const pastSlots = liveSlots.filter((s) => s.reason === "past");
+  // Only bail out entirely when there is genuinely nothing to render at all.
+  if (free.length === 0 && bookedSlots.length === 0 && pastSlots.length === 0) {
     return (
       <div className="sp-msg">
         <CalendarX size={18} style={{ opacity: .6 }} />
@@ -206,13 +207,11 @@ export default function SlotPicker({
 
   const activeBand = BANDS.find((b) => b.key === band) ?? BANDS[2];
   // Available slots stay clickable; booked slots are shown too (rendered
-  // as red "BOOKED" boxes below) so nothing silently disappears. Past
-  // times are still dropped — this timetable never shows a time gone by.
+  // as red "BOOKED" boxes below); past slots (times already gone by, in
+  // real Nepal time) are shown as greyed-out "PAST" boxes. Nothing is
+  // hidden from this timetable.
   const shown = liveSlots.filter(
-    (s) =>
-      s.mins >= activeBand.from &&
-      s.mins < activeBand.to &&
-      (s.available || s.reason === "booked"),
+    (s) => s.mins >= activeBand.from && s.mins < activeBand.to,
   );
 
   return (
@@ -221,7 +220,7 @@ export default function SlotPicker({
       <div className="sp-tabs">
         {BANDS.map((b) => {
           const c = counts[b.key];
-          if (!c || (c.free === 0 && c.booked === 0)) return null;
+          if (!c || (c.free === 0 && c.booked === 0 && c.past === 0)) return null;
           return (
             <button key={b.key} className={`sp-tab ${band === b.key ? "on" : ""}`} onClick={() => setBand(b.key)}>
               <span className="t">{b.label}</span>
@@ -248,6 +247,20 @@ export default function SlotPicker({
               </button>
             );
           }
+          if (s.reason === "past") {
+            return (
+              <button
+                key={s.mins}
+                type="button"
+                className="sp-slot past"
+                disabled
+                aria-disabled="true"
+                title={`${s.label} — already passed`}
+              >
+                {s.label}
+              </button>
+            );
+          }
           const picked = value === s.mins;
           return (
             <button
@@ -266,6 +279,7 @@ export default function SlotPicker({
         <span><i className="sw free" /> Free</span>
         <span><i className="sw picked" /> Your pick</span>
         {bookedSlots.length > 0 && <span><i className="sw booked" /> Booked</span>}
+        {pastSlots.length > 0 && <span><i className="sw past" /> Past</span>}
         <span className="sp-count">{free.length} free today</span>
       </div>
 
@@ -310,6 +324,18 @@ export default function SlotPicker({
           letter-spacing: .1em; opacity: .9;
         }
 
+        /* Past — time already gone by (real Nepal time). Shown, not
+           hidden, so the timetable reads as the whole day — just muted
+           and not clickable. */
+        .sp-slot.past {
+          cursor: not-allowed;
+          background: rgba(0,0,0,.03);
+          border-color: var(--line);
+          color: inherit;
+          opacity: .4;
+        }
+        .sp-slot.past:disabled { opacity: .4; }
+
         /* Your pick — solid, lifted and ringed so it can't be missed. */
         .sp-slot.picked {
           background: #006241; border-color: #006241; color: #ffffff;
@@ -327,6 +353,7 @@ export default function SlotPicker({
         .sp-legend .sw.free   { border: 1px solid var(--line); }
         .sp-legend .sw.picked { background: #006241; }
         .sp-legend .sw.booked { background: rgba(220,38,38,.12); border: 1px solid rgba(220,38,38,.55); }
+        .sp-legend .sw.past { background: rgba(0,0,0,.03); border: 1px solid var(--line); opacity: .6; }
         .sp-count { margin-left: auto; font-family: 'Inter', sans-serif; font-size: 11px; opacity: .55; }
 
         .sp-msg { display: flex; align-items: center; gap: 9px; font-size: 13.5px; opacity: .65; padding: 18px 0; }

@@ -94,7 +94,7 @@ export default function PendingPaymentsTable({ initialPayments }: { initialPayme
               )}
               target="_blank" rel="noopener noreferrer"
             >
-              <MessageCircle size={13} /> Notify via WhatsApp
+              <MessageCircle size={13} /> Faster check? Send to WhatsApp
             </a>
           )}
         </div>
@@ -106,7 +106,19 @@ export default function PendingPaymentsTable({ initialPayments }: { initialPayme
         pageSize={10}
         empty="No payments awaiting verification."
         actions={(p) => (
-          <button className="dt-btn ok" onClick={() => setReviewing(p)}>Review</button>
+          <>
+            <a
+              className="dt-btn"
+              href={whatsappNotifyUrl(
+                `Payment to verify — ${p.booking_label} · ${p.customer_name} · Rs ${Math.round(p.expected_amount)} via ${p.payment_method} · txn ${p.transaction_id}`
+              )}
+              target="_blank" rel="noopener noreferrer"
+              title="For a faster check, send this payment to WhatsApp"
+            >
+              <MessageCircle size={13} /> WhatsApp
+            </a>
+            <button className="dt-btn ok" onClick={() => setReviewing(p)}>Review</button>
+          </>
         )}
       />
 

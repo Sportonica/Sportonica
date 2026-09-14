@@ -203,7 +203,7 @@ export default function AccountDeletionPage() {
               <p>
                 You&apos;ll be asked to transfer or close the venue first, so existing bookings and
                 staff access aren&apos;t disrupted. Email{" "}
-                <a className="adp-inline" href="mailto:support@sportonica.com">support@sportonica.com</a>{" "}
+                <a className="adp-inline" href="mailto:info@sportonica.com">info@sportonica.com</a>{" "}
                 and we&apos;ll help with the handover.
               </p>
             </div>
@@ -227,7 +227,7 @@ export default function AccountDeletionPage() {
                 No. The whole flow runs on your own login. Support is only needed if your account owns
                 a venue, or in the rare case the automatic deletion can&apos;t finish — the app will
                 tell you and point you to{" "}
-                <a className="adp-inline" href="mailto:support@sportonica.com">support@sportonica.com</a>.
+                <a className="adp-inline" href="mailto:info@sportonica.com">info@sportonica.com</a>.
               </p>
             </details>
             <details>
@@ -254,7 +254,7 @@ export default function AccountDeletionPage() {
           <span className="adp-sep" aria-hidden />
           <Link href="/terms">Terms of Service</Link>
           <span className="adp-sep" aria-hidden />
-          <a href="mailto:support@sportonica.com">support@sportonica.com</a>
+          <a href="mailto:info@sportonica.com">info@sportonica.com</a>
           <span className="adp-sep" aria-hidden />
           <Link href="/">Back to Sportonica</Link>
         </div>

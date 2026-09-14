@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Plus, Trash2, X, Users, UserPlus, Pencil, Download } from "lucide-react";
 import {
-  openTournamentRegistration, closeTournamentRegistration, cancelTournament, approveTournament, completeTournament,
+  openTournamentRegistration, closeTournamentRegistration, reopenTournamentRegistration, cancelTournament, approveTournament, completeTournament,
   startSingleEvent, createWalkinTeam, markWalkinTeamPaid,
   getTeamRoster, searchPlayersForTeam, addTeamPlayer, removeTeamPlayerAdmin,
   addWalkinTeamPlayer, updateTeamPlayerGuest, updateTeamManager, updateTeamName, setTeamPlayerJerseyNumber, setTeamPlayerPosition,
@@ -17,11 +17,13 @@ import {
   type Tournament, type TournamentTeam, type TournamentMatch, type TournamentAnnouncement, type WalkinMember,
   type TournamentManager, type TournamentTeamPlayer,
 } from "@/lib/tournaments/types";
+import { getSportKind } from "@/lib/sports";
 import type { Payment } from "@/lib/payments/types";
 import TournamentForm from "./TournamentForm";
 import FixturesTab from "./FixturesTab";
 import BracketView from "./BracketView";
 import StandingsTab from "./StandingsTab";
+import RaceResultsTab from "./RaceResultsTab";
 import AnnouncementsTab from "./AnnouncementsTab";
 import TournamentAccessTab from "./TournamentAccessTab";
 import ReviewPaymentModal from "@/app/platform/payments/ReviewPaymentModal";
@@ -42,10 +44,13 @@ type TeamRow = TournamentTeam & { roster_count: number };
 type PaymentRow = { team_id: string; team_name: string; status: string; payment_method: string | null; expected_amount: number; submitted_at: string | null };
 type ReviewPaymentRow = Payment & { customer_name: string; booking_label: string };
 
-const TABS = ["Overview", "Registrations", "Payments", "Settings", "Fixtures", "Bracket", "Standings", "Announcements", "Access"] as const;
+const TABS = ["Overview", "Registrations", "Payments", "Settings", "Fixtures", "Bracket", "Standings", "Results", "Announcements", "Access"] as const;
 // A single_event tournament is captain-only, no bracket — those three tabs
 // don't apply and are dropped rather than shown locked.
 const NOT_FOR_SINGLE_EVENT = new Set<(typeof TABS)[number]>(["Fixtures", "Bracket", "Standings"]);
+// Results (race finish times) only makes sense for Running-shaped
+// tournaments; Fixtures/Bracket/Standings only for everything else.
+const ONLY_FOR_INDIVIDUAL_RACE = new Set<(typeof TABS)[number]>(["Results"]);
 export default function TournamentControlCenter({
   tournament, venueName, teams, payments, matches, announcements, viewer, backHref, reviewPayments, teamFines, managers,
 }: {
@@ -83,7 +88,9 @@ export default function TournamentControlCenter({
   const confirmedTeams = teams.filter((t) => t.status === "confirmed").length;
   const finesByTeam = new Map((teamFines ?? []).map((f) => [f.team_id, f.total_fine]));
   const trackingFines = tournament.yellow_card_fine > 0 || tournament.red_card_fine > 0;
+  const isIndividualRace = getSportKind(tournament.sport) === "individual_race";
   const visibleTabs = (tournament.format === "single_event" ? TABS.filter((t) => !NOT_FOR_SINGLE_EVENT.has(t)) : TABS)
+    .filter((t) => isIndividualRace || !ONLY_FOR_INDIVIDUAL_RACE.has(t))
     .filter((t) => t !== "Access" || viewer === "super_admin");
 
   // Every state-changing button passes its own confirmation text, in the
@@ -162,6 +169,9 @@ export default function TournamentControlCenter({
             )}
             {tournament.status === "registration_open" && (
               <button className="tc-btn" disabled={pending} onClick={() => run(() => closeTournamentRegistration(tournament.id), "Registration is closed.")}>Close registration</button>
+            )}
+            {tournament.status === "registration_closed" && (
+              <button className="tc-btn" disabled={pending} onClick={() => run(() => reopenTournamentRegistration(tournament.id), "Registration is open again.")}>Reopen registration</button>
             )}
             {tournament.format === "single_event" && tournament.status === "registration_closed" && (
               <button className="tc-btn primary" disabled={pending} onClick={() => run(() => startSingleEvent(tournament.id), "The event has started.")}>Start event</button>
@@ -466,12 +476,16 @@ export default function TournamentControlCenter({
       {tab === "Bracket" && (
         <div className="tc-card">
           <div className="tc-card-t">Bracket</div>
-          <BracketView matches={matches} teamName={(id) => teams.find((t) => t.id === id)?.name ?? "Unknown"} />
+          <BracketView matches={matches} teams={teams} />
         </div>
       )}
 
       {tab === "Standings" && (
         <StandingsTab tournament={tournament} teams={teams} />
+      )}
+
+      {tab === "Results" && (
+        <RaceResultsTab tournament={tournament} teams={teams.filter((t) => t.status === "confirmed")} />
       )}
 
       {tab === "Announcements" && (
