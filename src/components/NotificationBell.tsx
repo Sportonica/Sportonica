@@ -7,8 +7,8 @@ import { useNotifications } from "@/lib/hooks/useNotifications";
 import { notificationHref } from "@/lib/notifications/routing";
 import { NotificationIcon, notificationTimeAgo } from "./notifications/NotificationIcon";
 
-// The dropdown is a quick peek — the full history, filters and dismiss
-// live on /notifications.
+// The dropdown is a quick peek — "See all" goes to the notifications
+// settings placeholder until the full history page ships.
 const PEEK = 6;
 
 export default function NotificationBell({ inline = false }: { inline?: boolean }) {
@@ -166,7 +166,7 @@ export default function NotificationBell({ inline = false }: { inline?: boolean 
                 ))}
                 <button
                   className="notif-seeall"
-                  onClick={() => { router.push("/notifications"); setOpen(false); }}
+                  onClick={() => { router.push("/profile/coming-soon?section=notifications"); setOpen(false); }}
                 >
                   See all notifications <ArrowRight size={13} />
                 </button>
