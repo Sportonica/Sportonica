@@ -7,9 +7,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 // checks auth itself where it matters. Skipping getUser() for public
 // navigations removes a network round-trip from the critical path of
 // almost every page load.
-const AUTH_PREFIXES = ['/profile', '/admin', '/welcome']
+const AUTH_PREFIXES = ['/profile', '/admin', '/welcome', '/platform']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
   if (!AUTH_PREFIXES.some((p) => path === p || path.startsWith(p + '/'))) {
     return NextResponse.next({ request })
@@ -66,6 +66,28 @@ export async function middleware(request: NextRequest) {
     // console too. Without this it gets bounced to the homepage.
     if (role !== 'admin' && role !== 'venue_owner' && role !== 'super_admin') {
       return NextResponse.redirect(new URL('/', request.url))
+    }
+  }
+
+  // Platform gate — same shape as the admin gate above. This used to be
+  // enforced only by a redirect() inside platform/layout.tsx, but that
+  // let the child page's own data-fetch race ahead and render its
+  // "couldn't load" fallback (and Next's not-found boundary) with a 200
+  // instead of ever actually redirecting — no logged-out or wrong-role
+  // visitor was reliably bounced to /login. Doing it here, before any
+  // page code runs, is the same mechanism that already works for /admin.
+  if (path.startsWith('/platform')) {
+    if (!user) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', path)
+      return NextResponse.redirect(loginUrl)
+    }
+    const { data: profile } = await supabase
+      .from('profiles').select('role').eq('id', user.id).maybeSingle()
+    if (profile?.role !== 'super_admin') {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('redirect', path)
+      return NextResponse.redirect(loginUrl)
     }
   }
 
