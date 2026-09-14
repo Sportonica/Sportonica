@@ -64,20 +64,18 @@ export default function ReviewPaymentModal({
       <div className="rpm-card" onClick={(e) => e.stopPropagation()}>
         <div className="rpm-head">
           <h3>Review payment</h3>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <a
-              className="rpm-wa"
-              href={whatsappNotifyUrl(
-                `Payment to verify — ${payment.booking_label} · ${payment.customer_name} · Rs ${Math.round(payment.expected_amount)} via ${payment.payment_method} · txn ${payment.transaction_id}`
-              )}
-              target="_blank" rel="noopener noreferrer"
-              title="Notify via WhatsApp"
-            >
-              <MessageCircle size={16} />
-            </a>
-            <button className="rpm-x" onClick={onClose}><X size={18} /></button>
-          </div>
+          <button className="rpm-x" onClick={onClose}><X size={18} /></button>
         </div>
+
+        <a
+          className="rpm-wa-tip"
+          href={whatsappNotifyUrl(
+            `Payment to verify — ${payment.booking_label} · ${payment.customer_name} · Rs ${Math.round(payment.expected_amount)} via ${payment.payment_method} · txn ${payment.transaction_id}`
+          )}
+          target="_blank" rel="noopener noreferrer"
+        >
+          <MessageCircle size={14} /> For a faster check, send this to WhatsApp
+        </a>
 
         <div className="rpm-sec-t">Booking Information</div>
         <Row label="Booking ID" value={payment.booking_label} />
@@ -154,8 +152,12 @@ export default function ReviewPaymentModal({
         .rpm-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
         .rpm-head h3 { font-family: 'Inter', sans-serif; font-size: 19px; font-weight: 800; margin: 0; }
         .rpm-x { background: none; border: none; color: inherit; opacity: .6; cursor: pointer; }
-        .rpm-wa { display: inline-flex; color: #2E7D5B; opacity: .8; }
-        .rpm-wa:hover { opacity: 1; }
+        .rpm-wa-tip {
+          display: flex; align-items: center; gap: 8px; margin-top: 10px;
+          background: rgba(46,125,91,0.1); border: 1px solid rgba(46,125,91,0.35); color: #2E7D5B;
+          border-radius: 10px; padding: 9px 12px; font-size: 12.5px; font-weight: 700; text-decoration: none;
+        }
+        .rpm-wa-tip:hover { background: rgba(46,125,91,0.18); }
         .rpm-sec-t { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
           opacity: .5; margin: 16px 0 6px; }
         .rpm-shot { margin-top: 14px; border-radius: 12px; overflow: hidden; background: #000;
