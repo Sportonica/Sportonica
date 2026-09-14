@@ -170,8 +170,8 @@ export default function ProfileHub({
         <div className="pf-hub-list">
           <Row href="/profile/coming-soon?section=help" icon={<LifeBuoy size={16} />} label="Help &amp; Support" />
           <Row href="/privacy" icon={<ShieldQuestion size={16} />} label="Privacy Policy" />
+          <Row href="/terms" icon={<ScrollText size={16} />} label="Terms of Service" />
           <Row href="/account-deletion" icon={<Trash2 size={16} />} label="Account Deletion" />
-          <Row href="/profile/coming-soon?section=legal" icon={<ScrollText size={16} />} label="Legal" />
         </div>
       </section>
 

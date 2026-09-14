@@ -19,10 +19,6 @@ const SECTIONS: Record<string, { title: string; body: string }> = {
     title: "Help & Support",
     body: "A dedicated help centre is on the way. For now, reach out to the Sportonica team directly if you run into an issue.",
   },
-  legal: {
-    title: "Legal",
-    body: "Terms of service, privacy policy, and cancellation/refund policy pages are on the way.",
-  },
 };
 
 export default async function ComingSoonPage({
