@@ -7,8 +7,10 @@ import { useNotifications } from "@/lib/hooks/useNotifications";
 import { notificationHref } from "@/lib/notifications/routing";
 import { NotificationIcon, notificationTimeAgo } from "./notifications/NotificationIcon";
 
-// The dropdown is a quick peek — "See all" goes to the notifications
-// settings placeholder until the full history page ships.
+// The dropdown is a quick peek — the full history, filters and dismiss
+// live at /profile/coming-soon?section=notifications (the real feed,
+// served under the profile route since it broke as its own top-level
+// page — see src/app/(play)/notifications/page.tsx).
 const PEEK = 6;
 
 export default function NotificationBell({ inline = false }: { inline?: boolean }) {
