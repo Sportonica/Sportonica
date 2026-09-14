@@ -39,11 +39,15 @@ export default function ContactPage() {
           <h1 style={{ fontSize: 28, marginBottom: 6 }}>Contact us</h1>
           <p className="hint" style={{ marginBottom: 28 }}>
             Questions, feedback, or something not working right? Send us a note and we&apos;ll get
-            back to you — you can also email{" "}
-            <a href="mailto:support@sportonica.com" style={{ color: "var(--sodium)" }}>
-              support@sportonica.com
+            back to you — you can also reach us directly at{" "}
+            <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)" }}>
+              info@sportonica.com
             </a>{" "}
-            directly.
+            or{" "}
+            <a href="tel:+9779714593865" style={{ color: "var(--sodium)" }}>
+              +977 971-459-3865
+            </a>
+            .
           </p>
 
           {sent ? (

@@ -27,7 +27,7 @@ export async function submitContactForm(
   }
 
   await sendMail({
-    to: "support@sportonica.com",
+    to: "info@sportonica.com",
     subject: `[Contact form] ${subject || "New message"} — ${name}`,
     body: `From: ${name} <${email}>\n\n${message}`,
   });
