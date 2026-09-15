@@ -14,7 +14,7 @@ const ICON = { size: 22, strokeWidth: 2.15, absoluteStrokeWidth: true } as const
 
 const LINKS: Item[] = [
   { label: "Home", href: "/", icon: <Home {...ICON} /> },
-  { label: "Play", href: "/discover", icon: <Volleyball {...ICON} /> },
+  { label: "Join", href: "/discover", icon: <Volleyball {...ICON} /> },
   { label: "Book", href: "/create", icon: <CalendarPlus {...ICON} /> },
   { label: "Events", href: "/tournaments", icon: <Trophy {...ICON} /> },
   { label: "Chat", href: "/messages", icon: <MessagesSquare {...ICON} /> },
