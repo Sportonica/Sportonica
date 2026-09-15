@@ -28,7 +28,6 @@ export default function GoogleButton({
 
   async function signIn() {
     const safeNext = safeRedirect(next);
-    console.log("[GoogleButton] clicked — starting OAuth", { next: safeNext });
     setPending(true); setErr(null);
     // The ?next= query param on redirectTo isn't reliably preserved
     // through the full Google → Supabase → app round trip (it's landed
@@ -46,7 +45,6 @@ export default function GoogleButton({
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
       },
     });
-    console.log("[GoogleButton] supabase replied", { data, error });
     if (error) { setErr(error.message); setPending(false); return; }
     if (!data?.url) return;
     // Google blocks OAuth entirely inside an embedded/wrapped WebView

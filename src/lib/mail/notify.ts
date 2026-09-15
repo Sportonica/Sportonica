@@ -47,6 +47,48 @@ async function nameFor(userId: string | null | undefined): Promise<string> {
   return data?.full_name ?? data?.name ?? "Player";
 }
 
+// Writes go through emit_notification() (SECURITY DEFINER) instead of a
+// direct table insert — it checks that both the caller and the recipient
+// have real standing on the referenced game/event/tournament before the
+// row is written (see db/emit_notification.sql). This replaced a blanket
+// `with check (true)` insert policy that let any signed-in user write a
+// notification for any other user, claiming anything.
+//
+// A rejected or failed write never breaks the action that triggered it —
+// the booking/payment/join it describes already succeeded, and a
+// notification is best-effort. It's logged instead of thrown, matching
+// every existing call site here (none of them wrap notify*() in
+// try/catch further up the stack).
+type NotificationInput = {
+  userId: string;
+  kind: string;
+  title: string;
+  body?: string | null;
+  eventId?: string | null;
+  actorId?: string | null;
+  gameId?: string | null;
+  tournamentId?: string | null;
+};
+
+async function writeNotification(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  input: NotificationInput
+) {
+  const { error } = await sb.rpc("emit_notification", {
+    p_user_id: input.userId,
+    p_kind: input.kind,
+    p_title: input.title,
+    p_body: input.body ?? null,
+    p_event_id: input.eventId ?? null,
+    p_actor_id: input.actorId ?? null,
+    p_game_id: input.gameId ?? null,
+    p_tournament_id: input.tournamentId ?? null,
+  });
+  if (error) {
+    console.error("[notify] emit_notification failed", { kind: input.kind, error: error.message });
+  }
+}
+
 // ── A court was booked ──────────────────────────────────────────
 export async function notifyCourtBooked(input: {
   playerId: string | null;
@@ -215,12 +257,12 @@ export async function notifyPlayTogetherGamePublishedIfAny(courtBookingId: strin
     }));
   }
 
-  await sb.from("notifications").insert({
-    user_id: game.host_id,
+  await writeNotification(sb, {
+    userId: game.host_id,
     kind: "game_published",
     title: "Your venue is confirmed",
     body: `Your ${game.sport} game is now live on Play Together.`,
-    game_id: game.id,
+    gameId: game.id,
   });
 }
 
@@ -243,13 +285,13 @@ export async function notifyPlayTogetherJoinRequested(input: { requesterId: stri
   }
 
   const sb = await createClient();
-  await sb.from("notifications").insert({
-    user_id: game.host_id,
+  await writeNotification(sb, {
+    userId: game.host_id,
     kind: "game_join_requested",
     title: "New join request",
     body: `${requesterName} wants to join your ${game.sport} game.`,
-    game_id: game.id,
-    actor_id: input.requesterId,
+    gameId: game.id,
+    actorId: input.requesterId,
   });
 }
 
@@ -279,12 +321,12 @@ export async function notifyPlayTogetherPaymentRequired(input: { playerId: strin
     }));
   }
 
-  await sb.from("notifications").insert({
-    user_id: input.playerId,
+  await writeNotification(sb, {
+    userId: input.playerId,
     kind: "game_payment_required",
     title: "Payment required",
     body: `Complete your Rs ${Math.round(Number(row.contribution_amount) || 0)} payment within 2 hours to secure your spot in the ${game.sport} game.`,
-    game_id: game.id,
+    gameId: game.id,
   });
 }
 
@@ -314,17 +356,17 @@ export async function notifyPlayTogetherPaymentSubmitted(input: { gamePlayerId: 
     }));
   }
 
-  await sb.from("notifications").insert([
-    {
-      user_id: game.host_id, kind: "game_host_payment_submitted", title: "Payment verification required",
+  await Promise.all([
+    writeNotification(sb, {
+      userId: game.host_id, kind: "game_host_payment_submitted", title: "Payment verification required",
       body: `${playerName} submitted payment proof for your ${game.sport} game — review it.`,
-      game_id: game.id, actor_id: row.user_id,
-    },
-    {
-      user_id: row.user_id, kind: "game_payment_submitted", title: "Payment submitted",
+      gameId: game.id, actorId: row.user_id,
+    }),
+    writeNotification(sb, {
+      userId: row.user_id, kind: "game_payment_submitted", title: "Payment submitted",
       body: `Your payment proof for the ${game.sport} game was submitted. Waiting on the host to verify it.`,
-      game_id: game.id,
-    },
+      gameId: game.id,
+    }),
   ]);
 }
 
@@ -357,17 +399,17 @@ export async function notifyPlayTogetherCashSelected(input: { gamePlayerId: stri
     }));
   }
 
-  await sb.from("notifications").insert([
-    {
-      user_id: game.host_id, kind: "game_payment_cash_selected", title: "Player will pay in cash",
+  await Promise.all([
+    writeNotification(sb, {
+      userId: game.host_id, kind: "game_payment_cash_selected", title: "Player will pay in cash",
       body: `${playerName} chose to pay Rs ${Math.round(amount)} in cash at the venue for your ${game.sport} game. They're confirmed — mark it collected once they've paid.`,
-      game_id: game.id, actor_id: row.user_id,
-    },
-    {
-      user_id: row.user_id, kind: "game_joined", title: "You're in!",
+      gameId: game.id, actorId: row.user_id,
+    }),
+    writeNotification(sb, {
+      userId: row.user_id, kind: "game_joined", title: "You're in!",
       body: `You're confirmed for the ${game.sport} game. Bring Rs ${Math.round(amount)} in cash to pay the host at the venue.`,
-      game_id: game.id,
-    },
+      gameId: game.id,
+    }),
   ]);
 }
 
@@ -395,14 +437,14 @@ export async function notifyPlayTogetherPaymentRejected(input: { playerId: strin
     }));
   }
 
-  await sb.from("notifications").insert({
-    user_id: input.playerId,
+  await writeNotification(sb, {
+    userId: input.playerId,
     kind: "game_payment_rejected",
     title: "Payment couldn't be verified",
     body: reasonLabel
       ? `Your payment for the ${game.sport} game couldn't be verified: ${reasonLabel}.`
       : `Your payment for the ${game.sport} game couldn't be verified by the host.`,
-    game_id: game.id,
+    gameId: game.id,
   });
 }
 
@@ -429,12 +471,12 @@ export async function notifyPlayTogetherJoined(input: { playerId: string; gameId
   }
 
   const sb = await createClient();
-  await sb.from("notifications").insert({
-    user_id: input.playerId,
+  await writeNotification(sb, {
+    userId: input.playerId,
     kind: "game_joined",
     title: "You're in!",
     body: `The host approved your request to join their ${game.sport} game.`,
-    game_id: game.id,
+    gameId: game.id,
   });
 }
 
@@ -452,12 +494,12 @@ export async function notifyPlayTogetherJoinRejected(input: { playerId: string; 
   }
 
   const sb = await createClient();
-  await sb.from("notifications").insert({
-    user_id: input.playerId,
+  await writeNotification(sb, {
+    userId: input.playerId,
     kind: "game_join_rejected",
     title: "Request not approved",
     body: `The host didn't approve your request to join their ${game.sport} game.`,
-    game_id: game.id,
+    gameId: game.id,
   });
 }
 
@@ -479,13 +521,13 @@ export async function notifyPlayTogetherLeft(input: { leaverId: string; gameId: 
   }
 
   const sb = await createClient();
-  await sb.from("notifications").insert({
-    user_id: game.host_id,
+  await writeNotification(sb, {
+    userId: game.host_id,
     kind: "game_left",
     title: "Player left",
     body: `${leaverName} left your ${game.sport} game.`,
-    game_id: game.id,
-    actor_id: input.leaverId,
+    gameId: game.id,
+    actorId: input.leaverId,
   });
 }
 
@@ -518,15 +560,13 @@ export async function notifyPlayTogetherCancelled(input: { hostId: string; gameI
     }));
   if (mails.length) await sendMail(mails);
 
-  await sb.from("notifications").insert(
-    details.map((d) => ({
-      user_id: d.userId,
-      kind: "game_cancelled",
-      title: "Game cancelled",
-      body: `The host cancelled your ${game.sport} game.`,
-      game_id: game.id,
-    }))
-  );
+  await Promise.all(details.map((d) => writeNotification(sb, {
+    userId: d.userId,
+    kind: "game_cancelled",
+    title: "Game cancelled",
+    body: `The host cancelled your ${game.sport} game.`,
+    gameId: game.id,
+  })));
 }
 
 // ── Payment notifications ───────────────────────────────────────
@@ -637,20 +677,20 @@ export async function notifyPaymentSubmitted(paymentId: string) {
   if (mails.length) await sendMail(mails);
 
   const isTournament = ctx.payment.booking_type === "tournament_registration";
-  await sb.from("notifications").insert([
-    ...[...adminIds].map((id) => ({
-      user_id: id,
+  await Promise.all([
+    ...[...adminIds].map((id) => writeNotification(sb, {
+      userId: id,
       kind: "payment_submitted",
       title: `New payment to verify — ${ctx.label}`,
       body: `${ctx.customerName} · ${ctx.payment.payment_method} · Rs ${Math.round(ctx.payment.expected_amount)}`,
-      tournament_id: ctx.tournamentId,
+      tournamentId: ctx.tournamentId,
     })),
-    ...[...organizerIds].map((id) => ({
-      user_id: id,
+    ...[...organizerIds].map((id) => writeNotification(sb, {
+      userId: id,
       kind: isTournament ? "tournament_registration_submitted" : "payment_submitted",
       title: `New team registration payment — ${ctx.label}`,
       body: `${ctx.customerName} · ${ctx.payment.payment_method} · Rs ${Math.round(ctx.payment.expected_amount)}`,
-      tournament_id: ctx.tournamentId,
+      tournamentId: ctx.tournamentId,
     })),
   ]);
 }
@@ -671,14 +711,14 @@ export async function notifyPaymentReviewed(paymentId: string) {
       }));
     }
     const isTournament = ctx.payment.booking_type === "tournament_registration";
-    await sb.from("notifications").insert({
-      user_id: ctx.payment.user_id,
+    await writeNotification(sb, {
+      userId: ctx.payment.user_id,
       kind: isTournament ? "tournament_payment_verified" : "payment_approved",
       title: isTournament ? "Team registration confirmed" : "Booking confirmed",
       body: isTournament
         ? `Payment verified. Your team's spot is confirmed. Rs ${Math.round(ctx.payment.expected_amount)} · ${ctx.label}`
         : `Payment verified. Your booking is confirmed. Rs ${Math.round(ctx.payment.expected_amount)} · ${ctx.label}`,
-      tournament_id: ctx.tournamentId,
+      tournamentId: ctx.tournamentId,
     });
   } else if (ctx.payment.status === "REJECTED") {
     const isTournament = ctx.payment.booking_type === "tournament_registration";
@@ -686,12 +726,12 @@ export async function notifyPaymentReviewed(paymentId: string) {
     if (to) {
       await sendMail(paymentRejected({ to, playerName, bookingLabel: ctx.label, reason }));
     }
-    await sb.from("notifications").insert({
-      user_id: ctx.payment.user_id,
+    await writeNotification(sb, {
+      userId: ctx.payment.user_id,
       kind: isTournament ? "tournament_payment_rejected" : "payment_rejected",
       title: "Payment verification failed",
       body: `Payment could not be verified. ${ctx.label} · Reason: ${reason}`,
-      tournament_id: ctx.tournamentId,
+      tournamentId: ctx.tournamentId,
     });
   }
 }
