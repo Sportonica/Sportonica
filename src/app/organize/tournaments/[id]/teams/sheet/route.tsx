@@ -61,7 +61,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     }),
   );
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.sportonica.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   const qr = await QRCode.toDataURL(`${siteUrl}/tournaments/${tournament.id}`, {
     margin: 0, width: 200, color: { dark: "#14171E", light: "#FFFFFF" },
   });
