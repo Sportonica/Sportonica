@@ -6,6 +6,7 @@ import { Lock, AtSign, User } from "lucide-react";
 import GoogleButton from "@/components/GoogleButton";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthInput from "@/components/auth/AuthInput";
+import ConsentCheckbox from "@/components/auth/ConsentCheckbox";
 import IdentityBadge from "@/components/auth/IdentityBadge";
 import PasswordStrength from "@/components/auth/PasswordStrength";
 import SubmitButton from "@/components/auth/SubmitButton";
@@ -53,6 +54,8 @@ function SignupInner() {
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [consentErr, setConsentErr] = useState(false);
 
   const identifierValid = useMemo(() => {
     const id = identifier.trim();
@@ -72,6 +75,11 @@ function SignupInner() {
     if (!name.trim() || !id || !password) { setErr("Fill in every field to continue."); return; }
     if (password.length < PASSWORD_MIN) { setErr("Password needs at least 6 characters."); return; }
     if (password !== confirm) { setErr("Those passwords don't match."); return; }
+    if (!agreed) {
+      setConsentErr(true);
+      setErr("Please agree to the Terms and conditions and Privacy policy to continue.");
+      return;
+    }
 
     if (!looksLikeEmail(id)) {
       if (!isValidLocalPhone(id)) { setErr(BAD_IDENTIFIER); return; }
@@ -172,10 +180,27 @@ function SignupInner() {
           {err && <div className="auth-error">{err}</div>}
           {note && <div className="auth-note">{note}</div>}
 
+          <ConsentCheckbox
+            checked={agreed}
+            error={consentErr}
+            onChange={(v) => { setAgreed(v); if (v) setConsentErr(false); }}
+          />
+
           <SubmitButton loading={loading} onClick={signup}>Create account</SubmitButton>
 
           <div className="auth-or"><span>or</span></div>
-          <GoogleButton next={safeRedirect(redirect)} label="Sign up with Google" />
+          <GoogleButton
+            next={safeRedirect(redirect)}
+            label="Sign up with Google"
+            guard={() => {
+              if (!agreed) {
+                setConsentErr(true);
+                setErr("Please agree to the Terms and conditions and Privacy policy to continue.");
+                return false;
+              }
+              return true;
+            }}
+          />
 
           <div className="auth-alt">
             Already have an account?{" "}

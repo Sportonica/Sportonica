@@ -1,12 +1,10 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import "../../p/profile.css";
+import "../../(play)/play.css";
+import NotificationsPage from "../../(play)/notifications/page";
 
 const SECTIONS: Record<string, { title: string; body: string }> = {
-  notifications: {
-    title: "Notifications",
-    body: "Fine-grained notification preferences are on the way. You'll keep getting the notifications you get today via the bell icon in the meantime.",
-  },
   preferences: {
     title: "Preferences",
     body: "Preferred playing times, locations, and discovery settings are on the way. You can already set the sports you play from Edit Profile.",
@@ -25,6 +23,9 @@ export default async function ComingSoonPage({
   searchParams,
 }: { searchParams: Promise<{ section?: string }> }) {
   const { section } = await searchParams;
+
+  if (section === "notifications") return <NotificationsPage />;
+
   const content = (section && SECTIONS[section]) || {
     title: "Coming soon",
     body: "This section is on the way.",

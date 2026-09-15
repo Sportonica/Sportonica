@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useId } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getCachedUser } from "@/lib/supabase/authCache";
 
@@ -39,6 +39,13 @@ export function useNotifications(limit = 30) {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  // The bell (in AppHeader, mounted on every page) and a page-level
+  // caller of this hook (e.g. the notifications feed) can be mounted
+  // at once. A channel name shared across instances makes the second
+  // .on() call throw "cannot add postgres_changes callbacks ... after
+  // subscribe()", since Supabase reuses the already-subscribed channel
+  // for a repeated topic name — so each hook instance gets its own.
+  const instanceId = useId();
 
   const load = useCallback(async () => {
     const user = await getCachedUser();
@@ -62,7 +69,7 @@ export function useNotifications(limit = 30) {
   useEffect(() => {
     if (!userId) return;
     const channel = supabase
-      .channel("notifications-" + userId)
+      .channel("notifications-" + userId + "-" + instanceId)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
@@ -70,7 +77,7 @@ export function useNotifications(limit = 30) {
       )
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [userId, supabase, load]);
+  }, [userId, supabase, load, instanceId]);
 
   const unread = items.filter((n) => !n.read).length;
 
