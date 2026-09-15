@@ -57,7 +57,7 @@ export async function GET(
 
   const isSingleEvent = tournament.format === "single_event";
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.sportonica.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   // While registration is a live concept, the QR drops the scanner
   // straight onto the Register tab (?tab=register) rather than the
   // Overview — the card literally says "scan to register".

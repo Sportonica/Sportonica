@@ -100,7 +100,7 @@ export default async function OG({ params }: { params: Promise<{ username: strin
           <div style={{ display: "flex", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={`${process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.sportonica.com"}/icons/icon-192.png`}
+              src={`${process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com"}/icons/icon-192.png`}
               width={44} height={44}
               style={{ borderRadius: 10, marginRight: 14 }}
               alt=""

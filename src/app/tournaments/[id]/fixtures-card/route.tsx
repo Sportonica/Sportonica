@@ -97,7 +97,7 @@ export async function GET(
     : rowHeight >= 66 ? { time: 19, team: 22, round: 13, score: 22 }
     : { time: 17, team: 19, round: 12, score: 19 };
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.sportonica.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   const qrTarget = `${siteUrl}/tournaments/${tournament.id}?tab=fixtures`;
   const qrDataUrl = await QRCode.toDataURL(qrTarget, {
     margin: 2, width: 400, errorCorrectionLevel: "M", color: { dark: "#0B0D11", light: "#FFFFFF" },

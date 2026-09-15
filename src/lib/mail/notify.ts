@@ -169,7 +169,7 @@ export async function notifyHostedEventIfPublished(courtBookingId: string) {
     startsAt: event.event_date,
     spots: Math.max((event.max_players ?? 1) - 1, 0),
     perHead: Number(event.fee) || 0,
-    origin: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+    origin: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
   });
 }
 
@@ -253,7 +253,7 @@ export async function notifyPlayTogetherGamePublishedIfAny(courtBookingId: strin
       to, hostName, sport: game.sport, venue: venue?.name ?? "the venue",
       startsAt: game.starts_at, spots: Math.max(game.max_players - 1, 0),
       contribution: Number(game.contribution_amount) || 0,
-      link: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/play-together`,
+      link: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/play-together`,
     }));
   }
 
@@ -312,7 +312,7 @@ export async function notifyPlayTogetherPaymentRequired(input: { playerId: strin
   if (!row?.payment_deadline) return;
 
   const [playerEmail, playerName] = await Promise.all([emailFor(input.playerId), nameFor(input.playerId)]);
-  const link = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/play-together/${input.gameId}`;
+  const link = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/play-together/${input.gameId}`;
   if (playerEmail) {
     await sendMail(playTogetherPaymentRequired({
       to: playerEmail, playerName, sport: game.sport, venue: venueName,
@@ -347,7 +347,7 @@ export async function notifyPlayTogetherPaymentSubmitted(input: { gamePlayerId: 
   const [hostEmail, hostName, playerName] = await Promise.all([
     emailFor(game.host_id), nameFor(game.host_id), nameFor(row.user_id),
   ]);
-  const link = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/play-together/${input.gameId}/manage`;
+  const link = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/play-together/${input.gameId}/manage`;
   if (hostEmail) {
     await sendMail(playTogetherPaymentSubmitted({
       to: hostEmail, hostName, playerName, sport: game.sport,
@@ -429,7 +429,7 @@ export async function notifyPlayTogetherPaymentRejected(input: { playerId: strin
     .eq("game_id", input.gameId).eq("user_id", input.playerId).maybeSingle();
 
   const [playerEmail, playerName] = await Promise.all([emailFor(input.playerId), nameFor(input.playerId)]);
-  const link = `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/play-together/${input.gameId}`;
+  const link = `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/play-together/${input.gameId}`;
   if (playerEmail && row?.payment_deadline) {
     await sendMail(playTogetherPaymentRejected({
       to: playerEmail, playerName, sport: game.sport, venue: venueName,
