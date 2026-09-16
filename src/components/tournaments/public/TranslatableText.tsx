@@ -20,9 +20,11 @@ export default function TranslatableText({
   const [loading, setLoading] = useState(false);
   const [errored, setErrored] = useState(false);
 
-  const target: "en" | "ne" = isDevanagari(text) ? "en" : "ne";
+  const sourceLang: "en" | "ne" = isDevanagari(text) ? "ne" : "en";
+  const target: "en" | "ne" = sourceLang === "ne" ? "en" : "ne";
   const activeText = showTranslated && translated ? translated : text;
-  const prices = useMemo(() => extractPrices(activeText), [activeText]);
+  const activeLang: "en" | "ne" = showTranslated && translated ? target : sourceLang;
+  const prices = useMemo(() => extractPrices(activeText, activeLang), [activeText, activeLang]);
   const paragraphs = useMemo(() => activeText.split(/\n{2,}/).filter((p) => p.trim()), [activeText]);
 
   async function handleClick() {
@@ -72,8 +74,8 @@ export default function TranslatableText({
         <table className="tr-price-table">
           <thead>
             <tr>
-              <th>Item</th>
-              <th style={{ textAlign: "right" }}>Amount</th>
+              <th>{activeLang === "ne" ? "विवरण" : "Item"}</th>
+              <th style={{ textAlign: "right" }}>{activeLang === "ne" ? "रकम" : "Amount"}</th>
             </tr>
           </thead>
           <tbody>

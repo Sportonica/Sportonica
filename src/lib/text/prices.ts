@@ -14,9 +14,21 @@ const DEVANAGARI_DIGITS: Record<string, string> = {
   "०": "0", "१": "1", "२": "2", "३": "3", "४": "4",
   "५": "5", "६": "6", "७": "7", "८": "8", "९": "9",
 };
+const LATIN_TO_DEVANAGARI: Record<string, string> = Object.fromEntries(
+  Object.entries(DEVANAGARI_DIGITS).map(([dev, lat]) => [lat, dev])
+);
 
 function normalizeDigits(s: string): string {
   return s.replace(/[०-९]/g, (d) => DEVANAGARI_DIGITS[d] ?? d);
+}
+
+function toDevanagariDigits(s: string): string {
+  return s.replace(/[0-9]/g, (d) => LATIN_TO_DEVANAGARI[d] ?? d);
+}
+
+function formatAmount(amount: number, lang: "en" | "ne"): string {
+  const grouped = amount.toLocaleString("en-IN"); // lakh/crore grouping either way
+  return lang === "ne" ? `रू ${toDevanagariDigits(grouped)}` : `Rs ${grouped}`;
 }
 
 // Machine-translated output sometimes inserts a space after the thousands
@@ -25,7 +37,7 @@ function normalizeDigits(s: string): string {
 const AMOUNT_RE = /(?:रु\.?|रू\.?|Rs\.?|NPR|INR)\s?([०-९0-9]+(?:,\s?[०-९0-9]{2,3})*)\s*\/?-?/;
 const LIST_MARKER_RE = /^(?:[०-९0-9]+[.)]|[क-ह][.)])\s*/;
 
-export function extractPrices(text: string | null | undefined): PriceItem[] {
+export function extractPrices(text: string | null | undefined, lang: "en" | "ne" = "en"): PriceItem[] {
   if (!text) return [];
   const lines = text.split("\n");
   const items: PriceItem[] = [];
@@ -55,7 +67,7 @@ export function extractPrices(text: string | null | undefined): PriceItem[] {
       const label = (before && before.length <= 50) ? before : pendingLabel;
       if (!label) continue;
 
-      items.push({ label, amount: `Rs ${amount.toLocaleString("en-IN")}` });
+      items.push({ label, amount: formatAmount(amount, lang) });
     } else if (line.length < 60) {
       // Short standalone line — likely a heading/list item the next
       // amount-bearing line refers to (e.g. "१. प्रथम पुरस्कार" followed
