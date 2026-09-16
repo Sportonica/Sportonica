@@ -22,11 +22,13 @@ function GoogleMark({ size = 17 }: { size?: number }) {
 export default function GoogleButton({
   next = "/discover",
   label = "Continue with Google",
-}: { next?: string; label?: string }) {
+  guard,
+}: { next?: string; label?: string; guard?: () => boolean }) {
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function signIn() {
+    if (guard && !guard()) return;
     const safeNext = safeRedirect(next);
     setPending(true); setErr(null);
     // The ?next= query param on redirectTo isn't reliably preserved

@@ -47,7 +47,7 @@ export async function GET(
       ? profile.avatar_url
       : null;
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.sportonica.com";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   // Always dark-on-white regardless of card theme — a QR needs reliable
   // contrast to scan, which the "glass" (dark) theme's own palette can't
   // guarantee, so it gets its own fixed-white tile instead of following C.

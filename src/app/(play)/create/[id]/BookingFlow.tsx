@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Check, Users, Wallet, Clock, ChevronLeft, ChevronRight, Tag, Upload, AlertTriangle, Minus, Plus, MapPin, Calendar, Activity, Timer, Gauge, Phone } from "lucide-react";
 import { bookCourt } from "@/lib/admin/actions";
 import { confirmFreeBooking } from "@/lib/payments/actions";
@@ -95,6 +96,9 @@ export default function BookingFlow({
   const [ackRisk, setAckRisk] = useState(false);
   const [riskFlash, setRiskFlash] = useState(false);
   const riskBoxRef = useRef<HTMLDivElement>(null);
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [termsFlash, setTermsFlash] = useState(false);
+  const termsBoxRef = useRef<HTMLDivElement>(null);
   const [hostPhone, setHostPhone] = useState("");
   const [qrPreviewUrl, setQrPreviewUrl] = useState<string | null>(null);
   const [qrPath, setQrPath] = useState<string | null>(null);
@@ -229,6 +233,13 @@ export default function BookingFlow({
       }
     } else if (!isValidLocalPhone(phone)) {
       setErr(PHONE_ERROR);
+      return;
+    }
+    if (!agreedTerms) {
+      setErr("Please agree to the Terms of Service and Privacy Policy to continue.");
+      termsBoxRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTermsFlash(true);
+      setTimeout(() => setTermsFlash(false), 1000);
       return;
     }
     setErr(null);
@@ -691,6 +702,22 @@ export default function BookingFlow({
               </div>
             )}
 
+            <div className={`bk-terms ${termsFlash ? "flash" : ""}`} ref={termsBoxRef}>
+              <label className="bk-terms-check">
+                <input
+                  type="checkbox"
+                  checked={agreedTerms}
+                  onChange={(e) => setAgreedTerms(e.target.checked)}
+                />
+                <span>
+                  I agree to Sportonica&apos;s{" "}
+                  <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</Link>.
+                </span>
+              </label>
+            </div>
+
             <p className="hint" style={{ fontSize: 12.5, marginTop: 18, marginBottom: 0 }}>
               <Wallet size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 4 }} />
               Next you&apos;ll pay via eSewa or Khalti QR and submit your transaction ID for verification.
@@ -786,6 +813,20 @@ export default function BookingFlow({
         .bkw-steps li.done .dot { background: #2E7D5B; border-color: #2E7D5B; color: #fff; }
         .bkw-steps .lbl { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
         @media (max-width: 560px) { .bkw-steps .lbl { display: none; } }
+
+        .bk-terms {
+          margin-top: 18px; padding: 14px 16px; border-radius: 14px;
+          background: var(--ink); border: 1px solid var(--line);
+          transition: border-color 0.3s, background 0.3s;
+        }
+        .bk-terms.flash {
+          border-color: rgba(0,98,65,.6); background: rgba(0,98,65,.08);
+          animation: riskShake 0.4s ease;
+        }
+        .bk-terms-check { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; font-size: 13px; color: var(--dim); line-height: 1.5; }
+        .bk-terms-check input { margin-top: 3px; accent-color: var(--sodium); flex-shrink: 0; }
+        .bk-terms-check a { color: var(--sodium); font-weight: 700; text-decoration: none; }
+        .bk-terms-check a:hover { text-decoration: underline; }
 
         .bkw-body { min-height: 260px; }
         .bkw-err { color: var(--pink); font-size: 13px; margin-top: 12px; }
