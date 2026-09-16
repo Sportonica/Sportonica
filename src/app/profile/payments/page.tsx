@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import "../../p/profile.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Payments — Sportonica" };
 
 const KTM = "Asia/Kathmandu";
 const when = (iso: string) =>
