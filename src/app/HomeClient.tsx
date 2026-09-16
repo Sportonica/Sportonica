@@ -456,7 +456,7 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
           </Link>
           <div style={{ display:"flex", gap:"32px", flexWrap:"wrap" as const }}>
             {[
-              { label:"Play", href:"/discover" },
+              { label:"Join", href:"/discover" },
               { label:"Tournaments", href:"/tournaments" },
               { label:"Host event", href:"/create" },
               { label:"Contact us", href:"/contact" },
