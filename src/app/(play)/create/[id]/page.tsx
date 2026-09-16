@@ -1,11 +1,22 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ArrowLeft, MapPin, ImageIcon, ShieldCheck } from "lucide-react";
 import { getVenueForBooking } from "@/lib/play/queries";
 import BookingFlow from "./BookingFlow";
 import { getVenuePricingRules } from "@/lib/play/pricing";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const { venue } = await getVenueForBooking(id);
+  if (!venue) return { title: "Venue — Sportonica" };
+  return {
+    title: `${venue.name} — Sportonica`,
+    description: `Book a court at ${venue.name}${venue.address ? `, ${venue.address}` : ""}.`,
+  };
+}
 
 export default async function VenueBookingPage({
   params, searchParams,

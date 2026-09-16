@@ -1,9 +1,15 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { MessageCircle } from "lucide-react";
 import { listConversations } from "@/lib/dm/queries";
 import ChatTabs from "@/components/ChatTabs";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Messages — Sportonica",
+  description: "Your direct messages with other players.",
+};
 
 function timeAgo(iso: string): string {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);

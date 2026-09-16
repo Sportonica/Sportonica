@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import ChatTabs from "@/components/ChatTabs";
 import { listAllPlayers, listPendingRequests } from "@/lib/friends/queries";
 import PlayersClient from "./PlayersClient";
 import FriendRequestRow from "./FriendRequestRow";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Players — Sportonica",
+  description: "Find and connect with other players near you.",
+};
 
 export default async function PlayersPage() {
   const [players, pending] = await Promise.all([listAllPlayers(), listPendingRequests()]);

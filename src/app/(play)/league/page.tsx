@@ -1,8 +1,14 @@
+import type { Metadata } from "next";
 import { browseSquads, myMemberships } from "@/lib/squads/queries";
 import SquadsClient from "./SquadsClient";
 import ChatTabs from "@/components/ChatTabs";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Groups — Sportonica",
+  description: "Build a pool of players you can pull a game together with any time — make a group or join one near you.",
+};
 
 export default async function LeaguePage() {
   const [squads, memberships] = await Promise.all([browseSquads(), myMemberships()]);
