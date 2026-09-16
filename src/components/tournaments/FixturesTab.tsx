@@ -1112,7 +1112,7 @@ function MatchPlayerStatsModal({
             </div>
             {roster.filter((p) => !match.team_b_id || p.team === teamTab).map((p) => (
               <div key={p.id} style={{ display: "grid", gridTemplateColumns: `1.4fr 55px 55px 55px 45px 45px${trackingFines ? " 70px" : ""}`, gap: 8, alignItems: "center", padding: "6px 0", minWidth: 470 }}>
-                <div style={{ fontSize: 13.5 }}>{p.name}</div>
+                <div style={{ fontSize: 13.5 }}>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</div>
                 <input
                   type="number" min={0} value={goals[p.id] ?? ""}
                   onChange={(e) => setGoals((g) => ({ ...g, [p.id]: e.target.value }))}
@@ -1287,7 +1287,7 @@ function CricketPlayerStatsModal({
                 </div>
                 {roster.filter((p) => !match.team_b_id || p.team === teamTab).map((p) => (
                   <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 55px 50px 50px 50px 45px", gap: 8, alignItems: "center", padding: "6px 0", minWidth: 470 }}>
-                    <div style={{ fontSize: 13.5 }}>{p.name}</div>
+                    <div style={{ fontSize: 13.5 }}>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</div>
                     <input type="number" min={0} value={runs[p.id] ?? ""} onChange={(e) => setRuns((r) => ({ ...r, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} runs`} />
                     <input type="number" min={0} value={balls[p.id] ?? ""} onChange={(e) => setBalls((b) => ({ ...b, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} balls faced`} />
                     <input type="number" min={0} value={fours[p.id] ?? ""} onChange={(e) => setFours((f) => ({ ...f, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 45 }} aria-label={`${p.name} fours`} />
@@ -1304,7 +1304,7 @@ function CricketPlayerStatsModal({
                 </div>
                 {roster.filter((p) => !match.team_b_id || p.team === teamTab).map((p) => (
                   <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 60px 55px 55px", gap: 8, alignItems: "center", padding: "6px 0", minWidth: 400 }}>
-                    <div style={{ fontSize: 13.5 }}>{p.name}</div>
+                    <div style={{ fontSize: 13.5 }}>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</div>
                     <input type="number" min={0} step={0.1} value={oversBowled[p.id] ?? ""} onChange={(e) => setOversBowled((o) => ({ ...o, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} overs bowled`} />
                     <input type="number" min={0} value={runsConceded[p.id] ?? ""} onChange={(e) => setRunsConceded((r) => ({ ...r, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 55 }} aria-label={`${p.name} runs conceded`} />
                     <input type="number" min={0} value={wickets[p.id] ?? ""} onChange={(e) => setWickets((w) => ({ ...w, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} wickets`} />
