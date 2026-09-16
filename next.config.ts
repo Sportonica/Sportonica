@@ -22,6 +22,18 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.basemaps.cartocdn.com" },
     ],
   },
+  // apple-app-site-association has no file extension, so Next's static
+  // file serving guesses application/octet-stream — iOS is lenient about
+  // this over HTTPS, but serving the right content type removes any doubt
+  // during Universal Links verification.
+  async headers() {
+    return [
+      {
+        source: "/.well-known/apple-app-site-association",
+        headers: [{ key: "Content-Type", value: "application/json" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
