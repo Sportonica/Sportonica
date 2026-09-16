@@ -71,6 +71,7 @@ export default async function PaymentsPage() {
         href: `/play-together/${g.game_id}` as string | null,
       })),
   ];
+  rows.sort((a, b) => b.amount - a.amount);
 
   return (
     <div className="pf">
