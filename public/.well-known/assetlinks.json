@@ -4,7 +4,10 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.sportonica.app",
-      "sha256_cert_fingerprints": ["REPLACE_WITH_YOUR_SIGNING_CERT_SHA256_FINGERPRINT"]
+      "sha256_cert_fingerprints": [
+        "4B:DA:AA:AD:63:31:57:DF:97:89:3B:44:56:0E:9D:E1:4C:C5:21:4A:92:EB:57:2A:E4:B3:03:C1:EC:1F:E5:66",
+        "REPLACE_WITH_YOUR_PRODUCTION_SIGNING_CERT_SHA256_FINGERPRINT"
+      ]
     }
   }
 ]
