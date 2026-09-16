@@ -5,6 +5,16 @@
 // daily quota from 5k to 50k words. Not an LLM: it's a phrase-lookup/MT
 // service, so output grammar won't be perfect — this is scoped to getting
 // paragraph structure and punctuation spacing right, not full editing.
+//
+// Every translation is cached (keyed by exact text + target language) for
+// 60 days via Next's data cache — organizer text essentially never changes
+// after publish, and without this, every visitor who clicks Translate on
+// the same tournament re-spends the same free-tier quota on an identical
+// result. This is what actually exhausted MyMemory's daily allowance
+// during manual testing of a single tournament.
+
+import { unstable_cache } from "next/cache";
+import { createHash } from "crypto";
 
 const MYMEMORY_ENDPOINT = "https://api.mymemory.translated.net/get";
 const MAX_CHUNK_LEN = 450; // MyMemory caps requests around 500 bytes
@@ -78,16 +88,7 @@ function cleanup(text: string): string {
     .trim();
 }
 
-export async function translateText(text: string, target: "en" | "ne"): Promise<string> {
-  const trimmed = (text ?? "").trim();
-  if (!trimmed) return text ?? "";
-
-  const sourceIsDevanagari = isDevanagari(trimmed);
-  // Already in the requested language/script — nothing to do.
-  if ((target === "en" && !sourceIsDevanagari) || (target === "ne" && sourceIsDevanagari)) {
-    return trimmed;
-  }
-
+async function translateUncached(trimmed: string, target: "en" | "ne"): Promise<string> {
   const langpair = target === "en" ? "ne|en" : "en|ne";
   const paragraphs = trimmed.split(/\n{2,}/);
 
@@ -100,4 +101,25 @@ export async function translateText(text: string, target: "en" | "ne"): Promise<
   });
 
   return cleanup(translatedParagraphs.join("\n\n"));
+}
+
+const CACHE_TTL_SECONDS = 60 * 60 * 24 * 60; // 60 days
+
+export async function translateText(text: string, target: "en" | "ne"): Promise<string> {
+  const trimmed = (text ?? "").trim();
+  if (!trimmed) return text ?? "";
+
+  const sourceIsDevanagari = isDevanagari(trimmed);
+  // Already in the requested language/script — nothing to do.
+  if ((target === "en" && !sourceIsDevanagari) || (target === "ne" && sourceIsDevanagari)) {
+    return trimmed;
+  }
+
+  const key = createHash("sha256").update(`${target}:${trimmed}`).digest("hex");
+  const cached = unstable_cache(
+    () => translateUncached(trimmed, target),
+    ["tournament-text-translation", key],
+    { revalidate: CACHE_TTL_SECONDS }
+  );
+  return cached();
 }
