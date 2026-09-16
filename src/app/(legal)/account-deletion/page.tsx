@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
-  ShieldCheck, Zap, Clock, TriangleAlert,
+  ShieldCheck, ShieldAlert, Zap, Clock, TriangleAlert,
   UserRound, AtSign, SlidersHorizontal, Trophy, MessagesSquare, Star, ImageOff,
   CalendarOff, CalendarClock, Receipt,
-  LogIn, Type, Fingerprint, CircleCheck,
+  LogIn, CircleCheck,
   CalendarX, Building2,
 } from "lucide-react";
 import "./account-deletion.css";
@@ -74,8 +74,8 @@ export default function AccountDeletionPage() {
           </div>
           <div className="adp-fact">
             <span className="adp-fact-ico" aria-hidden><Clock size={18} /></span>
-            <b>About a minute</b>
-            <span>Confirm, re-enter your password, done — then you&apos;re signed out.</span>
+            <b>About ten seconds</b>
+            <span>Click Delete Account, confirm once, done — then you&apos;re signed out.</span>
           </div>
         </div>
 
@@ -137,16 +137,13 @@ export default function AccountDeletionPage() {
             From <strong>Profile → Login &amp; Security → Delete Account</strong>.
           </p>
           <ol className="adp-steps">
-            <Step icon={<LogIn size={15} aria-hidden />} title="Open the delete dialog">
+            <Step icon={<LogIn size={15} aria-hidden />} title="Click Delete Account">
               Scroll to the red &ldquo;Delete Account&rdquo; card at the bottom of Login &amp; Security
-              and open it — nothing is deleted yet, you&apos;ll see a summary first.
+              and click it — nothing is deleted yet, you&apos;ll see a summary first.
             </Step>
-            <Step icon={<Type size={15} aria-hidden />} title="Type DELETE to confirm">
-              You have to type <code>DELETE</code> exactly. The button stays disabled until you do.
-            </Step>
-            <Step icon={<Fingerprint size={15} aria-hidden />} title="Confirm it's you">
-              Re-enter your password, or sign in with Google again if that&apos;s how you log in. This
-              stops someone using an unlocked phone from deleting your account.
+            <Step icon={<ShieldAlert size={15} aria-hidden />} title="Confirm">
+              Click &ldquo;Yes, delete my account&rdquo; to go ahead, or Cancel to back out. No typing,
+              no re-entering your password — just the one confirmation.
             </Step>
             <Step icon={<CircleCheck size={15} aria-hidden />} title="Done">
               Your account and data are removed, you&apos;re signed out everywhere, and you land back

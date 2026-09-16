@@ -34,7 +34,7 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
     <div className="play tourn-page">
       <div className="play-wrap">
         <div className="play-hero">
-          <h1>Tournaments <em>& events.</em></h1>
+          <h1>Tournaments <em>& Events.</em></h1>
           <p>
             Register a team or book a spot, and pay online
             with eSewa, Khalti or bank transfer.

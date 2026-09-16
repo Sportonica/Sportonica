@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Venue, Court, CourtHours } from "@/lib/admin/types";
 
@@ -24,7 +25,9 @@ export async function browseVenues(): Promise<(Venue & { courts: Court[] })[]> {
   }));
 }
 
-export async function getVenueForBooking(id: string): Promise<{
+// cache()-wrapped so generateMetadata() and the page body can both call
+// this for the same request without doubling the DB round trip.
+export const getVenueForBooking = cache(async function getVenueForBooking(id: string): Promise<{
   venue: Venue | null;
   courts: Court[];
   hoursByCourt: Record<string, CourtHours[]>;
@@ -46,4 +49,4 @@ export async function getVenueForBooking(id: string): Promise<{
   (hours ?? []).forEach((h) => { (hoursByCourt[h.court_id] ??= []).push(h); });
 
   return { venue: venue as Venue, courts: (courts as Court[]) ?? [], hoursByCourt };
-}
+});

@@ -12,7 +12,10 @@ import { safeRedirect } from "@/lib/validation/redirect";
 import { isActionError } from "@/lib/actionError";
 import NotificationBell from "./NotificationBell";
 import OrganizerAccessModal from "./OrganizerAccessModal";
+import BackButton from "./nav/BackButton";
 import { isBareChromeRoute } from "@/lib/nav/authRoutes";
+
+const ASK_CITY_KEY = "sportonica:asked-city";
 
 export default function AppHeader() {
   const pathname = usePathname();
@@ -33,7 +36,18 @@ export default function AppHeader() {
     pathname.startsWith("/platform") ||
     isBareChromeRoute(pathname);
 
-  useEffect(() => { if (ready && !city && !hidden) setAsk(true); }, [ready, city, hidden]);
+  // Ask for a city once per session, not on every navigation. `hidden`
+  // depends on pathname, so without a guard this effect re-fires — and
+  // reopens the sheet — on every single page change for as long as the
+  // user hasn't actually picked a city (e.g. after "Skip for now").
+  useEffect(() => {
+    if (!ready || city || hidden) return;
+    try {
+      if (sessionStorage.getItem(ASK_CITY_KEY)) return;
+      sessionStorage.setItem(ASK_CITY_KEY, "1");
+    } catch { /* private mode / storage disabled — ask this once, same as before */ }
+    setAsk(true);
+  }, [ready, city, hidden]);
 
   // Once per session per account: link any walk-in tournament roster
   // spot registered with this account's phone/email — so a player who
@@ -125,7 +139,6 @@ export default function AppHeader() {
     : [];
 
   const firstName = profile?.full_name?.trim().split(" ")[0] ?? null;
-  const initial = firstName?.charAt(0).toUpperCase() ?? null;
 
   return (
     <>
@@ -133,14 +146,15 @@ export default function AppHeader() {
         <div className="ah-in">
           {/* left — who and where */}
           <div className="ah-l">
+            <BackButton className="ah-navback" iconSize={19} />
             {user ? (
               <Link href="/profile" className="ah-av" aria-label="Profile">
                 {profile?.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={profile.avatar_url} alt="" />
-                ) : initial ? (
-                  <span>{initial}</span>
                 ) : (
+                  // No profile photo set — the app mark, not an
+                  // auto-generated initial letter.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src="/icons/mark.png" alt="" className="ah-av-mark" />
                 )}
@@ -322,6 +336,15 @@ export default function AppHeader() {
         }
 
         .ah-l { display:flex; align-items:center; gap:11px; min-width:0; }
+        .ah-navback {
+          width:42px; height:42px; border-radius:999px; flex-shrink:0;
+          display:inline-flex; align-items:center; justify-content:center;
+          border:1px solid rgba(242,237,230,.14); background:transparent;
+          color:inherit; cursor:pointer; transition:border-color .2s, transform .15s;
+        }
+        [data-theme="paper"] .ah-navback { border-color:rgba(20,23,30,.14); }
+        .ah-navback:hover { transform:translateY(-1px); border-color:rgba(0,98,65,.55); }
+        .ah-navback svg { shape-rendering:geometricPrecision; }
         .ah-av {
           width:42px; height:42px; border-radius:999px; flex-shrink:0; overflow:hidden;
           display:flex; align-items:center; justify-content:center; text-decoration:none;
@@ -474,6 +497,7 @@ export default function AppHeader() {
         @media (max-width:560px) {
           .ah-in { padding:9px 16px; gap:10px; }
           .ah-av { width:38px; height:38px; font-size:15px; }
+          .ah-navback { width:38px; height:38px; }
           .ah-btn { width:38px; height:38px; }
           .ah-signin { height:38px; padding:0 15px; font-size:13px; }
           .ah-pick { font-size:15px; }

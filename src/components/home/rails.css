@@ -2,7 +2,11 @@
    Homepage rails — scannable, high-contrast previews.
    Cards must read as solid objects against the dark page.
    ================================================================ */
-.rail { padding: 54px clamp(24px, 5vw, 56px) 0; max-width: none; margin: 0; }
+/* Right padding has to clear MagnetDock (fixed, right:16px, ~66px wide,
+   vertically centered) — it doesn't scroll with the page, so whichever
+   rail happens to sit near mid-viewport gets its "See all X" link
+   rendered underneath it unless the rail reserves that space itself. */
+.rail { padding: 54px clamp(90px, 6vw, 130px) 0 clamp(24px, 5vw, 56px); max-width: none; margin: 0; }
 .rail-head {
   display: flex; align-items: flex-end; justify-content: space-between;
   gap: 18px; margin-bottom: 22px; flex-wrap: wrap;
