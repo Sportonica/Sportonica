@@ -296,10 +296,15 @@ export default function TournamentForm({
     // /tournaments and rejects every registration with "closed" — with no
     // hint anywhere why. Catching it here, at save time, is the only place
     // that can explain it clearly. Skipped for TBD dates — there's no end
-    // time yet to check against.
-    const nowIso = new Date().toISOString();
-    if (!datesTbd && combine(endsDate, endsTime) <= nowIso) return "The tournament's end time has already passed — pick a future date.";
-    if (combine(regCloseDate, regCloseTime) <= nowIso) return "Registration closes in the past — pick a future date/time.";
+    // time yet to check against. Also skipped once the tournament is
+    // already live: by then a past registration-close (or even a past end
+    // date, e.g. backdating after the fact) is a legitimate edit to an
+    // event already running, not a mistake about to be published.
+    if (!editingLive) {
+      const nowIso = new Date().toISOString();
+      if (!datesTbd && combine(endsDate, endsTime) <= nowIso) return "The tournament's end time has already passed — pick a future date.";
+      if (combine(regCloseDate, regCloseTime) <= nowIso) return "Registration closes in the past — pick a future date/time.";
+    }
     if (format !== "single_event" && maxPlayers < minPlayers) return "Max players per team can't be less than the minimum.";
     // A paid tournament with no QR is a foot-gun: the payer checkout would
     // render an empty QR panel with no support fallback, since the host —
