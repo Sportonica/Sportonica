@@ -146,7 +146,7 @@ export default function AppHeader() {
         <div className="ah-in">
           {/* left — who and where */}
           <div className="ah-l">
-            <BackButton className="ah-navback" iconSize={19} />
+            {pathname !== "/" && <BackButton className="ah-navback" iconSize={19} />}
             {user ? (
               <Link href="/profile" className="ah-av" aria-label="Profile">
                 {profile?.avatar_url ? (
