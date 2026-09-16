@@ -259,6 +259,9 @@ export default function MyGamesClient({
       {resubmit && (
         <div className="mg-scrim" onClick={() => setResubmit(null)}>
           <div className="mg-sheet" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="mg-btn ghost" style={{ marginBottom: 14 }} onClick={() => setResubmit(null)}>
+              <X size={14} /> Cancel
+            </button>
             <PaymentStep
               bookingType={resubmit.bookingType}
               bookingId={resubmit.bookingId}

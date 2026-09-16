@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, ShieldCheck } from "lucide-react";
 import AuthCard from "@/components/auth/AuthCard";
+import BackButton from "@/components/nav/BackButton";
 import AuthInput from "@/components/auth/AuthInput";
 import PasswordStrength from "@/components/auth/PasswordStrength";
 import SubmitButton from "@/components/auth/SubmitButton";
@@ -73,6 +74,7 @@ function ResetPasswordInner() {
 
   return (
     <div className="auth">
+      <BackButton className="auth-navback" iconSize={17} />
       <div className="auth-stage">
         <div className="auth-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}

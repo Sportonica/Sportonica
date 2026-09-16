@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { actionError, isActionError, type ActionError } from "@/lib/actionError";
@@ -39,12 +40,14 @@ export async function getMyVendorTournaments(): Promise<Tournament[] | ActionErr
 // export purely so /platform call sites read clearly.
 export const listAllTournaments = getMyVendorTournaments;
 
-export async function getTournament(id: string): Promise<Tournament | null | ActionError> {
+// cache()-wrapped so generateMetadata() and the page body can both call
+// this for the same request without doubling the DB round trip.
+export const getTournament = cache(async function getTournament(id: string): Promise<Tournament | null | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.from("tournaments").select("*").eq("id", id).maybeSingle();
   if (error) return actionError(error.message);
   return data as Tournament | null;
-}
+});
 
 export async function getTournamentVenueName(venueId: string | null): Promise<string | null> {
   if (!venueId) return null;
