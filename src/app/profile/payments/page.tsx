@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import "../../p/profile.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Payments — Sportonica" };
 
 const KTM = "Asia/Kathmandu";
 const when = (iso: string) =>
@@ -68,6 +71,7 @@ export default async function PaymentsPage() {
         href: `/play-together/${g.game_id}` as string | null,
       })),
   ];
+  rows.sort((a, b) => b.amount - a.amount);
 
   return (
     <div className="pf">

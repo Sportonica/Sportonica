@@ -96,6 +96,15 @@
   letter-spacing: -0.4px;
 }
 .adm-topbar-crumb { font-family: var(--a-mono); font-size: 11px; color: var(--a-faint); }
+.adm-topbar-l { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.adm-topbar-back {
+  flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--a-line-2); background: var(--a-panel-2); color: var(--a-text);
+  cursor: pointer; transition: border-color .14s ease, background .14s ease;
+}
+.adm-topbar-back:hover { border-color: var(--a-dim); background: #20252f; }
+[data-theme="paper"] .adm-topbar-back:hover { background: rgba(20,23,30,.05); }
 .adm-body { padding: 28px; max-width: 1240px; width: 100%; }
 
 /* ── Cards / panels ── */

@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { safeRedirect } from "@/lib/validation/redirect";
 import RolePicker from "./RolePicker";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Welcome — Sportonica" };
 
 export default async function WelcomePage({
   searchParams,

@@ -1,11 +1,15 @@
 import type { BookingState, VerificationStatus } from "@/lib/admin/types";
+import BackButton from "@/components/nav/BackButton";
 
 export function Topbar({ title, crumb, action }: { title: string; crumb?: string; action?: React.ReactNode }) {
   return (
     <div className="adm-topbar">
-      <div>
-        {crumb && <div className="adm-topbar-crumb">{crumb}</div>}
-        <h1>{title}</h1>
+      <div className="adm-topbar-l">
+        <BackButton className="adm-topbar-back" iconSize={17} />
+        <div>
+          {crumb && <div className="adm-topbar-crumb">{crumb}</div>}
+          <h1>{title}</h1>
+        </div>
       </div>
       {action}
     </div>
