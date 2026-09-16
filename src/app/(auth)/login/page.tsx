@@ -4,6 +4,7 @@ import { useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { Lock, AtSign } from "lucide-react";
 import GoogleButton from "@/components/GoogleButton";
+import BackButton from "@/components/nav/BackButton";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthInput from "@/components/auth/AuthInput";
 import IdentityBadge from "@/components/auth/IdentityBadge";
@@ -80,6 +81,7 @@ function LoginInner() {
 
   return (
     <div className="auth">
+      <BackButton className="auth-navback" iconSize={17} />
       <div className="auth-stage">
         {brandHome}
         <div className="auth-tagline">

@@ -4,6 +4,7 @@ import { useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { Lock, AtSign, User } from "lucide-react";
 import GoogleButton from "@/components/GoogleButton";
+import BackButton from "@/components/nav/BackButton";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthInput from "@/components/auth/AuthInput";
 import IdentityBadge from "@/components/auth/IdentityBadge";
@@ -102,6 +103,7 @@ function SignupInner() {
 
   return (
     <div className="auth">
+      <BackButton className="auth-navback" iconSize={17} />
       <div className="auth-stage">
         <div className="auth-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}

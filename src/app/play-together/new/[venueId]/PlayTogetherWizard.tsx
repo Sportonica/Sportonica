@@ -225,6 +225,10 @@ export default function PlayTogetherWizard({
     return (
       <div className="bkw">
         <div className="bk-panel">
+          <button type="button" className="bk-back" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit" }}
+            onClick={() => setAwaitingPayment(null)}>
+            <ChevronLeft size={16} /> Back
+          </button>
           <PaymentStep
             bookingType="court_booking"
             bookingId={awaitingPayment.id}
