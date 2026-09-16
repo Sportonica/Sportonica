@@ -42,3 +42,6 @@ next-env.d.ts
 
 # Local copies of DB migrations for manual application — never committed
 RUN_ME*.sql
+
+# Snapshots of deleted user data from cleanup scripts — contains PII, never committed
+/backups/

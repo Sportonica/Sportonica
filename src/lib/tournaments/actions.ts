@@ -166,7 +166,7 @@ export async function getTeamRoster(teamId: string): Promise<
     const prof = p.user_id ? map.get(p.user_id) : undefined;
     return {
       ...p,
-      name: prof?.full_name ?? prof?.name ?? prof?.username ?? p.guest_name ?? "Player",
+      name: prof?.full_name ?? prof?.name ?? prof?.username ?? p.guest_name ?? "Guest",
       username: prof?.username ?? null,
       avatar_url: prof?.avatar_url ?? null,
     };

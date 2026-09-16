@@ -1,9 +1,29 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { actionError, type ActionError } from "@/lib/actionError";
 import type { User } from "@supabase/supabase-js";
+
+// Registering for a tournament while logged out silently creates an
+// anonymous auth.users row (TournamentRegisterTab's signInAnonymously()),
+// and the handle_new_user() DB trigger gives every auth.users row a
+// profiles row regardless — so drive-by visitors who never actually sign
+// up otherwise show up here as blank "player" accounts. Filter them out
+// of platform-facing counts/lists until the trigger itself is fixed to
+// skip anonymous inserts.
+async function anonymousProfileIds(): Promise<Set<string>> {
+  const admin = createServiceClient();
+  const ids = new Set<string>();
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error || !data || data.users.length === 0) break;
+    for (const u of data.users) if (u.is_anonymous) ids.add(u.id);
+    if (data.users.length < 1000) break;
+  }
+  return ids;
+}
 
 type SuperAdminAuth =
   | { error: ActionError; sb?: undefined; user?: undefined }
@@ -35,17 +55,19 @@ export async function platformOverview() {
   if (auth.error) return auth.error;
   const { sb } = auth;
 
-  const [venues, pending, users, bookings] = await Promise.all([
+  const [venues, pending, profileIds, bookings, anonIds] = await Promise.all([
     sb.from("venues").select("id", { count: "exact", head: true }),
     sb.from("venues").select("id", { count: "exact", head: true }).eq("verification_status", "pending"),
-    sb.from("profiles").select("id", { count: "exact", head: true }),
+    sb.from("profiles").select("id"),
     sb.from("court_bookings").select("id", { count: "exact", head: true }),
+    anonymousProfileIds(),
   ]);
+  const realUsers = (profileIds.data ?? []).filter((p) => !anonIds.has(p.id)).length;
 
   return {
     venues: venues.count ?? 0,
     pending: pending.count ?? 0,
-    users: users.count ?? 0,
+    users: realUsers,
     bookings: bookings.count ?? 0,
   };
 }
@@ -126,15 +148,20 @@ export async function allUsersForPlatform() {
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.error;
   const { sb } = auth;
-  const { data } = await sb
-    .from("profiles")
-    .select("id, full_name, name, username, role, trust_score, city, is_public")
-    .order("trust_score", { ascending: false })
-    .limit(500);
-  return (data ?? []).map((u) => ({
-    ...u,
-    display_name: u.full_name ?? u.name ?? u.username ?? "—",
-  }));
+  const [{ data }, anonIds] = await Promise.all([
+    sb
+      .from("profiles")
+      .select("id, full_name, name, username, role, trust_score, city, is_public")
+      .order("trust_score", { ascending: false })
+      .limit(500),
+    anonymousProfileIds(),
+  ]);
+  return (data ?? [])
+    .filter((u) => !anonIds.has(u.id))
+    .map((u) => ({
+      ...u,
+      display_name: u.full_name ?? u.name ?? u.username ?? "—",
+    }));
 }
 
 // ── Change a user's role (promote to venue_owner, etc.) ─────────
