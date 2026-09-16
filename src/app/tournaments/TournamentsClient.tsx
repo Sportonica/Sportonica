@@ -110,7 +110,7 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
                   <div className="tc-body">
                     <span className="tc-sport">{item.sport}</span>
                     <h3 className="tc-title">{item.title}</h3>
-                    {item.organizerName && <div className="tc-org">by {item.organizerName}</div>}
+                    {item.organizerName && <div className="tc-org">By {item.organizerName}</div>}
 
                     <div className="tc-loc"><MapPin size={13} /><span>{item.venue}</span></div>
                     <div className={`tc-date${!item.when ? " tbd" : ""}`}>{dateLabel}</div>
