@@ -1,12 +1,15 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import { getMyProfile } from "@/lib/profile/queries";
 import ProfileEditor from "../ProfileEditor";
 import "../../p/profile.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Edit Profile — Sportonica" };
 
 export default async function EditProfilePage() {
   const profile = await getMyProfile();

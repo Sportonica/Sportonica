@@ -1,8 +1,18 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { getConversationPeer, getConversationMessages } from "@/lib/dm/queries";
 import DMThread from "./DMThread";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: { params: Promise<{ conversationId: string }> }): Promise<Metadata> {
+  const { conversationId } = await params;
+  const info = await getConversationPeer(conversationId);
+  const name = info?.peer.full_name ?? info?.peer.username;
+  return { title: name ? `${name} — Sportonica` : "Messages — Sportonica" };
+}
 
 export default async function ConversationPage({
   params,

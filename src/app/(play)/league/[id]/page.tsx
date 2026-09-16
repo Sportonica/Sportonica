@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ArrowLeft, Users, MapPin, Calendar } from "lucide-react";
 import { getSquad, getSquadMembers, myMemberships, getSquadMessages, getSquadPolls } from "@/lib/squads/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -12,6 +13,13 @@ import SquadPolls from "./SquadPolls";
 import { sportColor, normalizeSport } from "@/lib/sports";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const squad = await getSquad(id);
+  if (!squad) return { title: "Group — Sportonica" };
+  return { title: `${squad.name} — Sportonica` };
+}
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

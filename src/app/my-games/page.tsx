@@ -1,8 +1,11 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import MyGamesClient from "./MyGamesClient";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "My Games — Sportonica" };
 
 export default async function MyGamesPage() {
   const sb = await createClient();

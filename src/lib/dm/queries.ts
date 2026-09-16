@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient, getUser } from "@/lib/supabase/server";
 
 export interface EncryptedMessage {
@@ -36,7 +37,9 @@ export async function getConversationMessages(conversationId: string): Promise<E
 }
 
 /** Who's on the other side of a conversation, and am I actually a participant? */
-export async function getConversationPeer(conversationId: string) {
+// cache()-wrapped so generateMetadata() and the page body can both call
+// this for the same request without doubling the DB round trip.
+export const getConversationPeer = cache(async function getConversationPeer(conversationId: string) {
   const sb = await createClient();
   const user = await getUser();
   if (!user) return null;
@@ -58,7 +61,7 @@ export async function getConversationPeer(conversationId: string) {
     .maybeSingle();
 
   return { meId: user.id, peer: profile ?? { id: peerId, full_name: null, username: null, avatar_url: null } };
-}
+});
 
 /** Every conversation the current user is part of, newest activity first. */
 export async function listConversations(): Promise<ConversationSummary[]> {

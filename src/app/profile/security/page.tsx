@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import { getMyProfile } from "@/lib/profile/queries";
 import SecuritySettings from "./SecuritySettings";
 import "../../p/profile.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Login & Security — Sportonica" };
 
 export default async function SecurityPage() {
   const profile = await getMyProfile();

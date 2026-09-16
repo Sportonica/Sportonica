@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import "../../p/profile.css";
 import "../../(play)/play.css";
@@ -18,6 +19,15 @@ const SECTIONS: Record<string, { title: string; body: string }> = {
     body: "A dedicated help centre is on the way. For now, reach out to the Sportonica team directly if you run into an issue.",
   },
 };
+
+export async function generateMetadata({
+  searchParams,
+}: { searchParams: Promise<{ section?: string }> }): Promise<Metadata> {
+  const { section } = await searchParams;
+  if (section === "notifications") return { title: "Notifications — Sportonica" };
+  const title = (section && SECTIONS[section]?.title) || "Coming soon";
+  return { title: `${title} — Sportonica` };
+}
 
 export default async function ComingSoonPage({
   searchParams,

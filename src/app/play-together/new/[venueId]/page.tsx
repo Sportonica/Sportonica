@@ -1,10 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { ArrowLeft, ImageIcon } from "lucide-react";
 import { getVenueForBooking } from "@/lib/play/queries";
 import PlayTogetherWizard from "./PlayTogetherWizard";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ venueId: string }> }): Promise<Metadata> {
+  const { venueId } = await params;
+  const { venue } = await getVenueForBooking(venueId);
+  if (!venue) return { title: "Host a game — Sportonica" };
+  return { title: `Host at ${venue.name} — Sportonica` };
+}
 
 export default async function NewPlayTogetherGamePage({
   params,
