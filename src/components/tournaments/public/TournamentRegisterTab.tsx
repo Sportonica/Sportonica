@@ -107,6 +107,7 @@ export default function TournamentRegisterTab({
   const regOpen =
     tournament.status === "registration_open" &&
     new Date(tournament.registration_closes_at).getTime() > Date.now();
+  const full = openSlots === 0;
   const paid = tournament.fee > 0;
   const isIndividualRace = getSportKind(tournament.sport) === "individual_race";
 
@@ -338,19 +339,23 @@ export default function TournamentRegisterTab({
             )}
           </div>
         </>
-      ) : !team && !regOpen ? (
-        /* ── Registration not open ──────────────────────────────── */
+      ) : !team && (!regOpen || full) ? (
+        /* ── Registration not open, or full ─────────────────────── */
         <>
           {hero}
           <div className="rgt-card rgt-center">
             <div className="rgt-lock"><Clock size={20} /></div>
             <h3>
-              {tournament.status === "published"
+              {full
+                ? "Registration is full"
+                : tournament.status === "published"
                 ? "Registration hasn't opened yet"
                 : "Registration is closed"}
             </h3>
             <p>
-              {tournament.status === "published"
+              {full
+                ? "All team slots have been claimed. Check back in case a spot opens up."
+                : tournament.status === "published"
                 ? `Opens ${dateLabel(tournament.registration_opens_at)}.`
                 : "Follow the tournament for updates on the tabs above."}
             </p>

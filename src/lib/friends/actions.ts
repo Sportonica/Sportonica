@@ -53,7 +53,8 @@ export async function respondToRequest(requestId: string, decision: "accepted" |
   const { error } = await sb
     .from("friend_requests")
     .update({ status: decision })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("addressee_id", user.id);
   if (error) return actionError(error.message);
   revalidatePath("/friends");
 }

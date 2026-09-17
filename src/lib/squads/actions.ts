@@ -200,10 +200,16 @@ export async function decideRequest(
 ) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+
+  // Only the squad creator can decide requests for it.
+  const { data: sq } = await sb.from("squads").select("creator_id").eq("id", squadId).maybeSingle();
+  if (!sq || sq.creator_id !== user.id) return actionError("FORBIDDEN");
+
   const { error } = await sb
     .from("squad_requests")
     .update({ status: decision })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .eq("squad_id", squadId);
   if (error) return actionError(error.message);
   revalidatePath(`/league/${squadId}`);
 }

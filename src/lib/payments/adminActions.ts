@@ -292,9 +292,12 @@ export async function getPaymentOverviewStats() {
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.error;
   const { sb } = auth;
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayIso = todayStart.toISOString();
+  // "Today" in Kathmandu wall-clock time, not server-local/UTC — every
+  // other date in this file displays in Asia/Kathmandu (see fmt() below),
+  // and using UTC midnight here miscounts anything approved/rejected in
+  // the ~5h45m gap between UTC midnight and Kathmandu midnight.
+  const todayKtm = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" });
+  const todayIso = new Date(`${todayKtm}T00:00:00+05:45`).toISOString();
 
   const [pending, approvedToday, rejectedToday, approvedAll, esewaApproved, khaltiApproved] = await Promise.all([
     sb.from("payments").select("id", { count: "exact", head: true }).eq("status", "PENDING_VERIFICATION"),
