@@ -187,17 +187,19 @@ independent of the technical gaps above.
    account handed to reviewers, both stores will bounce the submission
    asking for one. Needs a seeded test account (or a documented way to
    create one) that isn't tied to a real person.
-4. ⬜ **User-blocking isn't implemented (Apple Guideline 1.2 — UGC apps).**
-   The app has messaging ([`(play)/messages`](../src/app/(play)/messages)),
-   game listings, and public profiles — Apple requires apps with
-   user-generated content or user-to-user communication to let users
-   **block abusive users**, not just report them. Reporting exists and
-   works (`fileReport` in [`squads/actions.ts`](../src/lib/squads/actions.ts)
-   feeds an admin moderation queue at `/platform/reports`), but "blocked
-   users" is explicitly listed as **coming soon** in
-   [`profile/coming-soon/page.tsx`](../src/app/profile/coming-soon/page.tsx).
-   This needs to ship before submitting an app with the messaging feature
-   turned on, or the feature needs to be gated off for v1.
+4. ✅ **Fixed.** User-blocking (Apple Guideline 1.2 — UGC apps) is shipped
+   and verified in production (PR #16). Blocking someone ends the
+   friendship, cancels pending friend requests, stops new friend requests
+   and new DM sends (in either direction, even in an existing
+   conversation — closed a real pre-existing gap where DM send RLS only
+   checked participancy, not live friendship), and never reveals to the
+   blocked party that they've been blocked. `RUN_ME_user_blocking.sql` ran
+   clean against production (table, functions, and policies all
+   confirmed present). Reporting (`fileReport` in
+   [`squads/actions.ts`](../src/lib/squads/actions.ts)) still feeds the
+   admin moderation queue at `/platform/reports` alongside it. Profile →
+   Privacy now lists and manages blocked users for real instead of the
+   old "coming soon" stub.
 5. ⬜ **Age rating / target audience.** [`terms/page.tsx`](../src/app/(legal)/terms/page.tsx)
    requires users to be **18+** to register. Set both consoles' age-rating
    questionnaires accordingly (Apple: 17+, the highest standard tier — note
@@ -246,7 +248,7 @@ link `https://www.sportonica.com/account-deletion` in:
 - [x] Add an iOS Privacy Manifest (`PrivacyInfo.xcprivacy`)
 - [x] Add `ITSAppUsesNonExemptEncryption = false` to `Info.plist`
 - [ ] Seed a reviewer/demo account and document it for App Review Information / Play App access
-- [ ] Ship (or feature-gate) user-blocking before submitting with messaging enabled
+- [x] Ship (or feature-gate) user-blocking before submitting with messaging enabled
 - [ ] Set age rating / target audience to 18+ adults in both consoles
 - [ ] Run the Play Console policy checker on the payment-facilitation flow (Financial features)
 - [ ] Confirm whether the Play Console account needs 14-day closed testing before production
