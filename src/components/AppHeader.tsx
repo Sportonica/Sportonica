@@ -160,12 +160,12 @@ export default function AppHeader() {
                 )}
               </Link>
             ) : (
-              // Logged out — the brand mark, not a login link. Sign-in lives
-              // as its own button in the top-right actions.
-              <div className="ah-av" aria-hidden="true">
+              // Logged out — the brand mark. Sign-in lives as its own
+              // button in the top-right actions; this just goes home.
+              <Link href="/" className="ah-av" aria-label="Sportonica home">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/icons/mark.png" alt="" className="ah-av-mark" />
-              </div>
+              </Link>
             )}
 
             <div className="ah-txt">

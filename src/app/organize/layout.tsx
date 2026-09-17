@@ -15,14 +15,14 @@ export default function OrganizeLayout({ children }: { children: React.ReactNode
   return (
     <div className="plt">
       <header className="plt-top">
-        <div className="plt-brand">
+        <Link href="/organize" className="plt-brand" style={{ textDecoration: "none", color: "inherit" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/mark.png" alt="" className="plt-k" />
           <div>
             <div className="plt-name">Sportonica</div>
             <div className="plt-sub">Organize</div>
           </div>
-        </div>
+        </Link>
         <nav className="plt-nav">
           <Link href="/organize">Tournaments</Link>
           <Link href="/organize/partnerships">Venues</Link>
