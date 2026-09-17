@@ -33,6 +33,19 @@ async function requireUser() {
   return { sb, user };
 }
 
+// Same check addStaff() already does, and for the same reason: RLS would
+// reject an unauthorized write anyway, but checking here first turns a raw
+// Postgres error into a clean FORBIDDEN for a staff member/owner poking at
+// a venue_id that isn't theirs.
+async function requireVenueAccess(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  venueId: string,
+  minRole: "owner" | "manager" = "manager",
+) {
+  const { data: canManage } = await sb.rpc("has_venue_access", { v_id: venueId, min_role: minRole });
+  return !!canManage;
+}
+
 // ── VENUES ───────────────────────────────────────────────────────
 export async function createVenue(input: {
   name: string;
@@ -63,6 +76,7 @@ export async function createVenue(input: {
 export async function updateVenue(id: string, patch: Record<string, unknown>) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, id))) return actionError("FORBIDDEN");
   const safe = pickVenueFields(patch);
   if (typeof safe.phone === "string" && !isValidLocalPhone(safe.phone)) {
     return actionError("Phone number must contain exactly 10 digits.");
@@ -80,6 +94,7 @@ export async function updateVenue(id: string, patch: Record<string, unknown>) {
 export async function uploadVenuePhoto(venueId: string, file: File): Promise<string | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venueId))) return actionError("FORBIDDEN");
   const ext = file.name.split(".").pop() ?? "jpg";
   const path = `${venueId}/${Date.now()}.${ext}`;
 
@@ -106,6 +121,7 @@ export async function uploadVenuePhoto(venueId: string, file: File): Promise<str
 export async function addVenuePhotoUrl(venueId: string, url: string) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venueId))) return actionError("FORBIDDEN");
   const { data: venue } = await sb.from("venues").select("photos").eq("id", venueId).single();
   const photos = [...(venue?.photos ?? []), url];
   const { error } = await sb.from("venues").update({ photos }).eq("id", venueId);
@@ -117,6 +133,7 @@ export async function addVenuePhotoUrl(venueId: string, url: string) {
 export async function removeVenuePhoto(venueId: string, url: string) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venueId))) return actionError("FORBIDDEN");
   const { data: venue } = await sb.from("venues").select("photos").eq("id", venueId).single();
   const photos = (venue?.photos ?? []).filter((p: string) => p !== url);
   const { error } = await sb.from("venues").update({ photos }).eq("id", venueId);
@@ -135,6 +152,7 @@ export async function createCourt(input: {
 }) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, input.venue_id))) return actionError("FORBIDDEN");
   const { data, error } = await sb.from("courts").insert(input).select().single();
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${input.venue_id}`);
@@ -144,7 +162,8 @@ export async function createCourt(input: {
 export async function updateCourt(id: string, venue_id: string, patch: Record<string, unknown>) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
-  const { error } = await sb.from("courts").update(patch).eq("id", id);
+  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
+  const { error } = await sb.from("courts").update(patch).eq("id", id).eq("venue_id", venue_id);
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${venue_id}`);
 }
@@ -158,6 +177,7 @@ export async function setCourtHours(
 ) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
   await sb.from("court_hours").delete().eq("court_id", court_id);
   if (rows.length) {
     const { error } = await sb.from("court_hours").insert(rows.map((r) => ({ ...r, court_id })));
@@ -177,6 +197,7 @@ export async function createBlock(input: {
 }) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, input.venue_id))) return actionError("FORBIDDEN");
   const { court_id, starts_at, ends_at, reason = "manual", note } = input;
   const { data, error } = await sb
     .from("court_blocks")
@@ -191,6 +212,7 @@ export async function createBlock(input: {
 export async function deleteBlock(id: string, venue_id: string) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
   const { error } = await sb.from("court_blocks").delete().eq("id", id);
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${venue_id}/calendar`);
@@ -275,6 +297,7 @@ export async function bookCourt(input: {
 export async function setBookingState(id: string, venue_id: string, state: string) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
   if (!BOOKING_STATES.has(state)) return actionError("That isn't a valid booking status.");
   const { error } = await sb.from("court_bookings").update({ state }).eq("id", id);
   if (error) { console.error("[setBookingState]", error.message); return actionError("Could not update that booking."); }
@@ -296,6 +319,7 @@ export async function createPricingRule(input: {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { venue_id, ...row } = input;
+  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
   const { data, error } = await sb.from("pricing_rules").insert(row).select().single();
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${venue_id}/pricing`);
@@ -305,6 +329,7 @@ export async function createPricingRule(input: {
 export async function togglePricingRule(id: string, venue_id: string, active: boolean) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
   const { error } = await sb.from("pricing_rules").update({ active }).eq("id", id);
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${venue_id}/pricing`);

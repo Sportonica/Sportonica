@@ -24,8 +24,11 @@ export default async function PayoutsPage() {
 
   const gross = earning.reduce((s, b) => s + Number(b.price), 0);
   const commission = gross * COMMISSION;
-  const net = gross - commission;
   const settled = payouts.filter((p) => p.status === "settled").reduce((s, p) => s + Number(p.net), 0);
+  // Lifetime net earned minus what's already been paid out — not just
+  // lifetime net, which never drops once a payout settles and would
+  // overstate what's still owed forever.
+  const net = Math.max(gross - commission - settled, 0);
 
   return (
     <>

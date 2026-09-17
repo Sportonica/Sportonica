@@ -202,11 +202,27 @@ function SlotModal({
 }) {
   const [start, setStart] = useState(defaultStart);
   const [end, setEnd] = useState(() => {
-    const h = (parseInt(defaultStart.slice(0, 2), 10) + 1) % 24;
-    return `${String(h).padStart(2, "0")}:00`;
+    // This modal has no way to represent a range crossing midnight (start
+    // and end always share the same calendar day, see ktmIso() call sites)
+    // — so a 23:xx start defaults to the last representable same-day time
+    // instead of wrapping to "00:00", which would silently look like a
+    // valid 1-hour slot but is actually a negative-duration range.
+    const h = parseInt(defaultStart.slice(0, 2), 10);
+    if (h >= 23) return "23:59";
+    return `${String(h + 1).padStart(2, "0")}:00`;
   });
   const [reason, setReason] = useState(kind === "block" ? "maintenance" : "walk_in");
   const [note, setNote] = useState("");
+  const [localErr, setLocalErr] = useState<string | null>(null);
+
+  function handleSubmit() {
+    if (end <= start) {
+      setLocalErr("End time must be after start time.");
+      return;
+    }
+    setLocalErr(null);
+    onSubmit({ start, end, reason, note });
+  }
 
   return (
     <div style={{
@@ -248,10 +264,10 @@ function SlotModal({
             <input className="adm-input" value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
         )}
-        {err && <div className="adm-badge danger" style={{ marginBottom: 12 }}>{err}</div>}
+        {(localErr || err) && <div className="adm-badge danger" style={{ marginBottom: 12 }}>{localErr || err}</div>}
         <div className="adm-flex">
           <button className="adm-btn primary sm" disabled={pending}
-            onClick={() => onSubmit({ start, end, reason, note })}>
+            onClick={handleSubmit}>
             {pending ? "Saving…" : kind === "block" ? "Block slot" : "Add booking"}
           </button>
           <button className="adm-btn ghost sm" onClick={onClose}>Cancel</button>

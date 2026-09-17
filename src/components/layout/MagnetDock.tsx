@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Volleyball, CalendarPlus, MessagesSquare, Trophy } from "lucide-react";
 import { isBareChromeRoute } from "@/lib/nav/authRoutes";
@@ -195,7 +196,7 @@ export default function MagnetDock() {
         {LINKS.map((item, i) => {
           const scale = hoverIdx === null ? 1 : magnify(i - hoverIdx);
           return (
-            <a
+            <Link
               key={item.href}
               href={item.href}
               className={`dock-item ${isActive(item.href) ? "active" : ""}`}
@@ -204,7 +205,7 @@ export default function MagnetDock() {
             >
               {item.icon}
               <span className="dock-label">{item.label}</span>
-            </a>
+            </Link>
           );
         })}
       </div>
