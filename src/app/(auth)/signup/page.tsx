@@ -4,6 +4,7 @@ import { useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { Lock, AtSign, User } from "lucide-react";
 import GoogleButton from "@/components/GoogleButton";
+import AppleButton from "@/components/AppleButton";
 import BackButton from "@/components/nav/BackButton";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthInput from "@/components/auth/AuthInput";
@@ -194,6 +195,19 @@ function SignupInner() {
           <GoogleButton
             next={safeRedirect(redirect)}
             label="Sign up with Google"
+            guard={() => {
+              if (!agreed) {
+                setConsentErr(true);
+                setErr("Please agree to the Terms and conditions and Privacy policy to continue.");
+                return false;
+              }
+              return true;
+            }}
+          />
+          <div style={{ height: 10 }} />
+          <AppleButton
+            next={safeRedirect(redirect)}
+            label="Sign up with Apple"
             guard={() => {
               if (!agreed) {
                 setConsentErr(true);

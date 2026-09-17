@@ -4,6 +4,7 @@ import { useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { Lock, AtSign } from "lucide-react";
 import GoogleButton from "@/components/GoogleButton";
+import AppleButton from "@/components/AppleButton";
 import BackButton from "@/components/nav/BackButton";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthInput from "@/components/auth/AuthInput";
@@ -136,6 +137,8 @@ function LoginInner() {
 
           <div className="auth-or"><span>or</span></div>
           <GoogleButton next={safeRedirect(redirect)} label="Sign in with Google" />
+          <div style={{ height: 10 }} />
+          <AppleButton next={safeRedirect(redirect)} label="Sign in with Apple" />
 
           <div className="auth-alt">
             New here?{" "}

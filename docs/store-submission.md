@@ -131,17 +131,38 @@ These aren't config typos — they're store **policy** requirements the app
 doesn't satisfy yet. Each one is a plausible rejection reason on its own,
 independent of the technical gaps above.
 
-1. ⬜ **Missing "Sign in with Apple" (Apple Guideline 4.8).** The app offers
-   Google OAuth as a login option ([`GoogleButton.tsx`](../src/components/GoogleButton.tsx),
-   used in [`login`](../src/app/(auth)/login/page.tsx) and
+1. 🟡 **Code shipped, blocked on paid Apple Developer enrollment (Apple
+   Guideline 4.8).** The app offers Google OAuth as a login option
+   ([`GoogleButton.tsx`](../src/components/GoogleButton.tsx), used in
+   [`login`](../src/app/(auth)/login/page.tsx) and
    [`signup`](../src/app/(auth)/signup/page.tsx)) alongside email/password.
    Any app offering a third-party/social login for account creation must
    also offer Sign in with Apple as an equivalent, privacy-preserving
    option — this is one of the most common iOS rejection reasons for apps
-   that already have Google/Facebook login. Needs the
-   `@capacitor-community/apple-sign-in` plugin (or equivalent) wired into
-   the same auth flow as `GoogleButton.tsx`, plus a corresponding Supabase
-   Apple OAuth provider.
+   that already have Google/Facebook login.
+
+   Added [`AppleButton.tsx`](../src/components/AppleButton.tsx), wired into
+   both auth pages identically to `GoogleButton.tsx` — same
+   `signInWithOAuth` → system-browser → `/auth/callback` round trip
+   (`CapacitorBridge.tsx`'s `appUrlOpen` listener was already
+   provider-agnostic, no change needed there). This is the **web OAuth**
+   flow, not the native `ASAuthorizationAppleIDProvider` SDK, which means
+   **no Xcode/entitlements changes and no native Capacitor plugin are
+   needed** — it's the same pattern already shipping for Google, just
+   pointed at `provider: "apple"`.
+
+   What's still blocked on paying for the $99/yr Apple Developer Program
+   (can't be done without it):
+   - Create a **Services ID** in the Apple Developer portal with "Sign in
+     with Apple" enabled, domain `sportonica.com`, return URL
+     `https://<your-supabase-project-ref>.supabase.co/auth/v1/callback`
+   - Generate a **Sign in with Apple private key** (Keys → +) — note the
+     Key ID and Team ID (`35K8C9GK45`, already known)
+   - In Supabase Dashboard → Authentication → Providers → Apple: enable
+     it, paste in the Services ID as Client ID, the Team ID, Key ID, and
+     the private key content as the Secret Key
+   - No App ID capability change needed (that's only required for the
+     native SDK flow, which this isn't using)
 2. ✅ **Fixed.** Added [`ios/App/App/PrivacyInfo.xcprivacy`](../ios/App/App/PrivacyInfo.xcprivacy)
    and wired it into the Xcode target (`project.pbxproj` — file reference,
    build file, group membership, and Resources build phase). Checked the
@@ -221,7 +242,7 @@ link `https://www.sportonica.com/account-deletion` in:
 - [x] Fix `Info.plist` usage-description keys
 - [x] Fix `apple-app-site-association` team-ID placeholder
 - [ ] Generate a release keystore and fill in `assetlinks.json`'s production SHA-256
-- [ ] Add Sign in with Apple alongside Google OAuth
+- [x] Add Sign in with Apple alongside Google OAuth (client code) — [ ] still needs the Services ID + private key + Supabase provider config once the Apple Developer account is paid for
 - [x] Add an iOS Privacy Manifest (`PrivacyInfo.xcprivacy`)
 - [x] Add `ITSAppUsesNonExemptEncryption = false` to `Info.plist`
 - [ ] Seed a reviewer/demo account and document it for App Review Information / Play App access
