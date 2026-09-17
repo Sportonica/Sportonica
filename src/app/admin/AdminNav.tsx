@@ -41,11 +41,11 @@ export default function AdminNav() {
         <button className="adm-mobilebar-btn" onClick={() => setOpen(true)} aria-label="Open menu">
           <Menu size={20} />
         </button>
-        <div className="adm-mobilebar-brand">
+        <Link href="/admin" className="adm-mobilebar-brand" style={{ textDecoration: "none", color: "inherit" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/mark.png" alt="" className="adm-brand-mark" />
+          <img src="/icons/mark.png" alt="" className="adm-brand-mark" />
           <span>Sportonica</span>
-        </div>
+        </Link>
       </div>
 
       {open && <div className="adm-scrim" onClick={() => setOpen(false)} />}

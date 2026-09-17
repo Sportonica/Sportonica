@@ -301,11 +301,11 @@ export default function Onboarding() {
     >
       <div className="ob-card">
         <div className="ob-top">
-          <div className="ob-brand">
+          <button className="ob-brand" onClick={() => finish("/")} aria-label="Sportonica home">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/icons/mark.png" alt="" />
             Sportonica
-          </div>
+          </button>
           <button className="ob-skip" onClick={() => finish()}>
             Skip
           </button>

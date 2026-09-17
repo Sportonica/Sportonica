@@ -113,11 +113,11 @@ function SignupInner() {
     <div className="auth">
       <BackButton className="auth-navback" iconSize={17} />
       <div className="auth-stage">
-        <div className="auth-brand">
+        <Link href="/" className="auth-brand" aria-label="Sportonica — go to the home page">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/mark.png" alt="" className="auth-brand-mark" />
           <div className="auth-brand-name">Sportonica</div>
-        </div>
+        </Link>
         <div className="auth-tagline">
           <h2>Find. Book. <em>Play.</em></h2>
           <p>Join as a player to host and find matches — or list your venue and start taking bookings today.</p>
