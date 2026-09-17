@@ -40,7 +40,7 @@ async function requireUser() {
 async function requireVenueAccess(
   sb: Awaited<ReturnType<typeof createClient>>,
   venueId: string,
-  minRole: "owner" | "manager" = "manager",
+  minRole: "owner" | "manager" | "staff" = "manager",
 ) {
   const { data: canManage } = await sb.rpc("has_venue_access", { v_id: venueId, min_role: minRole });
   return !!canManage;
@@ -197,7 +197,8 @@ export async function createBlock(input: {
 }) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
-  if (!(await requireVenueAccess(sb, input.venue_id))) return actionError("FORBIDDEN");
+  // blocks_staff (admin_schema.sql) only requires 'staff', not 'manager'.
+  if (!(await requireVenueAccess(sb, input.venue_id, "staff"))) return actionError("FORBIDDEN");
   const { court_id, starts_at, ends_at, reason = "manual", note } = input;
   const { data, error } = await sb
     .from("court_blocks")
@@ -212,7 +213,8 @@ export async function createBlock(input: {
 export async function deleteBlock(id: string, venue_id: string) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
-  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
+  // blocks_staff (admin_schema.sql) only requires 'staff', not 'manager'.
+  if (!(await requireVenueAccess(sb, venue_id, "staff"))) return actionError("FORBIDDEN");
   const { error } = await sb.from("court_blocks").delete().eq("id", id);
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${venue_id}/calendar`);
@@ -297,7 +299,8 @@ export async function bookCourt(input: {
 export async function setBookingState(id: string, venue_id: string, state: string) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
-  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
+  // bk_staff_all (admin_schema.sql) only requires 'staff', not 'manager'.
+  if (!(await requireVenueAccess(sb, venue_id, "staff"))) return actionError("FORBIDDEN");
   if (!BOOKING_STATES.has(state)) return actionError("That isn't a valid booking status.");
   const { error } = await sb.from("court_bookings").update({ state }).eq("id", id);
   if (error) { console.error("[setBookingState]", error.message); return actionError("Could not update that booking."); }
