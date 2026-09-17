@@ -87,6 +87,44 @@ numbers.
 | Screenshots | Largest current iPhone size Xcode/App Store Connect requires at submission time (check then — this has changed release over release); iPad if supporting tablets | Phone (min 2, up to 8); 7"/10" tablet if supporting tablets | ⬜ none captured yet |
 | App preview video | Optional | Optional | ⬜ not planned for v1 |
 
+### Screenshot shot list
+
+No device emulation tooling was available in this session (Claude in
+Chrome's browser control wasn't connected), so these weren't captured
+here — this is the exact list and method to do it by hand. The app is a
+Capacitor shell with **no native chrome** (`capacitor.config.ts` — full-
+screen WKWebView loading the live site), so a correctly device-emulated
+browser screenshot of `https://www.sportonica.com` is visually identical
+to what the native app shows. Chrome DevTools' device toolbar does this
+properly (real device pixel ratio + viewport), which a plain browser
+window resize can't.
+
+**Method (repeat per device below):**
+1. Open `https://www.sportonica.com` in Chrome
+2. DevTools → Toggle device toolbar (`Cmd+Shift+M` / `Ctrl+Shift+M`)
+3. Pick the device preset (or a Custom one matching the dimensions below), zoom 100%
+4. `Cmd+Shift+P` / `Ctrl+Shift+P` → **"Capture screenshot"** — this exports at the emulated device's real pixel dimensions, not the CSS window size, so it comes out submission-ready with no manual resizing
+5. Repeat for each screen in the shot list, save as `store-assets/ios/<n>-<name>.png` / `store-assets/android/<n>-<name>.png`
+
+**Devices:**
+| Store | DevTools preset (or Custom) | Output pixels |
+|---|---|---|
+| iOS | iPhone 15 Pro Max (or whatever the current largest iPhone preset is — verify against App Store Connect's current requirement at submission time) | 1290×2796 |
+| Android | Pixel 7 Pro, or Custom at 1080×2400 | matches preset / 1080×2400 |
+
+**Screens to capture (public pages — no login needed, already have real seeded content):**
+1. **Home** (`/`) — hero + featured events
+2. **Discover** (`/discover`) — event list + map, the core "find a game" experience
+3. **Tournaments** (`/tournaments`) — tournament listing
+4. **Tournament detail** (`/tournaments/[id]`) — pick one live tournament, shows the registration/fixtures tabs
+5. A **venue or game detail** view reached from Discover — shows the booking flow entry point
+
+**Authenticated screens (optional, sign in with the reviewer account first — see item 3 above for credentials):**
+6. **Profile** (`/profile`) — note: the seeded `appreview@sportonica.com` account is brand new with no games/bookings, so this will look sparse. Either accept that (it's honestly what a new user sees) or sign in as an account with real history if you want a more populated screenshot — don't use a real person's account for a public screenshot.
+7. **Messages** or **Play Together** — same caveat as above
+
+Play Store additionally wants at least 2 screenshots (up to 8); App Store Connect wants at least 1 per required device size (more is better, most listings use 4-6). The 5 public screens above comfortably cover both minimums without touching the empty-account problem.
+
 ---
 
 ## Pre-submission technical gaps
@@ -179,14 +217,18 @@ independent of the technical gaps above.
    instead. **Re-check this file if any native Capacitor plugin is added
    later** (e.g. a native Geolocation or Camera plugin instead of the
    current plain web APIs) — those would need real entries here.
-3. ⬜ **No reviewer/demo account documented.** Almost the entire app sits
-   behind login (booking, messages, tournaments, profile). Both consoles
-   ask for this explicitly: App Store Connect → App Review Information →
-   sign-in credentials + notes for the reviewer; Play Console → App content
-   → **App access** → instructions or credentials. Without a working test
-   account handed to reviewers, both stores will bounce the submission
-   asking for one. Needs a seeded test account (or a documented way to
-   create one) that isn't tied to a real person.
+3. ✅ **Fixed.** Reviewer/demo account seeded and verified working
+   (sign-in tested end to end, profile lands with `role: "player"` so it
+   skips `/welcome` onboarding and drops straight into `/discover`).
+   [`scripts/seed-demo-account.mjs`](../scripts/seed-demo-account.mjs) —
+   idempotent, re-run it any time to reset the password and get fresh
+   credentials printed to the terminal (never written to a file — this
+   repo's `.gitignore` already excludes `.env*` and `/backups/` for
+   secrets, but simplest is to just not persist it at all). Account:
+   `appreview@sportonica.com`. **Paste the current password into App
+   Store Connect → App Review Information and Play Console → App content
+   → App access when you submit** — the script doesn't do that part for
+   you, and it only prints the password once per run.
 4. ✅ **Fixed.** User-blocking (Apple Guideline 1.2 — UGC apps) is shipped
    and verified in production (PR #16). Blocking someone ends the
    friendship, cancels pending friend requests, stops new friend requests
@@ -247,7 +289,7 @@ link `https://www.sportonica.com/account-deletion` in:
 - [x] Add Sign in with Apple alongside Google OAuth (client code) — [ ] still needs the Services ID + private key + Supabase provider config once the Apple Developer account is paid for
 - [x] Add an iOS Privacy Manifest (`PrivacyInfo.xcprivacy`)
 - [x] Add `ITSAppUsesNonExemptEncryption = false` to `Info.plist`
-- [ ] Seed a reviewer/demo account and document it for App Review Information / Play App access
+- [x] Seed a reviewer/demo account (`scripts/seed-demo-account.mjs`) — still needs pasting into App Review Information / Play App access at actual submission time
 - [x] Ship (or feature-gate) user-blocking before submitting with messaging enabled
 - [ ] Set age rating / target audience to 18+ adults in both consoles
 - [ ] Run the Play Console policy checker on the payment-facilitation flow (Financial features)
