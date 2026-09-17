@@ -28,6 +28,8 @@
 	<string>Sportonica uses your camera to let you take a photo for your profile picture or as proof of payment.</string>
 	<key>NSPhotoLibraryUsageInfo</key>
 	<string>Sportonica uses your photo library to let you choose a profile picture, venue photo, or payment screenshot to upload.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

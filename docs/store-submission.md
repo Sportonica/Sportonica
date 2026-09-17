@@ -84,7 +84,7 @@ numbers.
 | App icon | 1024×1024, [`AppIcon.appiconset`](../ios/App/App/Assets.xcassets/AppIcon.appiconset) | Adaptive icon, `mipmap-*/ic_launcher*` | ✅ present on both |
 | Play Store hi-res icon (512×512) | — | Not yet exported to Play Console; source available at [`public/icons/icon-512.png`](../public/icons/icon-512.png) | ⬜ needs export |
 | Feature graphic (1024×500, Android) | — | Not created | ⬜ missing — needs design |
-| Screenshots | 6.7" iPhone required (1290×2796); iPad if supporting tablets | Phone (min 2, up to 8); 7"/10" tablet if supporting tablets | ⬜ none captured yet |
+| Screenshots | Largest current iPhone size Xcode/App Store Connect requires at submission time (check then — this has changed release over release); iPad if supporting tablets | Phone (min 2, up to 8); 7"/10" tablet if supporting tablets | ⬜ none captured yet |
 | App preview video | Optional | Optional | ⬜ not planned for v1 |
 
 ---
@@ -125,6 +125,86 @@ either submission:
 
 ---
 
+## Store-policy compliance gaps
+
+These aren't config typos — they're store **policy** requirements the app
+doesn't satisfy yet. Each one is a plausible rejection reason on its own,
+independent of the technical gaps above.
+
+1. ⬜ **Missing "Sign in with Apple" (Apple Guideline 4.8).** The app offers
+   Google OAuth as a login option ([`GoogleButton.tsx`](../src/components/GoogleButton.tsx),
+   used in [`login`](../src/app/(auth)/login/page.tsx) and
+   [`signup`](../src/app/(auth)/signup/page.tsx)) alongside email/password.
+   Any app offering a third-party/social login for account creation must
+   also offer Sign in with Apple as an equivalent, privacy-preserving
+   option — this is one of the most common iOS rejection reasons for apps
+   that already have Google/Facebook login. Needs the
+   `@capacitor-community/apple-sign-in` plugin (or equivalent) wired into
+   the same auth flow as `GoogleButton.tsx`, plus a corresponding Supabase
+   Apple OAuth provider.
+2. ✅ **Fixed.** Added [`ios/App/App/PrivacyInfo.xcprivacy`](../ios/App/App/PrivacyInfo.xcprivacy)
+   and wired it into the Xcode target (`project.pbxproj` — file reference,
+   build file, group membership, and Resources build phase). Checked the
+   actual source of every installed Capacitor package
+   (`@capacitor/core`, `ios`, `app`, `browser`, `splash-screen`,
+   `status-bar`) in `node_modules` for the required-reason API patterns
+   Apple's manifest cares about (`UserDefaults`, file/volume timestamps,
+   disk space, system boot time) — none were found, so the manifest
+   declares `NSPrivacyAccessedAPITypes` empty, `NSPrivacyTracking = false`,
+   and no tracking domains. `NSPrivacyCollectedDataTypes` is also left
+   empty since the native binary itself doesn't collect data — all
+   collection happens in the remote web content loaded into the WKWebView,
+   which is covered by the App Store Connect Privacy Nutrition Label
+   instead. **Re-check this file if any native Capacitor plugin is added
+   later** (e.g. a native Geolocation or Camera plugin instead of the
+   current plain web APIs) — those would need real entries here.
+3. ⬜ **No reviewer/demo account documented.** Almost the entire app sits
+   behind login (booking, messages, tournaments, profile). Both consoles
+   ask for this explicitly: App Store Connect → App Review Information →
+   sign-in credentials + notes for the reviewer; Play Console → App content
+   → **App access** → instructions or credentials. Without a working test
+   account handed to reviewers, both stores will bounce the submission
+   asking for one. Needs a seeded test account (or a documented way to
+   create one) that isn't tied to a real person.
+4. ⬜ **User-blocking isn't implemented (Apple Guideline 1.2 — UGC apps).**
+   The app has messaging ([`(play)/messages`](../src/app/(play)/messages)),
+   game listings, and public profiles — Apple requires apps with
+   user-generated content or user-to-user communication to let users
+   **block abusive users**, not just report them. Reporting exists and
+   works (`fileReport` in [`squads/actions.ts`](../src/lib/squads/actions.ts)
+   feeds an admin moderation queue at `/platform/reports`), but "blocked
+   users" is explicitly listed as **coming soon** in
+   [`profile/coming-soon/page.tsx`](../src/app/profile/coming-soon/page.tsx).
+   This needs to ship before submitting an app with the messaging feature
+   turned on, or the feature needs to be gated off for v1.
+5. ⬜ **Age rating / target audience.** [`terms/page.tsx`](../src/app/(legal)/terms/page.tsx)
+   requires users to be **18+** to register. Set both consoles' age-rating
+   questionnaires accordingly (Apple: 17+, the highest standard tier — note
+   Apple has no dedicated 18+ tier, so 17+ plus the ToS age-gate is the
+   correct combination; Play: complete the IARC questionnaire honestly and
+   set target audience to adults, not "designed for families").
+6. ⬜ **Play Console "Financial features" declaration — needs a policy check.**
+   The app facilitates real-money court/tournament bookings (QR-code /
+   eSewa / Khalti payment-proof upload flow in
+   [`PaymentStep.tsx`](../src/components/payments/PaymentStep.tsx)). Even
+   though Sportonica doesn't hold funds itself, Play's Financial Services
+   policy can still apply to apps that facilitate payments between users —
+   confirm with Play Console's policy checker before submitting so the
+   listing isn't rejected or held for extra verification.
+7. ✅ **Fixed.** Added `ITSAppUsesNonExemptEncryption = false` to
+   [`ios/App/App/Info.plist`](../ios/App/App/Info.plist). The app only uses
+   standard HTTPS/TLS, which qualifies for Apple's export-compliance
+   exemption, so this skips the manual encryption question on every App
+   Store Connect build upload.
+8. ⬜ **Play Console closed-testing requirement.** Newer (and personal)
+   Google Play developer accounts must run a closed test with a minimum
+   number of testers for at least 14 continuous days before Play grants
+   production access. Confirm the Sportonica Play Console account's
+   creation date/type and whether this gate applies before assuming a
+   direct-to-production release is possible.
+
+---
+
 ## Account deletion requirement
 
 Both stores require self-serve, in-app account deletion for any account
@@ -141,9 +221,16 @@ link `https://www.sportonica.com/account-deletion` in:
 - [x] Fix `Info.plist` usage-description keys
 - [x] Fix `apple-app-site-association` team-ID placeholder
 - [ ] Generate a release keystore and fill in `assetlinks.json`'s production SHA-256
+- [ ] Add Sign in with Apple alongside Google OAuth
+- [x] Add an iOS Privacy Manifest (`PrivacyInfo.xcprivacy`)
+- [x] Add `ITSAppUsesNonExemptEncryption = false` to `Info.plist`
+- [ ] Seed a reviewer/demo account and document it for App Review Information / Play App access
+- [ ] Ship (or feature-gate) user-blocking before submitting with messaging enabled
+- [ ] Set age rating / target audience to 18+ adults in both consoles
+- [ ] Run the Play Console policy checker on the payment-facilitation flow (Financial features)
+- [ ] Confirm whether the Play Console account needs 14-day closed testing before production
 - [ ] Capture real device screenshots for both stores
 - [ ] Design the Android feature graphic (1024×500)
 - [ ] Sign off on listing copy (name/subtitle/description/keywords)
 - [ ] Fill in the Data Safety form (Play Console) and Privacy Nutrition Label (App Store Connect) from the data table above
-- [ ] Create Play Console release keystore, update `assetlinks.json` with its SHA-256
 - [ ] First internal/TestFlight build once the above are resolved
