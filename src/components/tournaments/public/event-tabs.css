@@ -482,18 +482,7 @@
   .ev2-bracket-meta { padding: 7px 13px 9px; font-size: 11px; }
 }
 
-/* ── Translate button + extracted price table (description/rules) ── */
-.tr-btn {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700;
-  padding: 6px 13px; border-radius: 999px; margin-bottom: 14px; cursor: pointer;
-  background: rgba(0,135,90,0.12); border: 1px solid rgba(0,135,90,0.28); color: #00875a;
-  transition: background .14s ease, opacity .14s ease;
-}
-.tr-btn:hover:not(:disabled) { background: rgba(0,135,90,0.2); }
-.tr-btn:disabled { opacity: 0.6; cursor: default; }
-
-.tr-error { font-size: 12.5px; color: #ef4444; margin-bottom: 12px; }
-
+/* ── Formatted description/rules text + extracted price table ── */
 .tr-para { font-size: 14px; opacity: 0.8; line-height: 1.65; white-space: pre-wrap; margin: 0 0 14px; }
 .tr-para:last-child { margin-bottom: 0; }
 

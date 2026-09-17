@@ -18,7 +18,7 @@ import {
 import TournamentRegisterTab from "./TournamentRegisterTab";
 import DayFixturesShareButton from "./DayFixturesShareButton";
 import BracketBoard from "../BracketBoard";
-import TranslatableText from "./TranslatableText";
+import FormattedText from "./FormattedText";
 import "./event-tabs.css";
 
 const KTM = "Asia/Kathmandu";
@@ -220,7 +220,7 @@ function RulesPanel({ tournament }: { tournament: Tournament }) {
   return (
     <div className="bk-panel">
       <h3>Rules</h3>
-      {tournament.rules_text && <TranslatableText text={tournament.rules_text} style={{ fontSize: 13.5 }} />}
+      {tournament.rules_text && <FormattedText text={tournament.rules_text} style={{ fontSize: 13.5 }} />}
       {tournament.equipment_notes && <p style={{ fontSize: 13.5, opacity: 0.8, lineHeight: 1.6 }}><b>Equipment:</b> {tournament.equipment_notes}</p>}
       {tournament.venue_rules && <p style={{ fontSize: 13.5, opacity: 0.8, lineHeight: 1.6 }}><b>Venue rules:</b> {tournament.venue_rules}</p>}
     </div>
@@ -267,7 +267,7 @@ function OverviewTab({ tournament, teams, matches, awards }: {
           <div className="ev2-card-t" style={{ marginBottom: 0 }}>Tournament</div>
           <span className={`ev2-status-pill ${st.cls}`}>{st.label}</span>
         </div>
-        {tournament.description && <TranslatableText text={tournament.description} />}
+        {tournament.description && <FormattedText text={tournament.description} />}
         {tournament.organizer_name && (
           <div style={{ marginTop: 14, fontSize: 12.5, opacity: 0.6 }}>Organised by <b style={{ opacity: 1 }}>{tournament.organizer_name}</b></div>
         )}
