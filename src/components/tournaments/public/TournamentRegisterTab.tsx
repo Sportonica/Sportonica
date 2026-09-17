@@ -100,7 +100,13 @@ export default function TournamentRegisterTab({
 
   const managerOnRoster = !!team && roster.some((p) => p.user_id === team.captain_id);
   const openSlots = tournament.max_teams == null ? null : Math.max(0, tournament.max_teams - confirmedCount);
-  const regOpen = tournament.status === "registration_open";
+  // Gate on the actual deadline too, not just the DB status flag — status
+  // only flips when an organizer/admin clicks "Close registration" in the
+  // Control Center, so without this a tournament sits open to players past
+  // its advertised closing time until someone remembers to close it by hand.
+  const regOpen =
+    tournament.status === "registration_open" &&
+    new Date(tournament.registration_closes_at).getTime() > Date.now();
   const paid = tournament.fee > 0;
   const isIndividualRace = getSportKind(tournament.sport) === "individual_race";
 

@@ -22,6 +22,12 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Sportonica uses your location to show nearby games, venues, and courts on the map.</string>
+	<key>NSCameraUsageInfo</key>
+	<string>Sportonica uses your camera to let you take a photo for your profile picture or as proof of payment.</string>
+	<key>NSPhotoLibraryUsageInfo</key>
+	<string>Sportonica uses your photo library to let you choose a profile picture, venue photo, or payment screenshot to upload.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
