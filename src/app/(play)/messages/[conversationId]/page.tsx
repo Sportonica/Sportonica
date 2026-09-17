@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getConversationPeer, getConversationMessages } from "@/lib/dm/queries";
+import { haveIBlocked } from "@/lib/blocking/queries";
 import DMThread from "./DMThread";
 
 export const dynamic = "force-dynamic";
@@ -23,7 +24,10 @@ export default async function ConversationPage({
   const info = await getConversationPeer(conversationId);
   if (!info) notFound();
 
-  const messages = await getConversationMessages(conversationId);
+  const [messages, blocked] = await Promise.all([
+    getConversationMessages(conversationId),
+    haveIBlocked(info.peer.id),
+  ]);
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px 40px" }}>
@@ -32,6 +36,7 @@ export default async function ConversationPage({
         meId={info.meId}
         peer={info.peer}
         initialMessages={messages}
+        initialBlocked={blocked}
       />
     </div>
   );

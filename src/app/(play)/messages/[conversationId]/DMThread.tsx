@@ -9,17 +9,20 @@ import { isActionError } from "@/lib/actionError";
 import { getOrCreateKeyPair } from "@/lib/crypto/keyStore";
 import { deriveConversationKey, encryptText, decryptText } from "@/lib/crypto/e2e";
 import type { EncryptedMessage } from "@/lib/dm/queries";
+import BlockButton from "@/components/BlockButton";
+import ReportButton from "@/components/ReportButton";
 
 type Peer = { id: string; full_name: string | null; username: string | null; avatar_url: string | null };
 type DecryptedMessage = { id: string; sender_id: string; body: string; created_at: string; failed?: boolean };
 
 export default function DMThread({
-  conversationId, meId, peer, initialMessages,
+  conversationId, meId, peer, initialMessages, initialBlocked,
 }: {
   conversationId: string;
   meId: string;
   peer: Peer;
   initialMessages: EncryptedMessage[];
+  initialBlocked: boolean;
 }) {
   const sb = createClient();
   const [keyMissing, setKeyMissing] = useState(false);
@@ -27,6 +30,7 @@ export default function DMThread({
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);
   const [text, setText] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState(initialBlocked);
   const [, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
   const aesKeyRef = useRef<CryptoKey | null>(null);
@@ -98,14 +102,17 @@ export default function DMThread({
   function send() {
     const body = text.trim();
     const key = aesKeyRef.current;
-    if (!body || !key) return;
+    if (!body || !key || blocked) return;
     setText("");
     setSendError(null);
     startTransition(async () => {
       const { ciphertext, iv } = await encryptText(key, body);
       try {
         const res = await sendEncryptedMessage(conversationId, ciphertext, iv);
-        if (isActionError(res)) { setText(body); setSendError(res.message); }
+        if (isActionError(res)) {
+          setText(body);
+          setSendError(res.message === "BLOCKED" ? "This message couldn't be delivered." : res.message);
+        }
       }
       catch { setText(body); setSendError("Couldn't send — try again."); }
     });
@@ -123,10 +130,17 @@ export default function DMThread({
           </div>
         </Link>
         <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700 }}>{name}</div>
+        <BlockButton profileId={peer.id} initialBlocked={blocked} name={name} onChange={setBlocked} />
+        <ReportButton targetType="user" targetId={peer.id} label="" />
         <span title="End-to-end encrypted — only you and this person can read these messages" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: "#22c55e", opacity: 0.85 }}>
           <ShieldCheck size={14} /> Encrypted
         </span>
       </div>
+      {blocked && (
+        <div style={{ padding: "8px 16px", fontSize: 12, color: "var(--faint)", borderBottom: "1px solid var(--border-line)" }}>
+          You&apos;ve blocked {name}. Unblock them to send messages again.
+        </div>
+      )}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
         {keyMissing ? (

@@ -4,15 +4,12 @@ import { ArrowLeft } from "lucide-react";
 import "../../p/profile.css";
 import "../../(play)/play.css";
 import NotificationsPage from "../../(play)/notifications/page";
+import PrivacySection from "./PrivacySection";
 
 const SECTIONS: Record<string, { title: string; body: string }> = {
   preferences: {
     title: "Preferences",
     body: "Preferred playing times, locations, and discovery settings are on the way. You can already set the sports you play from Edit Profile.",
-  },
-  privacy: {
-    title: "Privacy",
-    body: "More granular privacy controls (blocked users, contact visibility) are on the way. You can already switch your player card between public and private from Edit Profile.",
   },
   help: {
     title: "Help & Support",
@@ -25,6 +22,7 @@ export async function generateMetadata({
 }: { searchParams: Promise<{ section?: string }> }): Promise<Metadata> {
   const { section } = await searchParams;
   if (section === "notifications") return { title: "Notifications — Sportonica" };
+  if (section === "privacy") return { title: "Privacy — Sportonica" };
   const title = (section && SECTIONS[section]?.title) || "Coming soon";
   return { title: `${title} — Sportonica` };
 }
@@ -35,6 +33,7 @@ export default async function ComingSoonPage({
   const { section } = await searchParams;
 
   if (section === "notifications") return <NotificationsPage />;
+  if (section === "privacy") return <PrivacySection />;
 
   const content = (section && SECTIONS[section]) || {
     title: "Coming soon",

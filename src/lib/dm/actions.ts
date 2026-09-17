@@ -30,7 +30,11 @@ export async function sendEncryptedMessage(conversationId: string, ciphertext: s
     ciphertext,
     iv,
   });
-  if (error) return actionError(error.message);
+  // The only way this insert's RLS check fails, given conversationId came
+  // from a real conversation the user is already a participant in, is the
+  // blocking policy in RUN_ME_user_blocking.sql (either side blocked the
+  // other) — surface that plainly instead of Postgres's generic wording.
+  if (error) return actionError(error.message.includes("row-level security") ? "BLOCKED" : error.message);
 }
 
 /** Mark a conversation as read up to now. */
