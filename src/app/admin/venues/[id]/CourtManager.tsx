@@ -136,6 +136,15 @@ function HoursEditor({
     const rows = Object.entries(days)
       .filter(([, v]) => v)
       .map(([d, v]) => ({ dow: Number(d), open_time: v!.open, close_time: v!.close }));
+    // The schema has no way to represent hours crossing midnight (a single
+    // open/close pair per day) — DayCalendar's hourly rail silently renders
+    // zero rows ("Closed on this day") whenever close <= open, so catch it
+    // here instead of saving a contradiction nothing else surfaces.
+    const invalid = rows.find((r) => r.close_time <= r.open_time);
+    if (invalid) {
+      setErr(`${DOW_LABELS[invalid.dow]}: close time must be after open time (overnight hours aren't supported yet).`);
+      return;
+    }
     startTransition(async () => {
       const res = await setCourtHours(courtId, venueId, rows);
       if (isActionError(res)) { setErr(res.message); return; }
