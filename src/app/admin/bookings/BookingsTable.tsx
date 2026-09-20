@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, UserX, LogIn } from "lucide-react";
+import { Check, UserX, LogIn, X } from "lucide-react";
 import { setBookingState } from "@/lib/admin/actions";
 import { isActionError } from "@/lib/actionError";
 import type { CourtBooking, Court } from "@/lib/admin/types";
@@ -24,6 +24,12 @@ export default function BookingsTable({ bookings, courts }: { bookings: CourtBoo
       if (isActionError(res)) { setErr(res.message); return; }
       router.refresh();
     });
+  }
+
+  function cancel(b: CourtBooking) {
+    const who = b.source === "walk_in" ? "walk-in" : b.source === "phone" ? "phone" : "player";
+    if (!window.confirm(`Cancel this ${who} booking? The slot becomes available again immediately.`)) return;
+    act(b, "cancelled");
   }
 
   const filtered = bookings.filter((b) => {
@@ -56,6 +62,7 @@ export default function BookingsTable({ bookings, courts }: { bookings: CourtBoo
               const court = courts.find((c) => c.id === b.court_id);
               const past = new Date(b.ends_at) < new Date();
               const canCheckIn = ["reserved", "paid", "confirmed"].includes(b.state);
+              const canCancel = !["cancelled", "refunded", "played", "no_show", "dropped"].includes(b.state);
               return (
                 <tr key={b.id}>
                   <td>
@@ -86,6 +93,12 @@ export default function BookingsTable({ bookings, courts }: { bookings: CourtBoo
                       {past && canCheckIn && (
                         <button className="adm-btn sm ghost danger" onClick={() => act(b, "no_show")} title="No-show">
                           <UserX size={13} />
+                        </button>
+                      )}
+                      {canCancel && (
+                        <button className="adm-btn sm ghost danger" disabled={pending && busyId === b.id}
+                          onClick={() => cancel(b)} title="Cancel booking — frees this slot for new bookings">
+                          <X size={13} /> Cancel
                         </button>
                       )}
                     </div>

@@ -2,8 +2,8 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Ban, UserPlus, Wrench } from "lucide-react";
-import { createBlock, bookCourt, deleteBlock } from "@/lib/admin/actions";
+import { ChevronLeft, ChevronRight, Ban, UserPlus, Wrench, X } from "lucide-react";
+import { createBlock, bookCourt, deleteBlock, setBookingState } from "@/lib/admin/actions";
 import { isActionError } from "@/lib/actionError";
 import type { Court, CourtBooking, CourtBlock, CourtHours } from "@/lib/admin/types";
 
@@ -124,13 +124,33 @@ export default function DayCalendar({
               </div>
               <div style={{ position: "relative" }}>
                 {rail.map((h) => <div key={h} className="adm-cal-track" />)}
-                {dayBookings.map((b) => (
-                  <div key={b.id} className={`adm-cal-block ${b.source === "walk_in" || b.source === "phone" ? "walk_in" : "booking"}`}
-                    style={{ top: pxTop(b.starts_at), height: pxHeight(b.starts_at, b.ends_at) }}>
-                    <b>{hhmm(b.starts_at)}–{hhmm(b.ends_at)}</b>
-                    <span>{b.customer_name ?? "Player"} · Rs {b.price}</span>
-                  </div>
-                ))}
+                {dayBookings.map((b) => {
+                  const cancellable = !["played", "no_show"].includes(b.state);
+                  return (
+                    <div key={b.id} className={`adm-cal-block ${b.source === "walk_in" || b.source === "phone" ? "walk_in" : "booking"}`}
+                      style={{ top: pxTop(b.starts_at), height: pxHeight(b.starts_at, b.ends_at) }}>
+                      <b>{hhmm(b.starts_at)}–{hhmm(b.ends_at)}</b>
+                      <span>{b.customer_name ?? "Player"} · Rs {b.price}</span>
+                      {cancellable && (
+                        <button
+                          className="adm-cal-cancel"
+                          title="Cancel booking — frees this slot for new bookings"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const who = b.source === "walk_in" ? "walk-in" : b.source === "phone" ? "phone" : "player";
+                            if (!window.confirm(`Cancel this ${who} booking? The slot becomes available again immediately.`)) return;
+                            startTransition(async () => {
+                              const res = await setBookingState(b.id, court.venue_id, "cancelled");
+                              if (isActionError(res)) { setErr(res.message); return; }
+                              router.refresh();
+                            });
+                          }}>
+                          <X size={11} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
                 {dayBlocks.map((bl) => (
                   <div key={bl.id} className="adm-cal-block block"
                     style={{ top: pxTop(bl.starts_at), height: pxHeight(bl.starts_at, bl.ends_at) }}

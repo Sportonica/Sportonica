@@ -305,6 +305,7 @@ export async function setBookingState(id: string, venue_id: string, state: strin
   const { error } = await sb.from("court_bookings").update({ state }).eq("id", id);
   if (error) { console.error("[setBookingState]", error.message); return actionError("Could not update that booking."); }
   revalidatePath(`/admin/venues/${venue_id}/bookings`);
+  revalidatePath(`/admin/venues/${venue_id}/calendar`);
 }
 
 // ── PRICING RULES ────────────────────────────────────────────────

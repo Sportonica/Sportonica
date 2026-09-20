@@ -269,6 +269,12 @@
 .adm-cal-block.block   { background: rgba(138,149,163,0.14); border-color: var(--a-line-2); color: var(--a-dim); }
 .adm-cal-block.walk_in { background: rgba(0,98,65,0.13); border-color: rgba(0,98,65,0.35); }
 .adm-cal-block b { font-family: var(--a-mono); font-size: 10px; font-weight: 700; }
+.adm-cal-cancel {
+  position: absolute; top: 3px; right: 3px; width: 15px; height: 15px;
+  display: grid; place-items: center; border-radius: 50%; border: none;
+  background: rgba(239,68,68,0.16); color: #ef4444; cursor: pointer; padding: 0;
+}
+.adm-cal-cancel:hover { background: #ef4444; color: #fff; }
 
 /* ── Misc ── */
 .adm-hr { height: 1px; background: var(--a-line); border: none; margin: 20px 0; }
