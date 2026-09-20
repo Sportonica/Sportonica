@@ -178,6 +178,13 @@ export async function setCourtHours(
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
+  // No way to represent hours crossing midnight in this schema (one
+  // open/close pair per day) — DayCalendar's hourly rail silently renders
+  // zero rows for a day where close <= open, so reject it here rather than
+  // saving a contradiction nothing else surfaces.
+  if (rows.some((r) => r.close_time <= r.open_time)) {
+    return actionError("Close time must be after open time (overnight hours aren't supported yet).");
+  }
   await sb.from("court_hours").delete().eq("court_id", court_id);
   if (rows.length) {
     const { error } = await sb.from("court_hours").insert(rows.map((r) => ({ ...r, court_id })));
