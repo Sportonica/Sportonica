@@ -20,7 +20,7 @@ export default async function RevenuePage() {
   return (
     <>
       <h1 className="plt-h1">Revenue</h1>
-      <p className="plt-sub2">Your commission, and what you owe each venue. Commission is 10% off the top.</p>
+      <p className="plt-sub2">Your commission, and what you owe each venue. Commission is 5% off the top.</p>
 
       <div className="plt-stats">
         <div className="plt-stat">
