@@ -426,9 +426,27 @@ async function applyHostPayment(
   return error ? actionError(friendlyTournamentError(error.message)) : null;
 }
 
+// banner_url travels as free text in the draft jsonb blob (see
+// TournamentForm.tsx) — the UI only ever sets it to the return value of
+// uploadTournamentBanner() or clears it, but this is a Server Action
+// reachable by direct POST, so it isn't trustworthy as typed. It's later
+// fetched server-side by the story/fixtures-card share-card image routes,
+// so an arbitrary host here is an SSRF sink. Anything that isn't our own
+// tournament-banners storage object is dropped before it's persisted,
+// rather than trusted through to the RPC.
+function sanitizeDraftInput(input: TournamentDraftInput): TournamentDraftInput {
+  if (!input.banner_url) return input;
+  const bannerPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tournament-banners/`;
+  if (input.banner_url.startsWith(bannerPrefix)) return input;
+  const rest = { ...input };
+  delete rest.banner_url;
+  return rest;
+}
+
 export async function createTournament(input: TournamentDraftInput): Promise<Tournament | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  input = sanitizeDraftInput(input);
   const { data, error } = await sb.rpc("create_tournament", { p: input });
   if (error) return actionError(friendlyTournamentError(error.message));
   const row = data as Tournament;
@@ -448,6 +466,7 @@ export async function createTournament(input: TournamentDraftInput): Promise<Tou
 export async function updateTournamentDraft(id: string, input: TournamentDraftInput): Promise<Tournament | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  input = sanitizeDraftInput(input);
   const { data, error } = await sb.rpc("update_tournament_draft", { p_id: id, p: input });
   if (error) return actionError(friendlyTournamentError(error.message));
   const qrErr = await applyHostPayment(sb, id, input);
