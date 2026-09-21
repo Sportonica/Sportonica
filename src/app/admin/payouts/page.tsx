@@ -7,7 +7,7 @@ import { Topbar, Stat, money } from "../ui";
 
 export const dynamic = "force-dynamic";
 
-const COMMISSION = 0.1; // 10% platform commission
+const COMMISSION = 0.05; // 5% platform commission
 
 export default async function PayoutsPage() {
   const venues = await getMyVenues();
@@ -24,8 +24,11 @@ export default async function PayoutsPage() {
 
   const gross = earning.reduce((s, b) => s + Number(b.price), 0);
   const commission = gross * COMMISSION;
-  const net = gross - commission;
   const settled = payouts.filter((p) => p.status === "settled").reduce((s, p) => s + Number(p.net), 0);
+  // Lifetime net earned minus what's already been paid out — not just
+  // lifetime net, which never drops once a payout settles and would
+  // overstate what's still owed forever.
+  const net = Math.max(gross - commission - settled, 0);
 
   return (
     <>
@@ -46,7 +49,7 @@ export default async function PayoutsPage() {
           <>
             <div className="adm-stats">
               <Stat label="Gross earnings" value={money(gross)} accent="var(--a-accent)" />
-              <Stat label="Commission (10%)" value={money(commission)} accent="var(--a-pink)" />
+              <Stat label="Commission (5%)" value={money(commission)} accent="var(--a-pink)" />
               <Stat label="Net payable" value={money(net)} accent="var(--a-lime)" />
               <Stat label="Settled to date" value={money(settled)} accent="var(--a-turf)" />
             </div>

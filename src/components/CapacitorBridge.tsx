@@ -56,10 +56,11 @@ export default function CapacitorBridge() {
     syncStatusBar();
 
     // Universal Link (iOS) / App Link (Android) reopening the app —
-    // this is how a Google Sign-In started via Browser.open() (see
-    // GoogleButton.tsx) hands control back once it lands on
-    // /auth/callback and finishes. Also covers any other sportonica.com
-    // link opened from outside the app (a shared game link, etc).
+    // this is how a Google or Apple sign-in started via Browser.open()
+    // (see GoogleButton.tsx / AppleButton.tsx) hands control back once
+    // it lands on /auth/callback and finishes. Also covers any other
+    // sportonica.com link opened from outside the app (a shared game
+    // link, etc).
     const urlSub = App.addListener("appUrlOpen", (event: URLOpenListenerEvent) => {
       Browser.close().catch(() => {});
       try {

@@ -96,6 +96,15 @@
   letter-spacing: -0.4px;
 }
 .adm-topbar-crumb { font-family: var(--a-mono); font-size: 11px; color: var(--a-faint); }
+.adm-topbar-l { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.adm-topbar-back {
+  flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--a-line-2); background: var(--a-panel-2); color: var(--a-text);
+  cursor: pointer; transition: border-color .14s ease, background .14s ease;
+}
+.adm-topbar-back:hover { border-color: var(--a-dim); background: #20252f; }
+[data-theme="paper"] .adm-topbar-back:hover { background: rgba(20,23,30,.05); }
 .adm-body { padding: 28px; max-width: 1240px; width: 100%; }
 
 /* ── Cards / panels ── */
@@ -260,6 +269,12 @@
 .adm-cal-block.block   { background: rgba(138,149,163,0.14); border-color: var(--a-line-2); color: var(--a-dim); }
 .adm-cal-block.walk_in { background: rgba(0,98,65,0.13); border-color: rgba(0,98,65,0.35); }
 .adm-cal-block b { font-family: var(--a-mono); font-size: 10px; font-weight: 700; }
+.adm-cal-cancel {
+  position: absolute; top: 3px; right: 3px; width: 15px; height: 15px;
+  display: grid; place-items: center; border-radius: 50%; border: none;
+  background: rgba(239,68,68,0.16); color: #ef4444; cursor: pointer; padding: 0;
+}
+.adm-cal-cancel:hover { background: #ef4444; color: #fff; }
 
 /* ── Misc ── */
 .adm-hr { height: 1px; background: var(--a-line); border: none; margin: 20px 0; }

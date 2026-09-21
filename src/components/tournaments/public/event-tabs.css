@@ -481,3 +481,17 @@
   .ev2-bracket-score { font-size: 14px; }
   .ev2-bracket-meta { padding: 7px 13px 9px; font-size: 11px; }
 }
+
+/* ── Formatted description/rules text + extracted price table ── */
+.tr-para { font-size: 14px; opacity: 0.8; line-height: 1.65; white-space: pre-wrap; margin: 0 0 14px; }
+.tr-para:last-child { margin-bottom: 0; }
+
+.tr-price-table {
+  width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px;
+  border: 1px solid rgba(242,237,230,0.09); border-radius: 12px; overflow: hidden;
+}
+.tr-price-table th, .tr-price-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(242,237,230,0.09); }
+.tr-price-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; opacity: 0.6; font-weight: 700; }
+.tr-price-table tr:last-child td { border-bottom: none; }
+[data-theme="paper"] .tr-price-table { border-color: rgba(20,23,30,0.08); }
+[data-theme="paper"] .tr-price-table th, [data-theme="paper"] .tr-price-table td { border-color: rgba(20,23,30,0.08); }

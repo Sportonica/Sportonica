@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, MapPin, Share2 } from "lucide-react";
+import { Check, MapPin, Share2, ChevronLeft } from "lucide-react";
 import { joinGame } from "@/lib/play/actions";
 import { confirmFreeBooking } from "@/lib/payments/actions";
 import { isActionError } from "@/lib/actionError";
@@ -77,16 +77,22 @@ export default function GameJoinPanel({
       {err && <div className="gm-err">{err}</div>}
 
       {awaitingPayment ? (
-        <PaymentStep
-          bookingType="event_booking"
-          bookingId={awaitingPayment.id}
-          amount={awaitingPayment.amount}
-          summary={[
-            { label: "Game", value: sport },
-            { label: "Venue", value: venue },
-            { label: "When", value: new Date(eventDate).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kathmandu" }) },
-          ]}
-        />
+        <>
+          <button type="button" className="gm-back" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit" }}
+            onClick={() => setAwaitingPayment(null)}>
+            <ChevronLeft size={16} /> Back
+          </button>
+          <PaymentStep
+            bookingType="event_booking"
+            bookingId={awaitingPayment.id}
+            amount={awaitingPayment.amount}
+            summary={[
+              { label: "Game", value: sport },
+              { label: "Venue", value: venue },
+              { label: "When", value: new Date(eventDate).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kathmandu" }) },
+            ]}
+          />
+        </>
       ) : isHost ? (
         <div className="gm-join-note">You&apos;re hosting this game.</div>
       ) : joined ? (

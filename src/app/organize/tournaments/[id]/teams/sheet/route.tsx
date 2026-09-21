@@ -247,10 +247,10 @@ function teamSection(
          <tbody>
            ${roster.map((p) => {
              const linked = p.user_id != null;
-             const acct = linked ? ` <span class="mini-tag">account</span>` : "";
+             const walkin = linked ? "" : ` <span class="mini-tag">walk-in</span>`;
              return `<tr class="${p.role === "captain" ? "captain" : ""}">
                <td class="num">${p.jersey_number != null ? esc(p.jersey_number) : "—"}</td>
-               <td>${esc(p.name)}${acct}</td>
+               <td>${esc(p.name)}${walkin}</td>
                <td class="${p.position ? "" : "dim"}">${p.position ? esc(p.position) : "—"}</td>
                <td>${esc(ROLE_LABEL[p.role] ?? p.role)}</td>
                <td class="${p.guest_phone ? "" : "dim"}">${p.guest_phone ? esc(p.guest_phone) : (linked ? "on file" : "—")}</td>

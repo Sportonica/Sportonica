@@ -100,7 +100,14 @@ export default function TournamentRegisterTab({
 
   const managerOnRoster = !!team && roster.some((p) => p.user_id === team.captain_id);
   const openSlots = tournament.max_teams == null ? null : Math.max(0, tournament.max_teams - confirmedCount);
-  const regOpen = tournament.status === "registration_open";
+  // Gate on the actual deadline too, not just the DB status flag — status
+  // only flips when an organizer/admin clicks "Close registration" in the
+  // Control Center, so without this a tournament sits open to players past
+  // its advertised closing time until someone remembers to close it by hand.
+  const regOpen =
+    tournament.status === "registration_open" &&
+    new Date(tournament.registration_closes_at).getTime() > Date.now();
+  const full = openSlots === 0;
   const paid = tournament.fee > 0;
   const isIndividualRace = getSportKind(tournament.sport) === "individual_race";
 
@@ -332,19 +339,23 @@ export default function TournamentRegisterTab({
             )}
           </div>
         </>
-      ) : !team && !regOpen ? (
-        /* ── Registration not open ──────────────────────────────── */
+      ) : !team && (!regOpen || full) ? (
+        /* ── Registration not open, or full ─────────────────────── */
         <>
           {hero}
           <div className="rgt-card rgt-center">
             <div className="rgt-lock"><Clock size={20} /></div>
             <h3>
-              {tournament.status === "published"
+              {full
+                ? "Registration is full"
+                : tournament.status === "published"
                 ? "Registration hasn't opened yet"
                 : "Registration is closed"}
             </h3>
             <p>
-              {tournament.status === "published"
+              {full
+                ? "All team slots have been claimed. Check back in case a spot opens up."
+                : tournament.status === "published"
                 ? `Opens ${dateLabel(tournament.registration_opens_at)}.`
                 : "Follow the tournament for updates on the tabs above."}
             </p>

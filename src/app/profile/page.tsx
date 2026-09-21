@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import {
   getMyProfile, getPlayerStats, getPlayerSports, getMyActivitySummary,
   computeBadges, trustLabel,
@@ -7,6 +8,8 @@ import ProfileHub from "./ProfileHub";
 import "../p/profile.css";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Your Profile — Sportonica" };
 
 export default async function ProfilePage() {
   const profile = await getMyProfile();

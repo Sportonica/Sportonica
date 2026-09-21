@@ -23,11 +23,17 @@
   color: var(--ob-ink);
   font-family: 'Inter', system-ui, sans-serif;
   display: flex;
-  flex-direction: column;
   overflow: hidden;
   padding-top: env(safe-area-inset-top, 0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   animation: ob-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.ob-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 .ob.ob-out {
   animation: ob-out 0.32s cubic-bezier(0.4, 0, 1, 1) both;
@@ -52,6 +58,12 @@
   font-weight: 800;
   font-size: 16px;
   letter-spacing: -0.4px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
 }
 .ob-brand img { width: 26px; height: 26px; object-fit: contain; }
 
@@ -374,9 +386,24 @@
 }
 .ob-signin b { color: var(--ob-green); font-weight: 700; }
 
-/* ── wider screens: keep it phone-shaped, centred ── */
+/* ── wider screens (tablet, laptop): keep it phone-shaped, centred.
+   Tall viewports (iPad portrait, a big laptop window) used to leave
+   .ob-canvas — flex:1 with no height cap — free to stretch to whatever
+   was left over, spreading the pins (positioned by % of the canvas)
+   apart with huge empty gaps top/bottom. Capping .ob-card's height too,
+   not just its width, keeps the whole card at the same proportions it
+   was designed at, letterboxed on --ob-bg instead of stretched. ── */
 @media (min-width: 640px) {
-  .ob-stage, .ob-top, .ob-foot { width: 100%; max-width: 460px; margin-left: auto; margin-right: auto; }
+  .ob { justify-content: center; align-items: center; }
+  .ob-card {
+    width: 100%;
+    height: 100%;
+    max-width: 460px;
+    max-height: min(860px, 94vh);
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 30px 80px -30px rgba(30, 57, 50, 0.35);
+  }
   .ob-canvas { margin-left: -32px; margin-right: -32px; }
 }
 

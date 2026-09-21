@@ -12,6 +12,13 @@
    ================================================================ */
 
 .tourn-page { position: relative; isolation: isolate; }
+/* The subtitle ("Register a team or book a spot...") is short enough to
+   read as one line — the shared .play-hero p max-width (560px) exists
+   for longer hero copy on other pages and just forces an early wrap here. */
+.tourn-page .play-hero p { max-width: none; white-space: nowrap; }
+@media (max-width: 640px) {
+  .tourn-page .play-hero p { white-space: normal; }
+}
 .tourn-page::before {
   content: ''; position: absolute; z-index: -1; pointer-events: none;
   top: -140px; left: 50%; transform: translateX(-50%);
@@ -155,6 +162,10 @@
   font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 700; letter-spacing: -0.01em;
   line-height: 1.25; margin: 0 0 6px; transition: color .2s ease;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  /* line-clamp only caps the max — a one-line title collapses to one
+     line's height instead of reserving room for two, so cards in the
+     same grid end up different heights depending on title length. */
+  min-height: calc(20px * 1.25 * 2);
 }
 .tc-card:hover .tc-title { color: var(--tc-accent, var(--sodium)); }
 .tc-org { font-size: 12.5px; color: var(--dim); margin-bottom: 12px; }
@@ -185,6 +196,6 @@
 .tc-foot-price.free { color: var(--tc-accent, var(--sodium)); }
 
 @media (max-width: 640px) {
-  .tc-title { font-size: 18px; }
+  .tc-title { font-size: 18px; min-height: calc(18px * 1.25 * 2); }
   .tc-body { margin: -20px 4px 0; padding: 16px 16px 14px; }
 }

@@ -14,14 +14,14 @@ export default async function PlatformLayout({ children }: { children: React.Rea
   return (
     <div className="plt">
       <header className="plt-top">
-        <div className="plt-brand">
+        <Link href="/platform" className="plt-brand" style={{ textDecoration: "none", color: "inherit" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/mark.png" alt="" className="plt-k" />
           <div>
             <div className="plt-name">Sportonica</div>
             <div className="plt-sub">Platform console</div>
           </div>
-        </div>
+        </Link>
         <nav className="plt-nav">
           <Link href="/platform">Overview</Link>
           <Link href="/platform/tournaments/new">+ Tournament</Link>

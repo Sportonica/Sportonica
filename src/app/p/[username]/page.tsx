@@ -7,12 +7,15 @@ import {
   computeBadges, trustLabel,
 } from "@/lib/profile/queries";
 import { getRelationship } from "@/lib/friends/queries";
+import { haveIBlocked } from "@/lib/blocking/queries";
 import { getPlayerScorecard } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { createClient } from "@/lib/supabase/server";
 import ShareButton from "./ShareButton";
 import DownloadButton from "./DownloadButton";
 import FriendRequestButton from "@/components/FriendRequestButton";
+import BlockButton from "@/components/BlockButton";
+import ReportButton from "@/components/ReportButton";
 import { sportColor, normalizeSport } from "@/lib/sports";
 import "../profile.css";
 
@@ -57,11 +60,12 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
     );
   }
 
-  const [stats, sports, recent, relationship, scorecardRes, sb] = await Promise.all([
+  const [stats, sports, recent, relationship, blocked, scorecardRes, sb] = await Promise.all([
     getPlayerStats(profile.id),
     getPlayerSports(profile.id),
     getRecentGames(profile.id),
     getRelationship(profile.id),
+    haveIBlocked(profile.id),
     getPlayerScorecard(profile.id),
     createClient(),
   ]);
@@ -107,6 +111,13 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
           <DownloadButton username={profile.username} name={name} />
           <Link href="/discover" className="pf-btn ghost">Find a game</Link>
         </div>
+
+        {!isOwnProfile && (
+          <div style={{ display: "flex", gap: 14, marginTop: -6, marginBottom: 6 }}>
+            <BlockButton profileId={profile.id} initialBlocked={blocked} name={name} />
+            <ReportButton targetType="user" targetId={profile.id} label="Report" />
+          </div>
+        )}
 
         {/* ── Stat strip ── */}
         <div className="pf-stats">

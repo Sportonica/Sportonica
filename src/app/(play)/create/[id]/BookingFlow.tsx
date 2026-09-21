@@ -355,6 +355,10 @@ export default function BookingFlow({
     return (
       <div className="bkw">
         <div className="bk-panel">
+          <button type="button" className="bk-back" style={{ background: "none", border: "none", cursor: "pointer", padding: 0, font: "inherit" }}
+            onClick={() => setAwaitingPayment(null)}>
+            <ChevronLeft size={16} /> Back
+          </button>
           {needPlayers && (
             <p className="hint" style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "rgba(217,119,6,.12)", color: "#d97706" }}>
               Your game won&apos;t appear in Play Together or the home page&apos;s &quot;Play socially&quot; list until we verify this payment — usually within a few hours.

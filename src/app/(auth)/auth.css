@@ -63,6 +63,19 @@
 }
 @keyframes auroraSpin { to { transform: rotate(1turn); } }
 
+.auth-navback {
+  position: absolute;
+  top: calc(20px + env(safe-area-inset-top, 0px)); left: 20px;
+  z-index: 5;
+  width: 40px; height: 40px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line); background: var(--panel);
+  color: var(--text); cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: border-color .2s, transform .15s;
+}
+.auth-navback:hover { transform: translateY(-1px); border-color: var(--sodium); }
+
 /* ── Left: atmosphere panel ── */
 .auth-stage {
   position: relative;

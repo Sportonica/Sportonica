@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient, getUser } from "@/lib/supabase/server";
 
 export interface Squad {
@@ -46,11 +47,13 @@ export async function browseSquads(): Promise<Squad[]> {
   return all.filter((s) => !s.unlisted || myIds.has(s.id));
 }
 
-export async function getSquad(id: string): Promise<Squad | null> {
+// cache()-wrapped so generateMetadata() and the page body can both call
+// this for the same request without doubling the DB round trip.
+export const getSquad = cache(async function getSquad(id: string): Promise<Squad | null> {
   const sb = await createClient();
   const { data } = await sb.from("squads_with_counts").select("*").eq("id", id).maybeSingle();
   return (data as Squad) ?? null;
-}
+});
 
 export async function getSquadMembers(squadId: string): Promise<SquadMember[]> {
   const sb = await createClient();

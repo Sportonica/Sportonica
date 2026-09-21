@@ -34,7 +34,7 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
     <div className="play tourn-page">
       <div className="play-wrap">
         <div className="play-hero">
-          <h1>Tournaments <em>& events.</em></h1>
+          <h1>Tournaments <em>& Events.</em></h1>
           <p>
             Register a team or book a spot, and pay online
             with eSewa, Khalti or bank transfer.
@@ -110,7 +110,7 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
                   <div className="tc-body">
                     <span className="tc-sport">{item.sport}</span>
                     <h3 className="tc-title">{item.title}</h3>
-                    {item.organizerName && <div className="tc-org">by {item.organizerName}</div>}
+                    {item.organizerName && <div className="tc-org">By {item.organizerName}</div>}
 
                     <div className="tc-loc"><MapPin size={13} /><span>{item.venue}</span></div>
                     <div className={`tc-date${!item.when ? " tbd" : ""}`}>{dateLabel}</div>

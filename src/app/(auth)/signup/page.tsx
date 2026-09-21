@@ -4,6 +4,8 @@ import { useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { Lock, AtSign, User } from "lucide-react";
 import GoogleButton from "@/components/GoogleButton";
+import AppleButton from "@/components/AppleButton";
+import BackButton from "@/components/nav/BackButton";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthInput from "@/components/auth/AuthInput";
 import ConsentCheckbox from "@/components/auth/ConsentCheckbox";
@@ -110,12 +112,13 @@ function SignupInner() {
 
   return (
     <div className="auth">
+      <BackButton className="auth-navback" iconSize={17} />
       <div className="auth-stage">
-        <div className="auth-brand">
+        <Link href="/" className="auth-brand" aria-label="Sportonica — go to the home page">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/mark.png" alt="" className="auth-brand-mark" />
           <div className="auth-brand-name">Sportonica</div>
-        </div>
+        </Link>
         <div className="auth-tagline">
           <h2>Find. Book. <em>Play.</em></h2>
           <p>Join as a player to host and find matches — or list your venue and start taking bookings today.</p>
@@ -192,6 +195,19 @@ function SignupInner() {
           <GoogleButton
             next={safeRedirect(redirect)}
             label="Sign up with Google"
+            guard={() => {
+              if (!agreed) {
+                setConsentErr(true);
+                setErr("Please agree to the Terms and conditions and Privacy policy to continue.");
+                return false;
+              }
+              return true;
+            }}
+          />
+          <div style={{ height: 10 }} />
+          <AppleButton
+            next={safeRedirect(redirect)}
+            label="Sign up with Apple"
             guard={() => {
               if (!agreed) {
                 setConsentErr(true);

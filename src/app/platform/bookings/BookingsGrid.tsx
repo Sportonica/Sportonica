@@ -16,8 +16,8 @@ interface BookingRow extends Record<string, unknown> {
   transaction_id: string | null;
 }
 
-// 10% platform commission, shown per booking.
-const COMMISSION = 0.10;
+// 5% platform commission, shown per booking.
+const COMMISSION = 0.05;
 
 const COLS: Column<BookingRow>[] = [
   { key: "venue", label: "Venue" },
@@ -79,7 +79,7 @@ export default function BookingsGrid({ bookings }: { bookings: BookingRow[] }) {
         </div>
         <div className="plt-stat">
           <div className="plt-stat-v warn dt-mono">Rs {cut.toLocaleString("en-IN")}</div>
-          <div className="plt-stat-l">Our commission (10%)</div>
+          <div className="plt-stat-l">Our commission (5%)</div>
         </div>
       </div>
 

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { ChevronLeft, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -18,6 +19,16 @@ import "@/app/platform/events/events.css";
 import "./tournament-hero.css";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const tournament = await getTournament(id);
+  if (isActionError(tournament) || !tournament) return { title: "Tournament — Sportonica" };
+  return {
+    title: `${tournament.name} — Sportonica`,
+    description: `${tournament.sport} tournament on Sportonica. Register a team or book a spot.`,
+  };
+}
 
 const money = (n: number) => "Rs " + Math.round(n).toLocaleString("en-IN");
 const when = (iso: string | null) => iso ? new Date(iso).toLocaleString("en-GB", {
@@ -89,12 +100,25 @@ export default async function TournamentDetailPage({
     return rows;
   }
   const otherPrizes = tournament.prize_other ? splitOtherPrizes(tournament.prize_other) : null;
+  // Prize values are freeform organizer text ("Rs. 300,000", "Trophy + Rs
+  // 5,000"), not numbers — pull out the digits to sort by, biggest first.
+  // Anything with no number in it (a plain prose "Other" blob) sinks to
+  // the bottom rather than sorting arbitrarily.
+  function prizeAmount(value: string): number {
+    // First run of digits (commas allowed inside, e.g. "300,000"), not
+    // every digit/period character in the string — "Rs. 300,000" has a
+    // period in "Rs." itself, which a blind [^\d.] strip would keep and
+    // misread as a decimal point ahead of the real number.
+    const match = value.match(/\d[\d,]*(\.\d+)?/);
+    return match ? parseFloat(match[0].replace(/,/g, "")) : -Infinity;
+  }
   const prizes = [
     tournament.prize_winner && ["Winner", tournament.prize_winner],
     tournament.prize_runner_up && ["Runner-up", tournament.prize_runner_up],
     tournament.prize_mvp && ["Best Player", tournament.prize_mvp],
     ...(otherPrizes ?? (tournament.prize_other ? [["Other", tournament.prize_other]] : [])),
   ].filter(Boolean) as [string, string][];
+  prizes.sort((a, b) => prizeAmount(b[1]) - prizeAmount(a[1]));
 
   const accent = sportColor(tournament.sport);
 

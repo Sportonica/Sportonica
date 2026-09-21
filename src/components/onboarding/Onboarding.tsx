@@ -299,70 +299,72 @@ export default function Onboarding() {
       aria-label="Welcome to Sportonica"
       tabIndex={-1}
     >
-      <div className="ob-top">
-        <div className="ob-brand">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icons/mark.png" alt="" />
-          Sportonica
+      <div className="ob-card">
+        <div className="ob-top">
+          <button className="ob-brand" onClick={() => finish("/")} aria-label="Sportonica home">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/mark.png" alt="" />
+            Sportonica
+          </button>
+          <button className="ob-skip" onClick={() => finish()}>
+            Skip
+          </button>
         </div>
-        <button className="ob-skip" onClick={() => finish()}>
-          Skip
-        </button>
-      </div>
 
-      <div className="ob-stage" ref={stageRef}>
-        <motion.div
-          className="ob-track"
-          style={{ x }}
-          drag="x"
-          dragElastic={0.12}
-          dragConstraints={{ left: -(SLIDES.length - 1) * w, right: 0 }}
-          onDragEnd={(_, info) => {
-            const span = w || 1;
-            const moved = info.offset.x;
-            const flung = Math.abs(info.velocity.x) > 350;
-            let target = i;
-            if ((moved < -span * 0.28 || (flung && info.velocity.x < 0)) && i < SLIDES.length - 1) target = i + 1;
-            else if ((moved > span * 0.28 || (flung && info.velocity.x > 0)) && i > 0) target = i - 1;
-            setI(target);
-            animate(x, -target * span, { type: "spring", stiffness: 320, damping: 38 });
-          }}
-        >
-          {SLIDES.map((s, idx) => (
-            <div className="ob-slide" key={idx} aria-hidden={idx !== i}>
-              <Canvas slide={s} active={idx === i} />
-              <div className="ob-copy">
-                <div className="ob-eyebrow">{s.eyebrow}</div>
-                <h2 className="ob-title">{s.title}</h2>
-                <p className="ob-sub">{s.sub}</p>
+        <div className="ob-stage" ref={stageRef}>
+          <motion.div
+            className="ob-track"
+            style={{ x }}
+            drag="x"
+            dragElastic={0.12}
+            dragConstraints={{ left: -(SLIDES.length - 1) * w, right: 0 }}
+            onDragEnd={(_, info) => {
+              const span = w || 1;
+              const moved = info.offset.x;
+              const flung = Math.abs(info.velocity.x) > 350;
+              let target = i;
+              if ((moved < -span * 0.28 || (flung && info.velocity.x < 0)) && i < SLIDES.length - 1) target = i + 1;
+              else if ((moved > span * 0.28 || (flung && info.velocity.x > 0)) && i > 0) target = i - 1;
+              setI(target);
+              animate(x, -target * span, { type: "spring", stiffness: 320, damping: 38 });
+            }}
+          >
+            {SLIDES.map((s, idx) => (
+              <div className="ob-slide" key={idx} aria-hidden={idx !== i}>
+                <Canvas slide={s} active={idx === i} />
+                <div className="ob-copy">
+                  <div className="ob-eyebrow">{s.eyebrow}</div>
+                  <h2 className="ob-title">{s.title}</h2>
+                  <p className="ob-sub">{s.sub}</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </motion.div>
-      </div>
-
-      <div className="ob-foot">
-        <div className="ob-dots" role="tablist" aria-label="Onboarding progress">
-          {SLIDES.map((_, idx) => (
-            <button
-              key={idx}
-              className={`ob-dot${idx === i ? " on" : ""}`}
-              aria-label={`Go to step ${idx + 1}`}
-              aria-selected={idx === i}
-              role="tab"
-              onClick={() => setI(idx)}
-            />
-          ))}
+            ))}
+          </motion.div>
         </div>
 
-        <button className="ob-cta" onClick={next}>
-          {last ? "Find your game" : "Next"}
-          <ArrowRight size={18} strokeWidth={2.4} />
-        </button>
+        <div className="ob-foot">
+          <div className="ob-dots" role="tablist" aria-label="Onboarding progress">
+            {SLIDES.map((_, idx) => (
+              <button
+                key={idx}
+                className={`ob-dot${idx === i ? " on" : ""}`}
+                aria-label={`Go to step ${idx + 1}`}
+                aria-selected={idx === i}
+                role="tab"
+                onClick={() => setI(idx)}
+              />
+            ))}
+          </div>
 
-        <button className="ob-signin" onClick={() => finish("/login")}>
-          Already play here? <b>Sign in</b>
-        </button>
+          <button className="ob-cta" onClick={next}>
+            {last ? "Find your game" : "Next"}
+            <ArrowRight size={18} strokeWidth={2.4} />
+          </button>
+
+          <button className="ob-signin" onClick={() => finish("/login")}>
+            Already play here? <b>Sign in</b>
+          </button>
+        </div>
       </div>
     </div>
   );

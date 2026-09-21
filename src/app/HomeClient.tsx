@@ -456,12 +456,11 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
           </Link>
           <div style={{ display:"flex", gap:"32px", flexWrap:"wrap" as const }}>
             {[
-              { label:"Play", href:"/discover" },
+              { label:"Join", href:"/discover" },
               { label:"Tournaments", href:"/tournaments" },
               { label:"Host event", href:"/create" },
-              { label:"Chat", href:"/league" },
               { label:"Contact us", href:"/contact" },
-              { label:"Sign in", href:"/login" },
+              { label:"Privacy Policy", href:"/privacy" },
               { label:"Admin", href:"/admin" },
             ].map(l => (
               <a key={l.label} href={l.href} style={{ color:"var(--muted)", textDecoration:"none", fontSize:"13px", fontWeight:600, transition:"color 0.2s" }}
