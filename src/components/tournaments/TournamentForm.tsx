@@ -302,15 +302,15 @@ export default function TournamentForm({
     // event already running, not a mistake about to be published.
     if (!editingLive) {
       const nowIso = new Date().toISOString();
-      if (!datesTbd && combine(endsDate, endsTime) <= nowIso) return "The tournament's end time has already passed — pick a future date.";
-      if (combine(regCloseDate, regCloseTime) <= nowIso) return "Registration closes in the past — pick a future date/time.";
+      if (!datesTbd && combine(endsDate, endsTime) <= nowIso) return "The tournament's end time has already passed. Pick a future date.";
+      if (combine(regCloseDate, regCloseTime) <= nowIso) return "Registration closes in the past. Pick a future date/time.";
     }
     if (format !== "single_event" && maxPlayers < minPlayers) return "Max players per team can't be less than the minimum.";
     // A paid tournament with no QR is a foot-gun: the payer checkout would
     // render an empty QR panel with no support fallback, since the host —
     // not Sportonica — owns this payment. Server re-checks at publish and
     // pay time; this just catches it early. Free tournaments are exempt.
-    if (fee > 0 && !hostQrUrl.trim()) return "Upload your payment QR — teams pay you directly, so a paid tournament needs one.";
+    if (fee > 0 && !hostQrUrl.trim()) return "Upload your payment QR. Teams pay you directly, so a paid tournament needs one.";
     if (fee > 0 && !hostPayName.trim()) return "Enter the name your payment QR pays to.";
     return null;
   }
@@ -376,7 +376,7 @@ export default function TournamentForm({
       </div>
       {editingLive && (
         <p style={{ fontSize: 12.5, opacity: 0.6, margin: "-8px 0 4px" }}>
-          Venue can&apos;t be changed here — {existing?.own_venue_name || venues.find((v) => v.id === existing?.venue_id)?.name || "current venue"} stays fixed for this tournament.
+          Venue can&apos;t be changed here. {existing?.own_venue_name || venues.find((v) => v.id === existing?.venue_id)?.name || "current venue"} stays fixed for this tournament.
         </p>
       )}
       <div className="ev-row">
@@ -408,16 +408,16 @@ export default function TournamentForm({
             </button>
             <button type="button" className={venueMode === "own" ? "on" : ""} onClick={() => setVenueMode("own")}>
               <MapPin size={15} />
-              <span>{mode === "platform" ? "Unlisted venue" : "My own venue"}<small>Name and location only — no vendor involved</small></span>
+              <span>{mode === "platform" ? "Unlisted venue" : "My own venue"}<small>Name and location only, no vendor involved</small></span>
             </button>
           </div>
           {venueMode === "partnered" ? (
             venues.length === 0 ? (
               <p style={{ fontSize: 12.5, opacity: 0.7, marginTop: 10 }}>
                 {mode === "platform" ? (
-                  <>No venues listed on the platform yet — switch to &quot;Unlisted venue&quot; above, or add one under Venues first.</>
+                  <>No venues listed on the platform yet. Switch to &quot;Unlisted venue&quot; above, or add one under Venues first.</>
                 ) : (
-                  <>No partnered venues yet — <a href="/organize/partnerships" style={{ color: "#006241" }}>invite one</a>, or switch to &quot;My own venue&quot; above.</>
+                  <>No partnered venues yet. <a href="/organize/partnerships" style={{ color: "#006241" }}>Invite one</a>, or switch to &quot;My own venue&quot; above.</>
                 )}
               </p>
             ) : (
@@ -525,7 +525,7 @@ export default function TournamentForm({
       <SectionTitle>Schedule</SectionTitle>
       <label className="ev-check">
         <input type="checkbox" checked={datesTbd} onChange={(e) => setDatesTbd(e.target.checked)} />
-        <span>Date TBD — venue/date not locked in yet, decide later</span>
+        <span>Date TBD: venue/date not locked in yet, decide later</span>
       </label>
       {!datesTbd && (
         <>
@@ -582,11 +582,11 @@ export default function TournamentForm({
         <div className="ev-entry-toggle">
           <button type="button" className={entryType === "team" ? "on" : ""} onClick={() => chooseEntryType("team")}>
             <Users size={15} />
-            <span>Team<small>Multiple players per entry — futsal, cricket…</small></span>
+            <span>Team<small>Multiple players per entry: futsal, cricket…</small></span>
           </button>
           <button type="button" className={entryType === "individual" ? "on" : ""} onClick={() => chooseEntryType("individual")}>
             <User size={15} />
-            <span>Individual<small>One person per entry — running, singles chess…</small></span>
+            <span>Individual<small>One person per entry: running, singles chess…</small></span>
           </button>
         </div>
         <style>{`
@@ -663,7 +663,7 @@ export default function TournamentForm({
 
       <SectionTitle>Registration & payment</SectionTitle>
       <div className="ev-field">
-        <label>Registration fee per team (Rs — 0 for free)</label>
+        <label>Registration fee per team (Rs, enter 0 for free)</label>
         <input type="number" min={0} value={fee} onChange={(e) => setFee(Number(e.target.value))} />
       </div>
       {fee > 0 && (
@@ -691,7 +691,7 @@ export default function TournamentForm({
               </button>
             )}
             <p style={{ fontSize: 11.5, opacity: 0.6, marginTop: 6 }}>
-              Teams scan this to pay you directly. Sportonica never holds this money — you verify each
+              Teams scan this to pay you directly. Sportonica never holds this money. You verify each
               payment yourself in the Payments tab.
             </p>
           </div>
@@ -747,7 +747,7 @@ export default function TournamentForm({
       <SectionTitle>Rules (optional)</SectionTitle>
       <div className="ev-field">
         <label>Tournament rules</label>
-        <textarea rows={3} value={rulesText} onChange={(e) => setRulesText(e.target.value)} placeholder="Paste your full rules & regulations here — shown to every registered team." />
+        <textarea rows={3} value={rulesText} onChange={(e) => setRulesText(e.target.value)} placeholder="Paste your full rules & regulations here. Shown to every registered team." />
       </div>
       <div className="ev-row">
         <div className="ev-field">

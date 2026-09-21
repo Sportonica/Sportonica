@@ -213,7 +213,7 @@ export default function PlayTogetherWizard({
         <div className="bk-success-mark"><Check size={30} color="#fff" /></div>
         <h3 style={{ fontSize: 22 }}>Your game is live!</h3>
         <p className="hint" style={{ maxWidth: 380, margin: "8px auto 20px" }}>
-          {court?.name} at {venueName}. Players can now request to join — approve them from
+          {court?.name} at {venueName}. Players can now request to join. Approve them from
           your Manage page, and each pays you Rs {contribution} in cash at the venue.
         </p>
         <button className="play-btn gold" onClick={() => router.push("/play-together")}>See Play Together games</button>
@@ -293,7 +293,7 @@ export default function PlayTogetherWizard({
         {step === 1 && (
           <div className="bk-panel">
             <h3>Game format</h3>
-            <p className="hint">Optional — helps players know what to expect.</p>
+            <p className="hint">Optional: helps players know what to expect.</p>
             {formatOpts.length > 0 && (
               <div className="bk-chips">
                 {formatOpts.map((f) => (
@@ -322,7 +322,7 @@ export default function PlayTogetherWizard({
             <h3>When are you playing?</h3>
             <p className="hint">
               <Clock size={13} style={{ verticalAlign: -2, marginRight: 4 }} />
-              Live availability — slots already taken are hidden.
+              Live availability: slots already taken are hidden.
             </p>
 
             <WeekStrip
@@ -400,7 +400,7 @@ export default function PlayTogetherWizard({
           <div className="bk-panel">
             <h3>How players pay you</h3>
             <p className="hint">
-              Sportonica never holds player contributions — this is shown directly to approved
+              Sportonica never holds player contributions. This is shown directly to approved
               players so they can pay you.
             </p>
 

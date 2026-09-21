@@ -29,7 +29,7 @@ export default function Error({
         </p>
         <h1 style={{ fontSize: 26, fontWeight: 800, marginBottom: 8 }}>That didn&apos;t load right</h1>
         <p style={{ fontSize: 14, color: "var(--slate)", marginBottom: 24, maxWidth: 380 }}>
-          Give it another try — if it keeps happening, reach us at{" "}
+          Give it another try. If it keeps happening, reach us at{" "}
           <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)" }}>info@sportonica.com</a>.
         </p>
         <button

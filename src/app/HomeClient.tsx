@@ -36,7 +36,7 @@ const STATS = [
 const FAQS = [
   {
     q: "Is Sportonica free to use?",
-    a: "Finding and joining pickup games is completely free. Booking a court only costs the venue's hourly rate, split automatically between everyone in the game — Sportonica doesn't add booking fees on top.",
+    a: "Finding and joining pickup games is completely free. Booking a court only costs the venue's hourly rate, split automatically between everyone in the game. Sportonica doesn't add booking fees on top.",
   },
   {
     q: "What sports can I play on Sportonica?",
@@ -44,15 +44,15 @@ const FAQS = [
   },
   {
     q: "How do I book a futsal court or ground?",
-    a: "Go to Book, pick a sport, date and location, then choose from verified grounds with live hourly availability. You don't need a full squad — open your booking to the city and other players can fill the empty spots.",
+    a: "Go to Book, pick a sport, date and location, then choose from verified grounds with live hourly availability. You don't need a full squad: open your booking to the city and other players can fill the empty spots.",
   },
   {
     q: "Is it safe to play with people I don't know?",
-    a: "Every player builds a trust score from how reliably they show up, and you can see who's joining before you commit. For a court you book directly through Sportonica, your payment sits in escrow until the game is actually played. For a Play Together game, you pay the host directly — cash at the venue or their own QR — and the host confirms they've received it before you're confirmed in.",
+    a: "Every player builds a trust score from how reliably they show up, and you can see who's joining before you commit. For a court you book directly through Sportonica, your payment sits in escrow until the game is actually played. For a Play Together game, you pay the host directly, in cash at the venue or via their own QR, and the host confirms they've received it before you're confirmed in.",
   },
   {
     q: "How do payments and refunds work?",
-    a: "Booking a court directly: pay with Khalti, eSewa, FonePay or bank transfer, and it sits in escrow until the game happens — if it's cancelled, you're covered. Joining a Play Together game: you pay the host directly, in cash or via their QR, and Sportonica never collects or holds that money — the host verifies it themselves.",
+    a: "Booking a court directly: pay with Khalti, eSewa, FonePay or bank transfer, and it sits in escrow until the game happens; if it's cancelled, you're covered. Joining a Play Together game: you pay the host directly, in cash or via their QR, and Sportonica never collects or holds that money. The host verifies it themselves.",
   },
   {
     q: "Which cities does Sportonica cover?",

@@ -62,9 +62,9 @@ export default async function PaymentsPage() {
         amount: Number(g.contribution_amount) || 0,
         status: g.status === "joined"
           ? (STATUS_LABEL[g.contribution_status] ?? g.contribution_status)
-          : g.status === "payment_pending" ? "Payment required — tap to pay"
+          : g.status === "payment_pending" ? "Payment required, tap to pay"
           : g.status === "payment_verification_pending" ? "Awaiting host verification"
-          : "Payment not verified — tap to resubmit",
+          : "Payment not verified, tap to resubmit",
         // Sends them straight back to the game page, which auto-opens the
         // pay-the-host / upload-screenshot popup for these two statuses
         // (see the autoOpenedRef effect in PlayTogetherJoinPanel).

@@ -114,7 +114,7 @@ export default function DMThread({
           setSendError(res.message === "BLOCKED" ? "This message couldn't be delivered." : res.message);
         }
       }
-      catch { setText(body); setSendError("Couldn't send — try again."); }
+      catch { setText(body); setSendError("Couldn't send. Try again."); }
     });
   }
 
@@ -132,7 +132,7 @@ export default function DMThread({
         <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700 }}>{name}</div>
         <BlockButton profileId={peer.id} initialBlocked={blocked} name={name} onChange={setBlocked} />
         <ReportButton targetType="user" targetId={peer.id} label="" />
-        <span title="End-to-end encrypted — only you and this person can read these messages" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: "#22c55e", opacity: 0.85 }}>
+        <span title="End-to-end encrypted: only you and this person can read these messages" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 700, color: "#22c55e", opacity: 0.85 }}>
           <ShieldCheck size={14} /> Encrypted
         </span>
       </div>
@@ -158,7 +158,7 @@ export default function DMThread({
         ) : !ready ? (
           <div style={{ margin: "auto", color: "var(--faint, rgba(255,255,255,.5))", fontSize: 13.5 }}>Setting up encryption…</div>
         ) : messages.length === 0 ? (
-          <div style={{ margin: "auto", color: "var(--faint, rgba(255,255,255,.5))", fontSize: 13.5 }}>No messages yet — say hi 👋</div>
+          <div style={{ margin: "auto", color: "var(--faint, rgba(255,255,255,.5))", fontSize: 13.5 }}>No messages yet. Say hi 👋</div>
         ) : messages.map((m) => {
           const mine = m.sender_id === meId;
           return (

@@ -43,7 +43,7 @@ export default function SquadSettings({
       <Row
         icon={unlisted ? <EyeOff size={15} /> : <Eye size={15} />}
         title={unlisted ? "Unlisted" : "Public"}
-        note={unlisted ? "Hidden from the squads list — shareable by link only." : "Shows in the public squads list."}
+        note={unlisted ? "Hidden from the squads list, shareable by link only." : "Shows in the public squads list."}
         on={unlisted}
         onToggle={toggleUnlisted}
         disabled={pending}

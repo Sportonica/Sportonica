@@ -12,7 +12,7 @@ export default async function RevenuePage() {
     return (
       <>
         <h1 className="plt-h1">Revenue</h1>
-        <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>{r.message} — refresh the page to try again.</p>
+        <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>{r.message.replace(/\.+$/, "")}. Refresh the page to try again.</p>
       </>
     );
   }

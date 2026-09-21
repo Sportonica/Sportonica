@@ -12,7 +12,7 @@ export default async function PlatformPage() {
       <>
         <h1 className="plt-h1">Overview</h1>
         <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>
-          Couldn&apos;t load the platform overview — refresh the page to try again.
+          Couldn&apos;t load the platform overview. Refresh the page to try again.
         </p>
       </>
     );

@@ -73,7 +73,7 @@ export async function removeMember(squadId: string, userId: string) {
   // Only the squad creator can remove others.
   const { data: sq } = await sb.from("squads").select("creator_id").eq("id", squadId).maybeSingle();
   if (!sq || sq.creator_id !== user.id) return actionError("FORBIDDEN");
-  if (userId === user.id) return actionError("Can't remove yourself — leave the squad instead.");
+  if (userId === user.id) return actionError("Can't remove yourself. Leave the squad instead.");
 
   const { error } = await sb.from("squad_members")
     .delete().eq("squad_id", squadId).eq("user_id", userId);

@@ -147,7 +147,7 @@ export default function NepalMap({
         <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center",
           flexDirection: "column", gap: 8, color: "var(--faint, #8b93b0)", fontSize: 14, textAlign: "center", padding: 20 }}>
           <span>Couldn&apos;t load the Nepal map.</span>
-          <span style={{ fontSize: 12 }}>Add <code>public/nepal-provinces.geojson</code> — {error}</span>
+          <span style={{ fontSize: 12 }}>Add <code>public/nepal-provinces.geojson</code>: {error}</span>
         </div>
       )}
 

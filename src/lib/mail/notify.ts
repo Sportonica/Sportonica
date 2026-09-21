@@ -359,7 +359,7 @@ export async function notifyPlayTogetherPaymentSubmitted(input: { gamePlayerId: 
   await Promise.all([
     writeNotification(sb, {
       userId: game.host_id, kind: "game_host_payment_submitted", title: "Payment verification required",
-      body: `${playerName} submitted payment proof for your ${game.sport} game — review it.`,
+      body: `${playerName} submitted payment proof for your ${game.sport} game. Review it.`,
       gameId: game.id, actorId: row.user_id,
     }),
     writeNotification(sb, {
@@ -402,7 +402,7 @@ export async function notifyPlayTogetherCashSelected(input: { gamePlayerId: stri
   await Promise.all([
     writeNotification(sb, {
       userId: game.host_id, kind: "game_payment_cash_selected", title: "Player will pay in cash",
-      body: `${playerName} chose to pay Rs ${Math.round(amount)} in cash at the venue for your ${game.sport} game. They're confirmed — mark it collected once they've paid.`,
+      body: `${playerName} chose to pay Rs ${Math.round(amount)} in cash at the venue for your ${game.sport} game. They're confirmed. Mark it collected once they've paid.`,
       gameId: game.id, actorId: row.user_id,
     }),
     writeNotification(sb, {
@@ -681,14 +681,14 @@ export async function notifyPaymentSubmitted(paymentId: string) {
     ...[...adminIds].map((id) => writeNotification(sb, {
       userId: id,
       kind: "payment_submitted",
-      title: `New payment to verify — ${ctx.label}`,
+      title: `New payment to verify: ${ctx.label}`,
       body: `${ctx.customerName} · ${ctx.payment.payment_method} · Rs ${Math.round(ctx.payment.expected_amount)}`,
       tournamentId: ctx.tournamentId,
     })),
     ...[...organizerIds].map((id) => writeNotification(sb, {
       userId: id,
       kind: isTournament ? "tournament_registration_submitted" : "payment_submitted",
-      title: `New team registration payment — ${ctx.label}`,
+      title: `New team registration payment: ${ctx.label}`,
       body: `${ctx.customerName} · ${ctx.payment.payment_method} · Rs ${Math.round(ctx.payment.expected_amount)}`,
       tournamentId: ctx.tournamentId,
     })),

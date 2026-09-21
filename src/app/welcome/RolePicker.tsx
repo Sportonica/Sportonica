@@ -35,7 +35,7 @@ export default function RolePicker({ name, next }: { name: string; next: string 
       <div className="wc-card">
         <div className="wc-eyebrow">Welcome to Sportonica</div>
         <h1 className="wc-title">Hey {name}.<br />How will you use it?</h1>
-        <p className="wc-sub">You can change this later — it just decides where we drop you.</p>
+        <p className="wc-sub">You can change this later. It just decides where we drop you.</p>
 
         <button className={`wc-opt ${role === "player" ? "on" : ""}`} onClick={() => setRole("player")}>
           <span className="wc-ic"><User size={20} /></span>

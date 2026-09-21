@@ -59,7 +59,7 @@ export async function signUpWithPhone(input: {
   try {
     admin = createServiceClient();
   } catch {
-    return actionError("Phone signup isn't available right now — please use email.");
+    return actionError("Phone signup isn't available right now. Please use email.");
   }
 
   // Friendly pre-check; the DB UNIQUE index is the real guard against a race.

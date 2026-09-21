@@ -303,7 +303,7 @@ function DiscoverInner() {
                           : (ev.host_name ?? "H").charAt(0).toUpperCase()}
                       </span>
                       <span className="disc-host-n">{ev.host_name ?? "Host"}</span>
-                      <span className="disc-host-t" title="Trust score — earned by showing up">
+                      <span className="disc-host-t" title="Trust score: earned by showing up">
                         <ShieldCheck size={10} /> {ev.host_trust ?? 50}
                       </span>
                       <span className="disc-host-g">
@@ -469,7 +469,7 @@ function DiscoverInner() {
             </p>
             <div className="disc-flash-actions">
               <button onClick={(e) => handleBook(flashEvent, e)} className="disc-flash-join">
-                <Zap size={13} fill="currentColor" /> I&apos;m in
+                <Zap size={13} fill="currentColor" />{" "}I&apos;m in
               </button>
               <button onClick={() => setShowFlash(false)} className="disc-flash-skip">
                 Skip

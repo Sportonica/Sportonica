@@ -42,7 +42,7 @@ export default async function OrganizePage() {
       <RoleExplainerBanner
         storageKey="organizer-dashboard-explainer-dismissed"
         title="You're viewing the Organizer dashboard"
-        body="As an Organizer, you set up and run tournaments — fixtures, teams, results, announcements. Use your own venue directly, or invite a Sportonica venue's owner (a Vendor) to host — they confirm each tournament separately."
+        body="As an Organizer, you set up and run tournaments: fixtures, teams, results, announcements. Use your own venue directly, or invite a Sportonica venue's owner (a Vendor) to host; they confirm each tournament separately."
       />
       <div className="adm-between" style={{ marginBottom: 20 }}>
         <div>

@@ -235,7 +235,7 @@ export function dayLine(): string {
   if (h < 9)  return "Early courts are free right now.";
   if (h < 12) return "Good time to lock tonight's game.";
   if (h < 16) return "Afternoon slots are usually quiet.";
-  if (h < 19) return "Prime time — book before it fills.";
+  if (h < 19) return "Prime time. Book before it fills.";
   if (h < 22) return "Floodlights are on across the valley.";
   return "Tomorrow's slots are already open.";
 }

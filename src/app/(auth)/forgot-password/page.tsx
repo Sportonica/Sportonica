@@ -49,7 +49,7 @@ function ForgotPasswordInner() {
     <div className="auth">
       <BackButton className="auth-navback" iconSize={17} />
       <div className="auth-stage">
-        <Link href="/" className="auth-brand" aria-label="Sportonica — go to the home page">
+        <Link href="/" className="auth-brand" aria-label="Sportonica, go to the home page">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/mark.png" alt="" className="auth-brand-mark" />
           <div className="auth-brand-name">Sportonica</div>
@@ -69,7 +69,7 @@ function ForgotPasswordInner() {
               <h1>Check your inbox</h1>
               <p className="sub">
                 If an account exists for <b>{email.trim()}</b>, a password-reset link is on
-                its way. It expires in an hour — check your spam folder if you don&apos;t see it.
+                its way. It expires in an hour. Check your spam folder if you don&apos;t see it.
               </p>
               <div className="auth-alt">
                 <Link href="/login">Back to sign in</Link>

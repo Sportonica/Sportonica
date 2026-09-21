@@ -12,7 +12,7 @@ export default async function PlatformNewTournamentPage() {
   return (
     <>
       <h1 className="plt-h1">New tournament</h1>
-      <p className="plt-sub2">A Sportonica-run tournament or one-off event — team-based or single-entry, at any venue on the platform.</p>
+      <p className="plt-sub2">A Sportonica-run tournament or one-off event, team-based or single-entry, at any venue on the platform.</p>
       <TournamentForm venues={rows.map((v) => ({ id: v.id, name: v.name }))} mode="platform" />
     </>
   );

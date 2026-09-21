@@ -39,7 +39,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               This policy is subject to modification at any time. We&apos;ll let you know when it changes,
-              and you may be asked to provide fresh consent to the updated terms — if you don&apos;t agree
+              and you may be asked to provide fresh consent to the updated terms. If you don&apos;t agree
               with a change, please discontinue using Sportonica. You are providing your information to us
               of your own free will; do not submit any data you&apos;re not comfortable sharing under this
               policy.
@@ -77,16 +77,16 @@ export default function PrivacyPolicyPage() {
               feedback, communications, or other user-generated content.
             </p>
             <p>
-              <b>Location.</b> If you&apos;ve enabled location-based services, we may collect your
+              <b>Location.</b>{" "}If you&apos;ve enabled location-based services, we may collect your
               device&apos;s geographic location, including GPS and associated timestamps, to customize and
               improve the service. This data may be linked with your device identifier and other
               information we hold. You can opt out at any time by turning off location services on your
               device, though this may limit some functionality.
             </p>
             <p>
-              <b>Contacts.</b> With your consent, we may ask for access to your device&apos;s contact list
+              <b>Contacts.</b>{" "}With your consent, we may ask for access to your device&apos;s contact list
               to implement certain features. Where access is granted, we collect and use contact
-              information — name, phone number, and email — exclusively to implement those features. We
+              information (name, phone number, and email) exclusively to implement those features. We
               reserve the right to monitor conversations between users or service providers facilitated
               through Sportonica, including to prevent abuse, protect users&apos; rights, and help settle
               disputes.
@@ -96,7 +96,7 @@ export default function PrivacyPolicyPage() {
               credit/debit card details, may need to be submitted to complete transactions through our
               authorized payment gateways and financial institutions. The Company does not collect, access,
               or store this payment-related information on its own systems, except for audit or
-              transaction record-keeping purposes — it is transmitted directly to, and processed by,
+              transaction record-keeping purposes. It is transmitted directly to, and processed by,
               third-party payment gateway providers integrated with Sportonica. We only engage payment
               service providers that adhere to industry-standard security protocols.
             </p>
@@ -128,8 +128,8 @@ export default function PrivacyPolicyPage() {
             <p>
               We may disclose your information, without prior notice, where required to comply with
               applicable law, regulation, subpoena, court order, or other legal process. We may also
-              disclose information — including, without limitation, your name, contact details, location,
-              and activity on Sportonica — to law enforcement agencies or other governmental authorities,
+              disclose information (including, without limitation, your name, contact details, location,
+              and activity on Sportonica) to law enforcement agencies or other governmental authorities,
               where required by law or in good-faith cooperation with an official investigation or
               proceeding.
             </p>
@@ -174,7 +174,7 @@ export default function PrivacyPolicyPage() {
               identities of any third parties your data has been disclosed to.
             </p>
             <p>
-              These rights may be limited in some cases — for example, where exercising them would
+              These rights may be limited in some cases, for example, where exercising them would
               adversely affect another individual&apos;s rights, where the information is necessary for
               detecting criminal activity, or where disclosure could prejudice a negotiation or an ongoing
               investigation into suspected unlawful activity. Exercising your rights is also subject to
@@ -182,7 +182,7 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               In practice: you can delete your account and its associated data yourself, any time, from{" "}
-              <b>Profile → Login &amp; Security</b> — see our{" "}
+              <b>Profile → Login &amp; Security</b>. See our{" "}
               <Link href="/account-deletion" style={{ color: "var(--sodium)" }}>Account Deletion</Link>{" "}
               page for exactly what&apos;s removed. For anything else, contact us below.
             </p>

@@ -21,7 +21,7 @@ export default async function PlatformPaymentsPage() {
     return (
       <>
         <h1 className="plt-h1">Payments</h1>
-        <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>{message} — refresh the page to try again.</p>
+        <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>{message.replace(/\.+$/, "")}. Refresh the page to try again.</p>
       </>
     );
   }
@@ -31,7 +31,7 @@ export default async function PlatformPaymentsPage() {
       <h1 className="plt-h1">Payments</h1>
       <p className="plt-sub2">
         Sportonica&apos;s own eSewa/Khalti merchant QR codes, and manual verification of every payment
-        submitted against a booking. A screenshot is evidence, not proof — always confirm the merchant,
+        submitted against a booking. A screenshot is evidence, not proof: always confirm the merchant,
         amount and transaction ID before approving.
       </p>
 

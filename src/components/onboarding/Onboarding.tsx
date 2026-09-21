@@ -57,7 +57,7 @@ const SLIDES: Slide[] = [
         Get into <em>your game</em>
       </>
     ),
-    sub: "Verified futsal courts, box-cricket pitches, badminton halls and pools — live hourly availability, and the bill split automatically across your squad.",
+    sub: "Verified futsal courts, box-cricket pitches, badminton halls and pools, with live hourly availability and the bill split automatically across your squad.",
     pins: [
       { x: 24, y: 24, img: P.futsal, pos: "50% 14%", kind: "venue", text: "Futsal", float: 6.5 },
       { x: 75, y: 20, img: P.cricket, pos: "52% 34%", kind: "venue", text: "Cricket", float: 7.2, delay: 0.4 },
@@ -72,7 +72,7 @@ const SLIDES: Slide[] = [
         Book the venues <em>nearby</em>
       </>
     ),
-    sub: "Short a couple of players? Open your game to the city. Every player carries a trust score from how reliably they show up — so you know who's turning up.",
+    sub: "Short a couple of players? Open your game to the city. Every player carries a trust score from how reliably they show up, so you know who's turning up.",
     pins: [
       { x: 30, y: 21, img: P.volleyball, pos: "24% 46%", kind: "chat", text: "I'm in! 👊", float: 6 },
       { x: 68, y: 24, img: P.pickleball, pos: "46% 36%", kind: "chat", text: "Got 2 spots?", float: 7, delay: 0.5 },
@@ -87,7 +87,7 @@ const SLIDES: Slide[] = [
         Find your <em>friends</em>
       </>
     ),
-    sub: "Build a squad, keep the chat and the fixtures in one place, and run your own weekly league — win, lose, and rank across the season.",
+    sub: "Build a squad, keep the chat and the fixtures in one place, and run your own weekly league: win, lose, and rank across the season.",
     pins: [
       { x: 25, y: 24, img: P.volleyball, pos: "24% 46%", kind: "venue", text: "Sat league", float: 6.4 },
       { x: 75, y: 21, img: P.basketball, pos: "50% 20%", kind: "venue", text: "3-on-3 crew", size: 56, float: 7, delay: 0.5 },

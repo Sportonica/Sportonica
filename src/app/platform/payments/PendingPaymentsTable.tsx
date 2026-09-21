@@ -81,7 +81,7 @@ export default function PendingPaymentsTable({ initialPayments }: { initialPayme
       {newCount > 0 && (
         <div className="ppt-new">
           <button className="ppt-new-btn" onClick={refreshNow}>
-            <Bell size={13} /> {newCount} new payment{newCount !== 1 ? "s" : ""} submitted — click to refresh
+            <Bell size={13} /> {newCount} new payment{newCount !== 1 ? "s" : ""} submitted, click to refresh
           </button>
           {latest && (
             // No WhatsApp Business/Twilio account is set up yet, so this
@@ -90,7 +90,7 @@ export default function PendingPaymentsTable({ initialPayments }: { initialPayme
             <a
               className="ppt-new-wa"
               href={whatsappNotifyUrl(
-                `New payment to verify — Rs ${Math.round(latest.expected_amount)} via ${latest.payment_method}, txn ${latest.transaction_id}. Review: /platform/payments`
+                `New payment to verify: Rs ${Math.round(latest.expected_amount)} via ${latest.payment_method}, txn ${latest.transaction_id}. Review: /platform/payments`
               )}
               target="_blank" rel="noopener noreferrer"
             >
@@ -110,7 +110,7 @@ export default function PendingPaymentsTable({ initialPayments }: { initialPayme
             <a
               className="dt-btn"
               href={whatsappNotifyUrl(
-                `Payment to verify — ${p.booking_label} · ${p.customer_name} · Rs ${Math.round(p.expected_amount)} via ${p.payment_method} · txn ${p.transaction_id}`
+                `Payment to verify: ${p.booking_label} · ${p.customer_name} · Rs ${Math.round(p.expected_amount)} via ${p.payment_method} · txn ${p.transaction_id}`
               )}
               target="_blank" rel="noopener noreferrer"
               title="For a faster check, send this payment to WhatsApp"

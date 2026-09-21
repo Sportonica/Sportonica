@@ -73,7 +73,7 @@ export default function PartnershipsClient({ initial }: { initial: Row[] }) {
         <div aria-live="polite">
           {searching && <p style={{ fontSize: 13, opacity: 0.6, marginTop: 10 }}>Searching…</p>}
           {!searching && q.trim().length >= 2 && results.length === 0 && (
-            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 10 }}>No venue matches &quot;{q}&quot; — try a different name.</p>
+            <p style={{ fontSize: 13, opacity: 0.6, marginTop: 10 }}>No venue matches &quot;{q}&quot;. Try a different name.</p>
           )}
         </div>
         {results.length > 0 && (
@@ -102,7 +102,7 @@ export default function PartnershipsClient({ initial }: { initial: Row[] }) {
           <div style={{ textAlign: "center", padding: "24px 12px" }}>
             <Handshake size={22} style={{ opacity: 0.35, marginBottom: 8 }} />
             <p style={{ fontSize: 13.5, opacity: 0.65, margin: 0 }}>
-              No venues yet — search above and send your first invite.
+              No venues yet. Search above and send your first invite.
             </p>
           </div>
         ) : (

@@ -10,7 +10,7 @@ export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: "Tournaments · Sportonica",
-  description: "Organised tournaments and events run by venues and by Sportonica — join and pay the same way you book a game.",
+  description: "Organised tournaments and events run by venues and by Sportonica. Join and pay the same way you book a game.",
 };
 
 export default async function TournamentsPage() {

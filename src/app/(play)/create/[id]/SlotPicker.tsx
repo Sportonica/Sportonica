@@ -240,7 +240,7 @@ export default function SlotPicker({
                 className="sp-slot booked"
                 disabled
                 aria-disabled="true"
-                title={`${s.label} — already booked`}
+                title={`${s.label}: already booked`}
               >
                 <span className="sp-slot-time">{s.label}</span>
                 <span className="sp-slot-tag">BOOKED</span>
@@ -255,7 +255,7 @@ export default function SlotPicker({
                 className="sp-slot past"
                 disabled
                 aria-disabled="true"
-                title={`${s.label} — already passed`}
+                title={`${s.label}: already passed`}
               >
                 {s.label}
               </button>

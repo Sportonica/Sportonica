@@ -47,15 +47,15 @@ export default function AccountDeletionPage() {
           <span className="adp-eyebrow">Account · Privacy</span>
           <h1>Deleting your <em>Sportonica</em> account</h1>
           <p>
-            You can permanently delete your account yourself, straight from the app — no request,
+            You can permanently delete your account yourself, straight from the app: no request,
             no waiting on us. Here&apos;s exactly what happens to your data when you do.
           </p>
 
           <div className="adp-draft">
             <TriangleAlert size={15} aria-hidden />
             <span>
-              <b>Draft.</b>{" "}This page reflects how deletion works in the app today. The wording —
-              and any retention periods required under Nepal law — should be reviewed before it&apos;s
+              <b>Draft.</b>{" "}This page reflects how deletion works in the app today. The wording,
+              and any retention periods required under Nepal law, should be reviewed before it&apos;s
               treated as an official policy.
             </span>
           </div>
@@ -75,7 +75,7 @@ export default function AccountDeletionPage() {
           <div className="adp-fact">
             <span className="adp-fact-ico" aria-hidden><Clock size={18} /></span>
             <b>About ten seconds</b>
-            <span>Click Delete Account, confirm once, done — then you&apos;re signed out.</span>
+            <span>Click Delete Account, confirm once, done. Then you&apos;re signed out.</span>
           </div>
         </div>
 
@@ -84,7 +84,7 @@ export default function AccountDeletionPage() {
           <h2 className="adp-sec-h">What happens to your data</h2>
           <p className="adp-sec-sub">
             Most of your data is erased outright. A few records are kept for accounting, safety or a
-            venue&apos;s own books — those have your identity stripped out so they can no longer point
+            venue&apos;s own books. Those have your identity stripped out so they can no longer point
             back to you.
           </p>
 
@@ -124,9 +124,9 @@ export default function AccountDeletionPage() {
           </div>
 
           <div className="adp-legend">
-            <span><i className="del" /> Deleted — erased entirely</span>
-            <span><i className="anon" /> Anonymised — kept, identity removed</span>
-            <span><i className="free" /> Released — booking freed for others</span>
+            <span><i className="del" /> Deleted: erased entirely</span>
+            <span><i className="anon" /> Anonymised: kept, identity removed</span>
+            <span><i className="free" /> Released: booking freed for others</span>
           </div>
         </section>
 
@@ -139,11 +139,11 @@ export default function AccountDeletionPage() {
           <ol className="adp-steps">
             <Step icon={<LogIn size={15} aria-hidden />} title="Click Delete Account">
               Scroll to the red &ldquo;Delete Account&rdquo; card at the bottom of Login &amp; Security
-              and click it — nothing is deleted yet, you&apos;ll see a summary first.
+              and click it. Nothing is deleted yet: you&apos;ll see a summary first.
             </Step>
             <Step icon={<ShieldAlert size={15} aria-hidden />} title="Confirm">
               Click &ldquo;Yes, delete my account&rdquo; to go ahead, or Cancel to back out. No typing,
-              no re-entering your password — just the one confirmation.
+              no re-entering your password, just the one confirmation.
             </Step>
             <Step icon={<CircleCheck size={15} aria-hidden />} title="Done">
               Your account and data are removed, you&apos;re signed out everywhere, and you land back
@@ -162,7 +162,7 @@ export default function AccountDeletionPage() {
               <h3>Bookings &amp; court availability</h3>
               <p>
                 Any booking in the future is cancelled as part of the deletion and the slot is
-                immediately freed for other players — deleting an account never leaves a court time
+                immediately freed for other players. Deleting an account never leaves a court time
                 blocked. Where a venue&apos;s policy requires notice of a cancellation, the venue is
                 notified.
               </p>
@@ -178,7 +178,7 @@ export default function AccountDeletionPage() {
             <div>
               <h3>Payments</h3>
               <p>
-                Sportonica never holds your card or bank details — you pay a venue or host directly by
+                Sportonica never holds your card or bank details. You pay a venue or host directly by
                 eSewa/Khalti QR and upload a screenshot for verification. When you delete your
                 account:
               </p>
@@ -222,7 +222,7 @@ export default function AccountDeletionPage() {
               <summary>Do I need to contact support to delete my account?</summary>
               <p>
                 No. The whole flow runs on your own login. Support is only needed if your account owns
-                a venue, or in the rare case the automatic deletion can&apos;t finish — the app will
+                a venue, or in the rare case the automatic deletion can&apos;t finish. The app will
                 tell you and point you to{" "}
                 <a className="adp-inline" href="mailto:info@sportonica.com">info@sportonica.com</a>.
               </p>
@@ -231,7 +231,7 @@ export default function AccountDeletionPage() {
               <summary>Is every record really deleted?</summary>
               <p>
                 Not literally. Financial and audit records that Sportonica or a venue must keep for
-                legal or accounting reasons are retained — but anonymised, so they can no longer
+                legal or accounting reasons are retained, but anonymised, so they can no longer
                 identify you. Everything that isn&apos;t in that category is erased.
               </p>
             </details>

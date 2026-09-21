@@ -14,7 +14,7 @@ export default async function PlatformUsersPage() {
       <>
         <h1 className="plt-h1">Users</h1>
         <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>
-          Couldn&apos;t load users — refresh the page to try again.
+          Couldn&apos;t load users. Refresh the page to try again.
         </p>
       </>
     );

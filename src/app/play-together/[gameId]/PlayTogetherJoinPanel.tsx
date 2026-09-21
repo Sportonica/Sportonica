@@ -151,7 +151,7 @@ export default function PlayTogetherJoinPanel({
               {pending ? "Leaving…" : "Leave game"}
             </button>
           ) : (
-            <p className="hint">Joining has closed — you can no longer leave online.</p>
+            <p className="hint">Joining has closed. You can no longer leave online.</p>
           )}
         </>
       ) : status === "requested" ? (
@@ -233,7 +233,7 @@ export default function PlayTogetherJoinPanel({
             Request to Join
           </button>
           <p className="hint" style={{ marginTop: 8 }}>
-            The host reviews every request — you&apos;ll only be notified once they approve it.
+            The host reviews every request. You&apos;ll only be notified once they approve it.
           </p>
         </>
       )}

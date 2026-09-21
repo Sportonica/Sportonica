@@ -40,7 +40,7 @@ function winnerOptions(matches: TournamentMatch[], teamName: (id: string | null)
   const out: { id: string; label: string }[] = [];
   for (const m of matches) {
     if (!m.winner_team_id) continue;
-    out.push({ id: m.winner_team_id, label: `${teamName(m.winner_team_id)} — won ${m.round_label}` });
+    out.push({ id: m.winner_team_id, label: `${teamName(m.winner_team_id)} won ${m.round_label}` });
   }
   return out;
 }
@@ -117,7 +117,7 @@ export default function FixturesTab({
       <div className="tc-empty">
         {!registrationClosed
           ? "Close registration to start adding matches."
-          : "Registration is closed, but no team is confirmed yet — approve at least one team's payment (or add a walk-in team) before fixtures can be added."}
+          : "Registration is closed, but no team is confirmed yet. Approve at least one team's payment (or add a walk-in team) before fixtures can be added."}
       </div>
     );
   }
@@ -130,9 +130,9 @@ export default function FixturesTab({
 
   const REGEN_MESSAGES: Record<string, string> = {
     REBUILT: "Fixtures rebuilt from the current team list.",
-    NO_MATCHES: "Nothing to regenerate — no bracket/schedule exists yet.",
-    ALREADY_PLAYED: "Not regenerated — a match already has a result, which would be lost.",
-    TEAMS_NOT_GROUPED: "Not regenerated — a confirmed team hasn't been assigned a group yet.",
+    NO_MATCHES: "Nothing to regenerate. No bracket/schedule exists yet.",
+    ALREADY_PLAYED: "Not regenerated. A match already has a result, which would be lost.",
+    TEAMS_NOT_GROUPED: "Not regenerated. A confirmed team hasn't been assigned a group yet.",
   };
 
   function runRegenerate() {
@@ -160,7 +160,7 @@ export default function FixturesTab({
       <div className="tc-card-sub">
         {canGenerateBracket && mode === "choose"
           ? "Choose how you'd like to build the bracket."
-          : "Add each match by hand — pick both teams, a round, and (optionally) a group. Set the date/time per match once it's added."}
+          : "Add each match by hand: pick both teams, a round, and (optionally) a group. Set the date/time per match once it's added."}
       </div>
       {regenMsg && <div className="tc-card-sub" style={{ marginBottom: 10 }}>{regenMsg}</div>}
       {err && <div ref={errRef} className="tc-err">{err}</div>}
@@ -231,7 +231,7 @@ export default function FixturesTab({
                     onUpdateTeams={(teamAId, teamBId) => run(() => updateMatchTeams(m.id, teamAId, teamBId))}
                     onDelete={() => {
                       const note = m.winner_team_id && m.next_match_id
-                        ? ` ${teamName(m.winner_team_id)} already advanced from this match — that will be reset too.`
+                        ? ` ${teamName(m.winner_team_id)} already advanced from this match. That will be reset too.`
                         : "";
                       if (!window.confirm(`Delete ${teamName(m.team_a_id)} vs ${teamName(m.team_b_id)}? This can't be undone.${note}`)) return;
                       run(() => deleteMatch(m.id));
@@ -295,7 +295,7 @@ function FixtureModeChooser({ onChoose }: { onChoose: (mode: "manual" | "auto") 
       >
         <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Auto-generate the bracket</div>
         <div className="tc-dim" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-          Set seeds (optional), then the full knockout tree is built for you — byes assigned automatically. You can still edit any match by hand afterwards.
+          Set seeds (optional), then the full knockout tree is built for you, with byes assigned automatically. You can still edit any match by hand afterwards.
         </div>
       </button>
     </div>
@@ -463,7 +463,7 @@ function GenerateBracketPanel({ teams, pending, onSeed, onGenerate }: {
     <div style={{ background: "rgba(0,98,65,0.06)", borderRadius: 12, padding: 16, marginTop: 12, marginBottom: 12, border: "1px solid rgba(0,98,65,0.15)" }}>
       <div style={{ fontWeight: 700, marginBottom: 4 }}>Generate bracket</div>
       <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 12 }}>
-        Optionally set seeds below (unseeded teams are ordered by signup date), then auto-build the full knockout tree — byes are assigned automatically. Or skip this and add matches by hand below instead.
+        Optionally set seeds below (unseeded teams are ordered by signup date), then auto-build the full knockout tree. Byes are assigned automatically. Or skip this and add matches by hand below instead.
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12, maxWidth: 340 }}>
         {sorted.map((t, i) => (
@@ -610,7 +610,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
             <button
               className="tc-btn primary" disabled={pending || !teamAId} style={{ padding: "5px 8px", fontSize: 11.5 }}
               onClick={() => {
-                if (done && !window.confirm(`This match is already decided — changing the teams will undo the result${match.next_match_id ? " and reset anything it already fed into" : ""}. Continue?`)) return;
+                if (done && !window.confirm(`This match is already decided. Changing the teams will undo the result${match.next_match_id ? " and reset anything it already fed into" : ""}. Continue?`)) return;
                 onUpdateTeams(teamAId, teamBId || undefined);
                 setEditingTeams(false);
               }}
@@ -631,11 +631,11 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
             </button>
           </div>
         )}
-        {match.status === "walkover" && <span className="tc-badge warn">Walkover — {teamName(match.winner_team_id)}</span>}
+        {match.status === "walkover" && <span className="tc-badge warn">Walkover: {teamName(match.winner_team_id)}</span>}
         {match.status === "completed" && match.team_b_id === null && <span className="tc-badge ok">Bye</span>}
         {match.status === "completed" && match.team_b_id !== null && (
           match.winner_team_id
-            ? <span className="tc-badge ok">Won — {teamName(match.winner_team_id)}</span>
+            ? <span className="tc-badge ok">Won: {teamName(match.winner_team_id)}</span>
             : <span className="tc-badge neutral">Draw</span>
         )}
       </td>
@@ -725,7 +725,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
           // and noticing Team B's "TBD / bye" placeholder.
           match.team_a_id && !done ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span className="tc-dim" style={{ fontSize: 12 }}>No opponent assigned —</span>
+              <span className="tc-dim" style={{ fontSize: 12 }}>No opponent assigned.</span>
               <button
                 className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
                 onClick={() => {
@@ -798,7 +798,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
 
             {showEt && (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                <span className="tc-dim" style={{ fontSize: 11, width: "100%" }}>Level after regulation — extra time score:</span>
+                <span className="tc-dim" style={{ fontSize: 11, width: "100%" }}>Level after regulation. Extra time score:</span>
                 <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_a_id)} (ET)</span>
                   <input
@@ -824,7 +824,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
 
             {showPens && (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                <span className="tc-dim" style={{ fontSize: 11, width: "100%" }}>Still level — penalty shootout score:</span>
+                <span className="tc-dim" style={{ fontSize: 11, width: "100%" }}>Still level. Penalty shootout score:</span>
                 <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_a_id)} (pens)</span>
                   <input
@@ -1255,7 +1255,7 @@ function CricketPlayerStatsModal({
           <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", color: "inherit", opacity: 0.6, cursor: "pointer", width: 36, height: 36, display: "grid", placeItems: "center" }}><X size={18} /></button>
         </div>
         <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 16 }}>
-          {teamName(match.team_a_id)} {match.score_a}/{match.wickets_a ?? "-"} ({match.overs_a ?? "-"}) — {teamName(match.team_b_id)} {match.score_b}/{match.wickets_b ?? "-"} ({match.overs_b ?? "-"})
+          {teamName(match.team_a_id)} {match.score_a}/{match.wickets_a ?? "-"} ({match.overs_a ?? "-"}) vs {teamName(match.team_b_id)} {match.score_b}/{match.wickets_b ?? "-"} ({match.overs_b ?? "-"})
         </div>
 
         {loading ? (
@@ -1368,7 +1368,7 @@ function MatchHistoryPanel({ matchId }: { matchId: string }) {
             <span className="tc-dim">
               {new Date(e.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: KTM_TZ })}
             </span>
-            {" — "}{summarizeAudit(e)}{" "}
+            {" · "}{summarizeAudit(e)}{" "}
             <span className="tc-dim">by {e.changed_by_name}</span>
           </div>
         ))

@@ -39,7 +39,7 @@ export default function VenueBookingsClient({ initial }: { initial: Row[] }) {
   }
 
   function decline(id: string, name: string) {
-    if (!window.confirm(`Decline "${name}"? The organizer will need to pick a different venue — this can't be undone.`)) return;
+    if (!window.confirm(`Decline "${name}"? The organizer will need to pick a different venue. This can't be undone.`)) return;
     respond(id, "declined", name);
   }
 
@@ -48,7 +48,7 @@ export default function VenueBookingsClient({ initial }: { initial: Row[] }) {
       <div style={{ textAlign: "center", padding: "24px 12px" }}>
         <CalendarCheck size={22} style={{ opacity: 0.35, marginBottom: 8 }} />
         <p style={{ fontSize: 13.5, opacity: 0.65, margin: 0 }}>
-          Nothing proposed yet — when an organizer sets up a tournament at your venue, it&apos;ll show up here for you to confirm.
+          Nothing proposed yet. When an organizer sets up a tournament at your venue, it&apos;ll show up here for you to confirm.
         </p>
       </div>
     );
@@ -83,7 +83,7 @@ export default function VenueBookingsClient({ initial }: { initial: Row[] }) {
             {r.venue_booking_status === "pending" && r.status === "draft" && (
               <>
                 <p style={{ fontSize: 13, opacity: 0.7, margin: "8px 0 12px" }}>
-                  Confirm if you&apos;re happy to host this — the organizer can&apos;t submit it for review until you do.
+                  Confirm if you&apos;re happy to host this. The organizer can&apos;t submit it for review until you do.
                 </p>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="adm-btn sm primary" disabled={pending} onClick={() => respond(r.id, "confirmed", r.name)}>Confirm</button>

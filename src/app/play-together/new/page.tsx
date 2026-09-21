@@ -21,7 +21,7 @@ export default async function NewGameVenuePickerPage() {
           <h1>Pick a <em>venue</em> to host at</h1>
           <p>
             You book and pay for the venue upfront. Players who join reimburse you in cash
-            at the venue — Sportonica never collects their contributions.
+            at the venue. Sportonica never collects their contributions.
           </p>
         </div>
 

@@ -74,7 +74,7 @@ export default function PlayTogetherManageClient({
       setHistoricalRows((rs) => [{ ...row, status: "rejected" }, ...rs]);
     }
     setReviewing(null);
-    notify(approve ? "Request approved — waiting on their payment" : "Request rejected");
+    notify(approve ? "Request approved, waiting on their payment" : "Request rejected");
   }
 
   // The ONLY action that actually adds a player to the group — see
@@ -89,7 +89,7 @@ export default function PlayTogetherManageClient({
       setAwaitingPaymentRows((rs) => [...rs, { ...row, status: "payment_rejected", payment_rejection_reason: rejectReason ?? null }]);
     }
     setReviewingPayment(null);
-    notify(approve ? "Payment verified — player confirmed" : "Payment rejected");
+    notify(approve ? "Payment verified, player confirmed" : "Payment rejected");
   }
 
   function doCancel() {
@@ -185,7 +185,7 @@ export default function PlayTogetherManageClient({
                 <div>
                   <div className="pt-player-name">{p.profiles?.full_name ?? p.profiles?.name ?? "Player"}</div>
                   <div className="pt-player-sub">
-                    {p.status === "payment_rejected" ? "Payment rejected — may resubmit" : "Hasn't paid yet"}
+                    {p.status === "payment_rejected" ? "Payment rejected, may resubmit" : "Hasn't paid yet"}
                     {p.payment_deadline ? ` · due ${new Date(p.payment_deadline).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : ""}
                   </div>
                 </div>
@@ -248,7 +248,7 @@ export default function PlayTogetherManageClient({
             <>
               <p>
                 Cancelling notifies every approved and pending player. Sportonica doesn&apos;t automatically
-                refund your venue payment — any refund follows the venue&apos;s cancellation policy and must
+                refund your venue payment. Any refund follows the venue&apos;s cancellation policy and must
                 currently be handled by an admin.
               </p>
               <input

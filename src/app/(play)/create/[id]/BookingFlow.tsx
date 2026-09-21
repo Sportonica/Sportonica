@@ -338,7 +338,7 @@ export default function BookingFlow({
         <h3 style={{ fontSize: 22 }}>{needPlayers ? "Your game is live!" : "You're booked!"}</h3>
         <p className="hint" style={{ maxWidth: 380, margin: "8px auto 20px" }}>
           {needPlayers
-            ? `${court?.sport} on ${court?.name} at ${venueName}. Players can now request to join — approve them from your Manage page, and each pays you Rs ${contribution} directly.`
+            ? `${court?.sport} on ${court?.name} at ${venueName}. Players can now request to join. Approve them from your Manage page, and each pays you Rs ${contribution} directly.`
             : `${court?.sport} on ${court?.name} at ${venueName}, ${new Date(ktmIso(dateStr, hour ?? 0)).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: KTM_TZ })} at ${fmtHM(hour ?? 0)} for ${duration === 1 ? "1 hour" : `${duration} hours`}.`}
         </p>
         <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
@@ -361,7 +361,7 @@ export default function BookingFlow({
           </button>
           {needPlayers && (
             <p className="hint" style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: "rgba(217,119,6,.12)", color: "#d97706" }}>
-              Your game won&apos;t appear in Play Together or the home page&apos;s &quot;Play socially&quot; list until we verify this payment — usually within a few hours.
+              Your game won&apos;t appear in Play Together or the home page&apos;s &quot;Play socially&quot; list until we verify this payment, usually within a few hours.
             </p>
           )}
           <PaymentStep
@@ -466,7 +466,7 @@ export default function BookingFlow({
             <h3>When are you playing?</h3>
             <p className="hint">
               <Clock size={13} style={{ display: "inline", verticalAlign: -2, marginRight: 4 }} />
-              Live availability — booked slots are shown in red, passed times greyed out.
+              Live availability: booked slots are shown in red, passed times greyed out.
             </p>
 
             <WeekStrip
@@ -548,12 +548,12 @@ export default function BookingFlow({
                 </div>
                 <p className="pt-min-note" style={{ marginTop: 10 }}>
                   {Math.max(maxPlayers - 1, 0)} open spot{Math.max(maxPlayers - 1, 0) === 1 ? "" : "s"}{" "}
-                  for others to join — you&apos;re already counted in as the host.
+                  for others to join. You&apos;re already counted in as the host.
                 </p>
 
                 <p className="hint" style={{ marginBottom: 2, marginTop: 24 }}>Minimum to make it happen</p>
                 <p className="hint" style={{ marginBottom: 10, fontSize: 12, opacity: .7 }}>
-                  If fewer than this join, you can still play — just know it won&apos;t be full.
+                  If fewer than this join, you can still play, but it won&apos;t be full.
                 </p>
                 <div className="bk-stepper">
                   <button type="button" className="bk-step-btn" onClick={decMinPlayers}
@@ -599,7 +599,7 @@ export default function BookingFlow({
           <div className="bk-panel">
             <h3>How players pay you</h3>
             <p className="hint">
-              Sportonica never holds player contributions — this is shown directly to approved
+              Sportonica never holds player contributions. This is shown directly to approved
               players so they can pay you.
             </p>
 

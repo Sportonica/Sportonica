@@ -45,7 +45,7 @@ export default function PayoutsGrid({ venues }: { venues: PayoutRow[] }) {
       rows={venues}
       pageSize={15}
       exportName="sportonica-payouts"
-      empty="No revenue yet — bookings will show here."
+      empty="No revenue yet. Bookings will show here."
       actions={(v) => (
         Number(v.payout_pending) > 0 ? (
           <button className="dt-btn ok" disabled={pending} onClick={() => pay(v.venue_id)}>
