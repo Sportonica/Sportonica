@@ -12,10 +12,6 @@ export default async function PrivacySection() {
       <div className="pf-wrap" style={{ maxWidth: 640 }}>
         <Link href="/profile" className="pf-back"><ArrowLeft size={15} /> Profile</Link>
         <h1 className="pf-hub-name" style={{ marginTop: 18 }}>Privacy</h1>
-        <p className="pf-lede" style={{ marginTop: 16 }}>
-          You can switch your player card between public and private from Edit Profile.
-          More granular contact-visibility controls are on the way.
-        </p>
 
         <h2 style={{ fontSize: 15, fontWeight: 800, marginTop: 32, marginBottom: 4 }}>Blocked users</h2>
         <p style={{ fontSize: 13, opacity: 0.65, marginBottom: 16 }}>
