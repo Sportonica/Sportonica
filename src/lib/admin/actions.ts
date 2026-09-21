@@ -21,6 +21,26 @@ function pickVenueFields(patch: Record<string, unknown>) {
   );
 }
 
+// Same reasoning as VENUE_OWNER_FIELDS: these actions are reachable by direct
+// POST, so a patch/insert object is allowlisted rather than passed through
+// as-is — in particular this keeps a caller from smuggling a `venue_id` into
+// updateCourt()/createPricingRule()'s patch to reassign a row across venues.
+const COURT_FIELDS = new Set(["name", "sport", "surface", "capacity", "base_price"]);
+function pickCourtFields(patch: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(patch).filter(([k]) => COURT_FIELDS.has(k)),
+  );
+}
+
+const PRICING_RULE_FIELDS = new Set([
+  "court_id", "label", "kind", "amount", "days", "start_time", "end_time", "priority",
+]);
+function pickPricingFields(patch: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(patch).filter(([k]) => PRICING_RULE_FIELDS.has(k)),
+  );
+}
+
 const BOOKING_STATES = new Set([
   "reserved", "confirmed", "played", "no_show", "dropped", "cancelled", "refunded",
 ]);
@@ -153,7 +173,11 @@ export async function createCourt(input: {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   if (!(await requireVenueAccess(sb, input.venue_id))) return actionError("FORBIDDEN");
-  const { data, error } = await sb.from("courts").insert(input).select().single();
+  const { data, error } = await sb
+    .from("courts")
+    .insert({ ...pickCourtFields(input as Record<string, unknown>), venue_id: input.venue_id })
+    .select()
+    .single();
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${input.venue_id}`);
   return data;
@@ -163,7 +187,9 @@ export async function updateCourt(id: string, venue_id: string, patch: Record<st
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
-  const { error } = await sb.from("courts").update(patch).eq("id", id).eq("venue_id", venue_id);
+  const safe = pickCourtFields(patch);
+  if (Object.keys(safe).length === 0) return actionError("Nothing to update.");
+  const { error } = await sb.from("courts").update(safe).eq("id", id).eq("venue_id", venue_id);
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${venue_id}`);
 }
@@ -331,7 +357,7 @@ export async function createPricingRule(input: {
   if (!user) return actionError("UNAUTHORIZED");
   const { venue_id, ...row } = input;
   if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
-  const { data, error } = await sb.from("pricing_rules").insert(row).select().single();
+  const { data, error } = await sb.from("pricing_rules").insert(pickPricingFields(row)).select().single();
   if (error) return actionError(error.message);
   revalidatePath(`/admin/venues/${venue_id}/pricing`);
   return data;

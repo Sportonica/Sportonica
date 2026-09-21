@@ -175,8 +175,8 @@ export default function AppHeader() {
 
               <div className="ah-city" ref={boxRef}>
                 <button className="ah-pick" onClick={() => setOpen((v) => !v)}>
-                  <MapPin size={13} />
-                  <span>{area?.name ?? city?.name ?? "Choose city"}</span>
+                  <MapPin size={13} style={{ flexShrink: 0 }} />
+                  <span className="ah-pick-name">{area?.name ?? city?.name ?? "Choose city"}</span>
                   {city && <em>{area ? `, ${city.name}` : `, ${city.province}`}</em>}
                   <ChevronDown size={13} className={open ? "flip" : ""} />
                 </button>
@@ -356,17 +356,23 @@ export default function AppHeader() {
         .ah-av img.ah-av-mark { object-fit:contain; padding:9px; box-sizing:border-box; }
         .ah-av:has(img.ah-av-mark) { background:#F2EDE6; border:1px solid rgba(0,98,65,0.3); box-shadow:none; }
         .ah-txt { min-width:0; }
-        .ah-hi { font-size:12.5px; opacity:.55; margin:0 0 1px; white-space:nowrap; }
+        .ah-hi {
+          font-size:12.5px; opacity:.55; margin:0 0 1px; white-space:nowrap;
+          overflow:hidden; text-overflow:ellipsis;
+        }
         .ah-hi b { font-weight:800; opacity:1; }
 
-        .ah-city { position:relative; }
+        .ah-city { position:relative; min-width:0; }
         .ah-pick {
           display:inline-flex; align-items:center; gap:5px; cursor:pointer;
           background:none; border:none; padding:0; color:inherit; font-family:inherit;
-          font-size:16px; font-weight:800; letter-spacing:-.3px; max-width:100%;
+          font-size:16px; font-weight:800; letter-spacing:-.3px; max-width:100%; min-width:0;
         }
-        .ah-pick em { font-style:normal; font-weight:600; opacity:.5; font-size:14px; }
-        .ah-pick svg:last-child { opacity:.5; transition:transform .25s; }
+        .ah-pick-name {
+          overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;
+        }
+        .ah-pick em { font-style:normal; font-weight:600; opacity:.5; font-size:14px; flex-shrink:0; }
+        .ah-pick svg:last-child { opacity:.5; transition:transform .25s; flex-shrink:0; }
         .ah-pick svg.flip { transform:rotate(180deg); }
 
         .ah-r { display:flex; align-items:center; gap:9px; flex-shrink:0; }

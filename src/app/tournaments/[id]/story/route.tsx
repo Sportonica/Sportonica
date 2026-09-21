@@ -46,12 +46,15 @@ export async function GET(
     ? { bg: "#F2EDE6", text: "#1e3932", dim: "#5f756d", faint: "#5f756d", hair: "#D6CEC0" }
     : { bg: "#0B0D11", text: "#F2EDE6", dim: "#5f756d", faint: "#5f756d", hair: "#22262E" };
 
-  // Absolute-URL check matters here, not just the extension: banner_url
-  // used to be a freeform text field (pre file-upload), so old rows can
-  // hold a bare filename like "logo.png" that Satori's <img> then rejects
-  // outright ("Image source must be an absolute URL") and 500s the route.
+  // Restricted to our own storage host, not just URL-shaped: banner_url is
+  // fetched server-side by this route (Satori's <img>), so anything else
+  // would be an SSRF sink — a caller could point it at an internal address.
+  // Old rows can also hold a bare filename from before the upload flow
+  // existed, which this same check correctly rejects (Satori's <img>
+  // requires an absolute URL and 500s the route otherwise).
+  const bannerPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tournament-banners/`;
   const safeBanner =
-    tournament.banner_url && /^https?:\/\/.+\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(tournament.banner_url)
+    tournament.banner_url && tournament.banner_url.startsWith(bannerPrefix)
       ? tournament.banner_url
       : null;
 
