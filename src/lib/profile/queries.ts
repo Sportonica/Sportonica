@@ -74,19 +74,29 @@ export async function getPlayerSports(userId: string): Promise<SportCount[]> {
   return (data as SportCount[]) ?? [];
 }
 
+// Reads through event_players (a public view — no phone/payment columns)
+// instead of the bookings table directly: this runs for any viewed
+// profile, not just the caller's own, and bookings' own RLS only allows
+// reading your own rows or an event you host.
 export async function getRecentGames(userId: string, limit = 5): Promise<RecentGame[]> {
   const sb = await createClient();
-  const { data } = await sb
-    .from("bookings")
-    .select("event_id, status, events(id, title, sport, venue, event_date, sport_color)")
+  const { data: joins } = await sb
+    .from("event_players")
+    .select("event_id, joined_at")
     .eq("user_id", userId)
-    .eq("status", "confirmed")
-    .order("created_at", { ascending: false })
+    .order("joined_at", { ascending: false })
     .limit(limit);
 
-  return ((data ?? []) as unknown as { events: RecentGame | null }[])
-    .map((r) => r.events)
-    .filter((e): e is RecentGame => !!e);
+  const ids = (joins ?? []).map((j) => j.event_id);
+  if (!ids.length) return [];
+
+  const { data: events } = await sb
+    .from("events_full")
+    .select("id, title, sport, venue, event_date, sport_color")
+    .in("id", ids);
+
+  const byId = new Map((events ?? []).map((e) => [e.id, e as RecentGame]));
+  return ids.map((id) => byId.get(id)).filter((e): e is RecentGame => !!e);
 }
 
 // ── Activity summary for the Profile hub's "My Activity" card ───
