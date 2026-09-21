@@ -1,6 +1,6 @@
 {
   "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in changes|ios|android|db/*) exit 0 ;; *) exit 1 ;; esac",
-  "regions": ["sin1"],
+  "regions": ["syd1"],
   "headers": [
     {
       "source": "/.well-known/apple-app-site-association",
