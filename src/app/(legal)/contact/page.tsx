@@ -39,7 +39,7 @@ export default function ContactPage() {
           <h1 style={{ fontSize: 28, marginBottom: 6 }}>Contact us</h1>
           <p className="hint" style={{ marginBottom: 28 }}>
             Questions, feedback, or something not working right? Send us a note and we&apos;ll get
-            back to you — you can also reach us directly at{" "}
+            back to you. You can also reach us directly at{" "}
             <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)" }}>
               info@sportonica.com
             </a>{" "}
@@ -62,7 +62,7 @@ export default function ContactPage() {
                 color: "inherit",
               }}
             >
-              <b style={{ color: "var(--sodium)" }}>Message sent.</b> Thanks for reaching out — we
+              <b style={{ color: "var(--sodium)" }}>Message sent.</b> Thanks for reaching out. We
               usually reply within a day or two.
             </div>
           ) : (

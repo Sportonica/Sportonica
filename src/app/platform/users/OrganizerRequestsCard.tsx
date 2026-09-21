@@ -29,7 +29,7 @@ export default function OrganizerRequestsCard({ initial }: { initial: { id: stri
     <div style={{ marginBottom: 8 }}>
       <div className="plt-sec-t" style={{ marginBottom: 4 }}>Organizer requests</div>
       <p style={{ fontSize: 13, opacity: 0.65, margin: "0 0 14px" }}>
-        People asking to run their own tournaments — approve to let them invite venues (or use
+        People asking to run their own tournaments. Approve to let them invite venues (or use
         their own) and start creating tournaments.
       </p>
       {err && <div role="alert" style={{ color: "#ef4444", fontSize: 13, marginBottom: 10 }}>{err}</div>}

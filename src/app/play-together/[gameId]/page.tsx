@@ -135,7 +135,7 @@ export default async function PlayTogetherGamePage({ params }: { params: Promise
                 </p>
 
                 {players.length === 0 ? (
-                  <p className="hint">Nobody&apos;s joined yet — be the first to request a spot.</p>
+                  <p className="hint">Nobody&apos;s joined yet. Be the first to request a spot.</p>
                 ) : (
                   <div className="pt-players-grid">
                     {players.map((p) => {

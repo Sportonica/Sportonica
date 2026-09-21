@@ -137,7 +137,7 @@ export default function PlayTogetherPaymentModal({
         </div>
 
         {resubmit && (
-          <p className="ptpm-warn">Your last submission couldn&apos;t be verified — check the details and try again.</p>
+          <p className="ptpm-warn">Your last submission couldn&apos;t be verified. Check the details and try again.</p>
         )}
         {expired && (
           <p className="ptpm-warn">Your payment window has closed. This request has been cancelled.</p>
@@ -164,7 +164,7 @@ export default function PlayTogetherPaymentModal({
                 <Wallet size={20} />
                 <div>
                   <b>Pay at the venue</b>
-                  <span>Pay the host in cash when you arrive. No proof needed — you&apos;re confirmed right away.</span>
+                  <span>Pay the host in cash when you arrive. No proof needed. You&apos;re confirmed right away.</span>
                 </div>
               </button>
             </div>
@@ -244,15 +244,15 @@ export default function PlayTogetherPaymentModal({
             </div>
 
             <p className="ptpm-warn" style={{ marginTop: 12 }}>
-              You&apos;ll pay {rs(contribution)} directly to the host when you arrive. Choosing this
-              confirms your spot immediately — no proof needed — but let the host know once you&apos;ve
+              You&apos;ll pay {rs(contribution)}{" "}directly to the host when you arrive. Choosing this
+              confirms your spot immediately, no proof needed, but let the host know once you&apos;ve
               actually paid.
             </p>
 
             {err && <div className="pymt-err">{err}</div>}
 
             <button className="pymt-submit" onClick={confirmCash} disabled={pending}>
-              {pending ? "Confirming…" : "Confirm — I'll pay at the venue"}
+              {pending ? "Confirming…" : "Confirm, I'll pay at the venue"}
             </button>
             <button className="ptpm-later" style={{ marginTop: 8 }} onClick={() => setMethod(null)} disabled={pending}>
               <ChevronLeft size={14} style={{ verticalAlign: -2 }} /> Choose a different payment method

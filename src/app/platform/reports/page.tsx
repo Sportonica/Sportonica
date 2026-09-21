@@ -10,7 +10,7 @@ export default async function ReportsPage() {
     return (
       <>
         <h1 className="plt-h1">Reports</h1>
-        <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>{reports.message} — refresh the page to try again.</p>
+        <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>{reports.message.replace(/\.+$/, "")}. Refresh the page to try again.</p>
       </>
     );
   }

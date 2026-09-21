@@ -110,7 +110,7 @@ function MethodCard({ method }: { method: Row }) {
       ) : (
         <div className="pmc-info" onClick={() => setEditing(true)}>
           <div className="pmc-info-name">{method.merchant_name}</div>
-          <div className="pmc-info-acct">{method.account_identifier || "No account number set — click to add"}</div>
+          <div className="pmc-info-acct">{method.account_identifier || "No account number set, click to add"}</div>
         </div>
       )}
 

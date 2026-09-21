@@ -74,7 +74,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
                   ? <Link href={`/p/${game.host_username}`} className="gm-link">{game.host_name ?? "Host"}</Link>
                   : (game.organizer_name ?? game.host_name ?? "Host")}
               </span>
-              <span className="gm-trust" title="Trust score — built from showing up">
+              <span className="gm-trust" title="Trust score: built from showing up">
                 <ShieldCheck size={12} /> {game.host_trust}
               </span>
             </div>
@@ -111,11 +111,11 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
             {/* Who's in */}
             <section className="gm-sec">
               <h2 className="gm-sec-t">
-                <span className="gm-num">02</span> Who&apos;s playing
+                <span className="gm-num">02</span>{" "}Who&apos;s playing
                 <span className="gm-sec-count">{players.length} in</span>
               </h2>
               {players.length === 0 ? (
-                <p className="gm-empty">Nobody yet — be the first to join.</p>
+                <p className="gm-empty">Nobody yet. Be the first to join.</p>
               ) : (
                 <div className="gm-players">
                   {players.map((p) => (

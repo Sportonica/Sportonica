@@ -45,7 +45,7 @@ export default async function AdminOverview() {
         <RoleExplainerBanner
           storageKey="vendor-dashboard-explainer-dismissed"
           title="You're viewing the Vendor console"
-          body="As a Vendor, you manage your venue — courts, pricing, availability. Tournaments are run by Organizers; you just say yes or no when one wants to host at your venue, under Organizers and Venue bookings."
+          body="As a Vendor, you manage your venue: courts, pricing, availability. Tournaments are run by Organizers; you just say yes or no when one wants to host at your venue, under Organizers and Venue bookings."
         />
         <div className="adm-stats">
           <Stat label="Venues" value={venues.length} accent="var(--a-accent)" />

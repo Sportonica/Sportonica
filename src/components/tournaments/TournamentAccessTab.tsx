@@ -48,7 +48,7 @@ export default function TournamentAccessTab({ tournamentId, managers }: {
     <div className="tc-card">
       <div className="tc-card-t">Owner access</div>
       <div className="tc-card-sub">
-        Give someone full control of this tournament — same as you have here — without making them a platform-wide Organizer.
+        Give someone full control of this tournament, the same access you have here, without making them a platform-wide Organizer.
         They can manage teams, fixtures, results, announcements, and settings, but only for this tournament.
       </div>
 
@@ -66,7 +66,7 @@ export default function TournamentAccessTab({ tournamentId, managers }: {
       {err && <div className="tc-err" style={{ marginBottom: 16 }}>{err}</div>}
 
       {managers.length === 0 ? (
-        <div className="tc-empty">No one else has access yet — just you.</div>
+        <div className="tc-empty">No one else has access yet, just you.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {managers.map((m) => (

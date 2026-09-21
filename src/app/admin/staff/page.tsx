@@ -8,7 +8,7 @@ import StaffTeamCard from "./StaffTeamCard";
 export const dynamic = "force-dynamic";
 
 const ROLE_DESC: Record<string, string> = {
-  owner: "Full control — pricing, payouts, staff, everything.",
+  owner: "Full control: pricing, payouts, staff, everything.",
   manager: "Manages courts, pricing and bookings. No payout access.",
   staff: "Checks players in and blocks slots. Can't touch pricing or money.",
 };
@@ -59,7 +59,7 @@ export default async function StaffPage({
 
         <div className="adm-card" style={{ marginTop: 18 }}>
           <div className="adm-card-t">Roles explained</div>
-          <div className="adm-card-sub">Small venues run on a family plus one helper — roles keep money safe.</div>
+          <div className="adm-card-sub">Small venues run on a family plus one helper. Roles keep money safe.</div>
           {Object.entries(ROLE_DESC).map(([role, desc]) => (
             <div key={role} className="adm-flex" style={{ padding: "10px 0", borderBottom: "1px solid var(--a-line)", gap: 14 }}>
               <span className={`adm-badge ${role === "owner" ? "warn" : "neutral"}`} style={{ minWidth: 70 }}>{role}</span>

@@ -188,7 +188,7 @@ export default function AppHeader() {
                       <input
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
-                        placeholder="Search an area — Maitidevi, Lakeside…"
+                        placeholder="Search an area, like Maitidevi or Lakeside…"
                         aria-label="Search area"
                         autoFocus
                       />

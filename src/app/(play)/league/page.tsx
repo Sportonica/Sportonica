@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Groups — Sportonica",
-  description: "Build a pool of players you can pull a game together with any time — make a group or join one near you.",
+  description: "Build a pool of players you can pull a game together with any time. Make a group or join one near you.",
 };
 
 export default async function LeaguePage() {
@@ -18,7 +18,7 @@ export default async function LeaguePage() {
         <ChatTabs />
         <div className="play-hero">
           <p>
-            The best games come around every week. Make a group or join one near you —
+            The best games come around every week. Make a group or join one near you and
             build a pool of players you can pull a game together with any time.
           </p>
         </div>

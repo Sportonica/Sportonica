@@ -70,7 +70,7 @@ export default function ReviewPaymentModal({
         <a
           className="rpm-wa-tip"
           href={whatsappNotifyUrl(
-            `Payment to verify — ${payment.booking_label} · ${payment.customer_name} · Rs ${Math.round(payment.expected_amount)} via ${payment.payment_method} · txn ${payment.transaction_id}`
+            `Payment to verify: ${payment.booking_label} · ${payment.customer_name} · Rs ${Math.round(payment.expected_amount)} via ${payment.payment_method} · txn ${payment.transaction_id}`
           )}
           target="_blank" rel="noopener noreferrer"
         >

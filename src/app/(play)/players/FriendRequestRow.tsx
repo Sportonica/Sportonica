@@ -21,7 +21,7 @@ export default function FriendRequestRow({ request }: { request: PendingRequest 
         const res = await respondToRequest(request.id, decision);
         if (isActionError(res)) { setError(res.message); return; }
         setGone(true);
-      } catch { setError("Couldn't update — try again."); }
+      } catch { setError("Couldn't update. Try again."); }
     });
   }
 

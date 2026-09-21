@@ -199,7 +199,7 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
             <div className="pf-empty">
               No tournament stats linked yet. Played as a walk-in at the venue? Sportonica links your goals and
               match history automatically the moment your account&apos;s email or phone matches what you registered
-              with — check that they match, or ask the organizer to confirm what was entered at sign-up.
+              with. Check that they match, or ask the organizer to confirm what was entered at sign-up.
             </div>
           </section>
         ) : null}
@@ -231,7 +231,7 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
           </div>
           {recent.length === 0 ? (
             <div className="pf-empty">
-              No games yet — the first one&apos;s always the hardest.{" "}
+              No games yet. The first one&apos;s always the hardest.{" "}
               <Link href="/discover" style={{ color: "var(--pf-accent)", fontWeight: 700, textDecoration: "none" }}>Find one →</Link>
             </div>
           ) : (

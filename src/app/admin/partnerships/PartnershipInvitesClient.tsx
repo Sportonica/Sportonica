@@ -41,7 +41,7 @@ export default function PartnershipInvitesClient({ initial }: { initial: Row[] }
   }
 
   function revoke(id: string, name: string) {
-    if (!window.confirm(`End your partnership with ${name}? They'll no longer be able to pick your venue for new tournaments — anything already scheduled is unaffected.`)) return;
+    if (!window.confirm(`End your partnership with ${name}? They'll no longer be able to pick your venue for new tournaments. Anything already scheduled is unaffected.`)) return;
     respond(id, "revoked", name, "Partnership ended with");
   }
 
@@ -50,7 +50,7 @@ export default function PartnershipInvitesClient({ initial }: { initial: Row[] }
       <div style={{ textAlign: "center", padding: "24px 12px" }}>
         <Handshake size={22} style={{ opacity: 0.35, marginBottom: 8 }} />
         <p style={{ fontSize: 13.5, opacity: 0.65, margin: 0 }}>
-          No invites yet — when an organizer wants to host a tournament at your venue, their invite shows up here.
+          No invites yet. When an organizer wants to host a tournament at your venue, their invite shows up here.
         </p>
       </div>
     );

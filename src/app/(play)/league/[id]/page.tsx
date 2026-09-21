@@ -62,7 +62,7 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <SquadJoinButton squadId={squad.id} initialJoined={isIn} />
           {squad.locked && !isIn && (
-            <span style={{ fontSize: 12.5, color: "var(--faint)" }}>This squad is locked — no new members.</span>
+            <span style={{ fontSize: 12.5, color: "var(--faint)" }}>This squad is locked. No new members.</span>
           )}
           {user && user.id !== squad.creator_id && (
             <ReportButton targetType="squad" targetId={squad.id} label="Report squad" />

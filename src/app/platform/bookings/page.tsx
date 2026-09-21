@@ -10,7 +10,7 @@ export default async function PlatformBookingsPage() {
     return (
       <>
         <h1 className="plt-h1">Bookings</h1>
-        <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>{bookings.message} — refresh the page to try again.</p>
+        <p style={{ color: "#ef4444", fontSize: 14, marginTop: 16 }}>{bookings.message.replace(/\.+$/, "")}. Refresh the page to try again.</p>
       </>
     );
   }

@@ -9,13 +9,13 @@ import { isActionError } from "@/lib/actionError";
 type StaffRow = { id: string; user_id: string; role: string; created_at: string };
 
 const ROLE_DESC: Record<string, string> = {
-  owner: "Full control — pricing, payouts, staff, everything.",
+  owner: "Full control: pricing, payouts, staff, everything.",
   manager: "Manages courts, pricing and bookings. No payout access.",
   staff: "Checks players in and blocks slots. Can't touch pricing or money.",
 };
 
 const ERROR_TEXT: Record<string, string> = {
-  USER_NOT_FOUND: "No Sportonica account found for that email — ask them to sign up first, then try again.",
+  USER_NOT_FOUND: "No Sportonica account found for that email. Ask them to sign up first, then try again.",
   FORBIDDEN: "You don't have permission to add staff to this venue.",
 };
 
@@ -64,7 +64,7 @@ export default function StaffTeamCard({ venueId, staff }: { venueId: string; sta
                 placeholder="name@example.com"
               />
               <div className="adm-dim" style={{ fontSize: 11.5, marginTop: 4 }}>
-                They need an existing Sportonica account — sharing/signup isn&apos;t handled here yet.
+                They need an existing Sportonica account. Sharing/signup isn&apos;t handled here yet.
               </div>
             </div>
             <div className="adm-field">

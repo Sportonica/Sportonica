@@ -172,7 +172,7 @@ function HoursEditor({
                 <button className="adm-btn sm ghost danger" onClick={() => setDay(d, null)}><X size={13} /></button>
               </>
             ) : (
-              <button className="adm-btn sm ghost" onClick={() => setDay(d, { open: "06:00", close: "22:00" })}>Closed — set open</button>
+              <button className="adm-btn sm ghost" onClick={() => setDay(d, { open: "06:00", close: "22:00" })}>Closed, set open</button>
             )}
           </div>
         );

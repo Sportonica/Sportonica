@@ -134,7 +134,7 @@ export default function DayCalendar({
                       {cancellable && (
                         <button
                           className="adm-cal-cancel"
-                          title="Cancel booking — frees this slot for new bookings"
+                          title="Cancel booking: frees this slot for new bookings"
                           onClick={(e) => {
                             e.stopPropagation();
                             const who = b.source === "walk_in" ? "walk-in" : b.source === "phone" ? "phone" : "player";

@@ -73,7 +73,7 @@ export default async function AnalyticsPage() {
                   <span className="adm-mono" style={{ color: "var(--a-accent)" }}>
                     {DOW_LABELS[busiest.dow]} {String(HOURS[busiest.band]).padStart(2, "0")}:00
                   </span>{" "}
-                  <span className="adm-dim">is your busiest slot — {busiest.n} booking{busiest.n !== 1 ? "s" : ""} in the last month.</span>
+                  <span className="adm-dim">is your busiest slot, with {busiest.n} booking{busiest.n !== 1 ? "s" : ""} in the last month.</span>
                 </div>
               </div>
             )}
@@ -92,7 +92,7 @@ export default async function AnalyticsPage() {
                       const intensity = n / peak;
                       return (
                         <div key={`${d}-${b}`} className="adm-heat-cell"
-                          title={`${label} ${HOURS[b]}:00 — ${n} booking${n !== 1 ? "s" : ""}`}
+                          title={`${label} ${HOURS[b]}:00: ${n} booking${n !== 1 ? "s" : ""}`}
                           style={{
                             background: n === 0 ? "var(--a-panel-2)" : `rgba(0,98,65,${0.12 + intensity * 0.7})`,
                             display: "grid", placeItems: "center",

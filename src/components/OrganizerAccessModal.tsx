@@ -58,7 +58,7 @@ export default function OrganizerAccessModal({ onClose }: { onClose: () => void 
             <Trophy size={28} className="oam-icon" />
             <h3>Request to become an Organizer</h3>
             <p>
-              Run tournaments — fixtures, teams, results, announcements. Use your own venue
+              Run tournaments: fixtures, teams, results, announcements. Use your own venue
               directly, or invite a Sportonica venue to host. Sportonica reviews your request
               first, then reviews each tournament the same as anyone else&apos;s.
             </p>
@@ -82,7 +82,7 @@ export default function OrganizerAccessModal({ onClose }: { onClose: () => void 
           <div className="oam-body">
             <Clock size={28} className="oam-icon" />
             <h3>Waiting for review</h3>
-            <p>Your request to become an organizer is with Sportonica — check back soon.</p>
+            <p>Your request to become an organizer is with Sportonica. Check back soon.</p>
             <button className="oam-btn" onClick={onClose}>Close</button>
           </div>
         )}

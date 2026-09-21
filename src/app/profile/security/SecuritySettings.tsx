@@ -62,7 +62,7 @@ export default function SecuritySettings({ name }: { name: string }) {
       <div className="pf-card">
         <h2 className="pf-card-t"><Lock size={15} style={{ verticalAlign: "-2px", marginRight: 6 }} /> Password</h2>
         <p style={{ fontSize: 12.5, color: "var(--pf-dim)", marginTop: -4, marginBottom: 16 }}>
-          Sets a password you can use to sign in with your email — handy even if you normally
+          Sets a password you can use to sign in with your email. It&apos;s handy even if you normally
           use Google or your phone number.
         </p>
 
@@ -93,9 +93,9 @@ export default function SecuritySettings({ name }: { name: string }) {
         <p>
           Permanently removes your Sportonica account and personal data, {name}. Upcoming bookings
           are cancelled; a few records (payments, past bookings) are kept without your name for
-          legal and accounting reasons. This can&apos;t be undone —{" "}
+          legal and accounting reasons. This can&apos;t be undone.{" "}
           <a href="/account-deletion" target="_blank" rel="noopener" style={{ color: "#dc2626", fontWeight: 600 }}>
-            what gets deleted
+            See what gets deleted
           </a>.
         </p>
 

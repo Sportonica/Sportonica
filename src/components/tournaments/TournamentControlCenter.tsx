@@ -149,7 +149,7 @@ export default function TournamentControlCenter({
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
             {tournament.status === "pending_approval" && viewer === "super_admin" && (
               <>
-                <button className="tc-btn primary" disabled={pending} onClick={() => run(() => approveTournament(tournament.id, true), "Published — this tournament is now public.")}>Approve & publish</button>
+                <button className="tc-btn primary" disabled={pending} onClick={() => run(() => approveTournament(tournament.id, true), "Published. This tournament is now public.")}>Approve & publish</button>
                 <button
                   className="tc-btn danger" disabled={pending}
                   onClick={() => {
@@ -180,7 +180,7 @@ export default function TournamentControlCenter({
               <button
                 className="tc-btn primary" disabled={pending}
                 onClick={() => {
-                  if (!window.confirm(`Complete "${tournament.name}"? This locks in the final results — you won't be able to record any more scores.`)) return;
+                  if (!window.confirm(`Complete "${tournament.name}"? This locks in the final results. You won't be able to record any more scores.`)) return;
                   run(() => completeTournament(tournament.id), "Tournament completed.");
                 }}
               >
@@ -214,7 +214,7 @@ export default function TournamentControlCenter({
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <div>
               <div className="tc-card-t">Registered teams</div>
-              <div className="tc-card-sub">Payment approval happens in Payments — Payouts &amp; Verification, same as every other booking.</div>
+              <div className="tc-card-sub">Payment approval happens in Payments → Payouts &amp; Verification, same as every other booking.</div>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {teams.length > 0 && (
@@ -339,7 +339,7 @@ export default function TournamentControlCenter({
       {tab === "Payments" && viewer === "super_admin" && (
         <div className="tc-card">
           <div className="tc-card-t">Payments</div>
-          <div className="tc-card-sub">Approve or reject right here — same review as /platform/payments, scoped to this tournament.</div>
+          <div className="tc-card-sub">Approve or reject right here, the same review as /platform/payments, scoped to this tournament.</div>
           {(reviewPayments ?? []).length === 0 ? (
             <div className="tc-empty">No payments submitted yet.</div>
           ) : (
@@ -380,7 +380,7 @@ export default function TournamentControlCenter({
           </div>
           {tournament.fee > 0 && !tournament.host_payment_qr_url && (
             <div className="tc-empty" style={{ color: "#d97706" }}>
-              This tournament has a registration fee but no payment QR — add one in Settings so teams can pay you.
+              This tournament has a registration fee but no payment QR. Add one in Settings so teams can pay you.
             </div>
           )}
           {(reviewPayments ?? []).length === 0 ? (
@@ -419,7 +419,7 @@ export default function TournamentControlCenter({
       {tab === "Payments" && viewer === "vendor" && (
         <div className="tc-card">
           <div className="tc-card-t">Payments</div>
-          <div className="tc-card-sub">View-only here — the organizer verifies payments made to their QR.</div>
+          <div className="tc-card-sub">View-only here. The organizer verifies payments made to their QR.</div>
           {payments.length === 0 ? (
             <div className="tc-empty">No payments submitted yet.</div>
           ) : (
@@ -452,11 +452,11 @@ export default function TournamentControlCenter({
           <div className="tc-card">
             <div className="tc-card-t">Settings</div>
             {tournament.status === "draft" ? (
-              <p style={{ fontSize: 13.5, opacity: 0.7 }}>This tournament is still a draft — edit it from the tournaments list.</p>
+              <p style={{ fontSize: 13.5, opacity: 0.7 }}>This tournament is still a draft. Edit it from the tournaments list.</p>
             ) : (
               <>
                 <p style={{ fontSize: 13.5, opacity: 0.7, marginBottom: 14 }}>
-                  Name, dates, fees, rules, and everything else except the venue can be edited any time — it just won&apos;t retroactively change anything already locked in (existing team payments, results, etc).
+                  Name, dates, fees, rules, and everything else except the venue can be edited any time. It just won&apos;t retroactively change anything already locked in (existing team payments, results, etc).
                 </p>
                 <button className="tc-btn primary" onClick={() => setEditingDetails(true)}>Edit details</button>
               </>
@@ -829,7 +829,7 @@ function TeamRosterModal({ team, onClose, onChanged }: {
     <div className="tc-scrim" onClick={onClose}>
       <div className="tc-modal" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h3 style={{ margin: 0, fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800 }}>{team.name} — Roster</h3>
+          <h3 style={{ margin: 0, fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800 }}>{team.name} Roster</h3>
           <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", color: "inherit", opacity: 0.6, cursor: "pointer", width: 36, height: 36, display: "grid", placeItems: "center" }}><X size={18} /></button>
         </div>
 

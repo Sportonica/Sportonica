@@ -30,7 +30,7 @@ const INSTRUCTIONS_HOST = [
   "Pay the exact amount shown, to the organizer.",
   "Enter the transaction/reference ID from your payment app.",
   "Upload a screenshot of the completed payment.",
-  "Submit — the organizer verifies it.",
+  "Submit, and the organizer verifies it.",
 ];
 
 /** When set, the payer pays this fixed recipient (a tournament host's own
@@ -217,7 +217,7 @@ export default function PaymentStep({
               ) : (
                 <div className="pymt-qr pymt-qr-empty">
                   <AlertCircle size={20} />
-                  <span>{hostMethod ? "The organizer hasn't added a QR yet — contact them." : "QR not configured yet — contact support."}</span>
+                  <span>{hostMethod ? "The organizer hasn't added a QR yet. Contact them." : "QR not configured yet. Contact support."}</span>
                 </div>
               )}
 
@@ -259,8 +259,8 @@ export default function PaymentStep({
               </button>
               <p className="pymt-fine">
                 {hostMethod
-                  ? "A screenshot is evidence, not automatic proof — the organizer verifies the amount and transaction ID before your team is confirmed."
-                  : "A screenshot is evidence, not automatic proof — our team verifies the merchant, amount and transaction ID before your booking is confirmed."}
+                  ? "A screenshot is evidence, not automatic proof. The organizer verifies the amount and transaction ID before your team is confirmed."
+                  : "A screenshot is evidence, not automatic proof. Our team verifies the merchant, amount and transaction ID before your booking is confirmed."}
               </p>
             </div>
           )}

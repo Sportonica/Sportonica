@@ -134,7 +134,7 @@ export default function ProfileEditor({ profile, origin }: { profile: PlayerProf
             className="pf-in" type="tel" inputMode="numeric" maxLength={10}
             value={phone}
             onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-            placeholder="98XXXXXXXX — used for phone login"
+            placeholder="98XXXXXXXX (used for phone login)"
           />
         </Field>
         <Field label="City">

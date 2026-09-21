@@ -38,7 +38,7 @@ Your court is locked in.
 
 See you on the pitch.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -59,7 +59,7 @@ export function venueNewBooking(p: {
 
 It's already on your calendar in the venue console.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -70,7 +70,7 @@ export function hostGameLive(p: {
 }): Mail {
   return {
     to: p.to,
-    subject: `Your ${p.sport} game is live — ${p.spots} spots open`,
+    subject: `Your ${p.sport} game is live: ${p.spots} spots open`,
     body: `Hi ${p.hostName},
 
 Your game is up on Sportonica and players can join now.
@@ -85,7 +85,7 @@ Share it around: ${p.link}
 
 We'll email you as players join.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -108,7 +108,7 @@ You've joined the game.
 
 Turn up. Your show-up rate is watching.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -122,7 +122,7 @@ export function hostSomeoneJoined(p: {
     to: p.to,
     subject: full
       ? `Your ${p.sport} game is FULL`
-      : `${p.joinerName} joined — ${p.spotsLeft} spot${p.spotsLeft !== 1 ? "s" : ""} left`,
+      : `${p.joinerName} joined, ${p.spotsLeft} spot${p.spotsLeft !== 1 ? "s" : ""} left`,
     body: `Hi ${p.hostName},
 
 ${p.joinerName} just joined your ${p.sport} game on ${fmtWhen(p.startsAt)}.
@@ -131,7 +131,7 @@ ${full
   ? "That's a full side. Game on."
   : `${p.spotsLeft} spot${p.spotsLeft !== 1 ? "s" : ""} still open.`}
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -142,7 +142,7 @@ export function paymentSubmitted(p: {
 }): Mail {
   return {
     to: p.to,
-    subject: `New payment to verify — ${p.bookingLabel}`,
+    subject: `New payment to verify: ${p.bookingLabel}`,
     body: `🔔 New Payment Verification
 
   Booking       ${p.bookingLabel}
@@ -153,10 +153,10 @@ export function paymentSubmitted(p: {
 
 Review it in the Payment Verification Center: /platform/payments
 Notify on WhatsApp: ${whatsappNotifyUrl(
-  `New payment to verify — Rs ${Math.round(p.amount)} via ${p.method}, txn ${p.transactionId}. Review: /platform/payments`
+  `New payment to verify: Rs ${Math.round(p.amount)} via ${p.method}, txn ${p.transactionId}. Review: /platform/payments`
 )}
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -168,7 +168,7 @@ export function paymentApproved(p: {
   const when = p.startsAt ? `${fmtWhen(p.startsAt)} – ${fmtWhen(p.endsAt).split(", ").pop()}` : "TBD";
   return {
     to: p.to,
-    subject: `Booking confirmed — ${p.bookingLabel}`,
+    subject: `Booking confirmed: ${p.bookingLabel}`,
     body: `Hi ${p.playerName},
 
 Payment verified. Your booking is confirmed.
@@ -180,7 +180,7 @@ Payment verified. Your booking is confirmed.
 
 See you on the pitch.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -190,7 +190,7 @@ export function paymentRejected(p: {
 }): Mail {
   return {
     to: p.to,
-    subject: `Payment verification failed — ${p.bookingLabel}`,
+    subject: `Payment verification failed: ${p.bookingLabel}`,
     body: `Hi ${p.playerName},
 
 Payment could not be verified.
@@ -200,7 +200,7 @@ Payment could not be verified.
 
 Please submit a valid payment or contact support.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -211,7 +211,7 @@ export function playTogetherGamePublished(p: {
 }): Mail {
   return {
     to: p.to,
-    subject: `Your venue is confirmed — ${p.sport} game is live`,
+    subject: `Your venue is confirmed: ${p.sport} game is live`,
     body: `Hi ${p.hostName},
 
 Your venue payment is confirmed. Your ${p.sport} game is now live on Play Together.
@@ -221,12 +221,12 @@ Your venue payment is confirmed. Your ${p.sport} game is now live on Play Togeth
   Open spots    ${p.spots}
   Contribution  ${rs(p.contribution)} per player, paid to you in cash at the venue
 
-Players don't pay Sportonica to join — you collect their contributions
+Players don't pay Sportonica to join. You collect their contributions
 yourself when they show up.
 
 Share it around: ${p.link}
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -249,7 +249,7 @@ Payment verified. You're officially in the game!
   When           ${fmtWhen(p.startsAt)}
   Paid           ${rs(p.contribution)}, direct to the host
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -272,7 +272,7 @@ venue rather than online.
   When           ${fmtWhen(p.startsAt)}
   Bring          ${rs(p.contribution)} in cash for the host
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -284,15 +284,15 @@ export function playTogetherCashPaymentSelected(p: {
 }): Mail {
   return {
     to: p.to,
-    subject: `${p.playerName} will pay you in cash — ${p.sport}`,
+    subject: `${p.playerName} will pay you in cash: ${p.sport}`,
     body: `Hi ${p.hostName},
 
 ${p.playerName} chose to pay ${rs(p.amount)} in cash at the venue instead
-of online for your ${p.sport} game. They're already confirmed — nothing
+of online for your ${p.sport} game. They're already confirmed. Nothing
 to verify, just collect it at the venue and mark it collected from your
 game's Manage page once they've paid.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -305,11 +305,11 @@ export function playTogetherPaymentRequired(p: {
 }): Mail {
   return {
     to: p.to,
-    subject: `Payment required — ${p.sport} at ${p.venue}`,
+    subject: `Payment required: ${p.sport} at ${p.venue}`,
     body: `Hi ${p.playerName},
 
 The host approved your request to join. Complete your payment within
-2 hours to secure your spot — you're not confirmed until they verify it.
+2 hours to secure your spot. You're not confirmed until they verify it.
 
   Sport          ${p.sport}
   Venue          ${p.venue}
@@ -322,7 +322,7 @@ Pay now: ${p.link}
 If payment isn't completed by the deadline, this request is automatically
 cancelled and your spot is released.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -342,7 +342,7 @@ until you verify it.
 
 Review it from your game's Manage Payments page: ${p.link}
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -354,7 +354,7 @@ export function playTogetherPaymentRejected(p: {
 }): Mail {
   return {
     to: p.to,
-    subject: `Payment couldn't be verified — ${p.sport} at ${p.venue}`,
+    subject: `Payment couldn't be verified: ${p.sport} at ${p.venue}`,
     body: `Hi ${p.playerName},
 
 Your payment could not be verified by the host.${p.reason ? `\n\n  Reason   ${p.reason}` : ""}
@@ -362,7 +362,7 @@ Your payment could not be verified by the host.${p.reason ? `\n\n  Reason   ${p.
 If your payment window hasn't closed yet (deadline: ${fmtWhen(p.deadline)}),
 you can submit valid payment proof again: ${p.link}
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -382,7 +382,7 @@ ${p.playerName} just ${p.joined ? "joined" : "left"} your ${p.sport} game on ${f
 
 ${p.spotsLeft > 0 ? `${p.spotsLeft} spot${p.spotsLeft !== 1 ? "s" : ""} still open.` : "That's a full side."}
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -405,7 +405,7 @@ You never paid Sportonica for this game, so there's nothing to refund from
 our side. If you'd already paid the host in cash, that's between you and
 them.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -420,10 +420,10 @@ export function playTogetherJoinRequested(p: {
 
 ${p.requesterName} requested to join your ${p.sport} game on ${fmtWhen(p.startsAt)}.
 
-They won't be counted in or notified until you approve them — review it
+They won't be counted in or notified until you approve them. Review it
 from your game's Manage page.
 
-— Sportonica`,
+Sportonica`,
   };
 }
 
@@ -442,6 +442,6 @@ The host didn't approve your request to join this game.
   Venue   ${p.venue}
   When    ${fmtWhen(p.startsAt)}
 
-— Sportonica`,
+Sportonica`,
   };
 }

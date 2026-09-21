@@ -51,7 +51,7 @@ export default function ReportsGrid({ reports }: { reports: ReportRow[] }) {
       rows={reports}
       pageSize={15}
       exportName="sportonica-reports"
-      empty="No reports — all quiet."
+      empty="No reports. All quiet."
       actions={(r) => (
         r.status === "open" ? (
           <>

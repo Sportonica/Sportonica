@@ -325,7 +325,7 @@ export default function TournamentRegisterTab({
               <>
                 <div className="rgt-lock"><LogIn size={20} /></div>
                 <h3>Sign in to register your team</h3>
-                <p>You&apos;ll manage the team, add players and pay — all from here.</p>
+                <p>You&apos;ll manage the team, add players and pay, all from here.</p>
                 <a className="rgt-btn primary" href={`/login?redirect=${encodeURIComponent(`/tournaments/${tournament.id}?tab=register`)}`}>
                   <LogIn size={15} /> Sign in
                 </a>
@@ -378,7 +378,7 @@ export default function TournamentRegisterTab({
 
             <label className="rgt-check">
               <input type="checkbox" checked={iPlay} onChange={(e) => setIPlay(e.target.checked)} />
-              <span>I&apos;m also playing — add me to the roster</span>
+              <span>I&apos;m also playing (add me to the roster)</span>
             </label>
             <label className="rgt-check">
               <input type="checkbox" checked={ackTerms} onChange={(e) => setAckTerms(e.target.checked)} />
@@ -448,7 +448,7 @@ export default function TournamentRegisterTab({
           <Stepper active={team.status === "payment_pending" && paid ? 2 : 1} paid={paid} />
 
           {team.status === "verification_pending" && (
-            <div className="rgt-note"><ShieldCheck size={15} /> Payment submitted — the organiser is verifying it. You&apos;ll be confirmed once it&apos;s approved.</div>
+            <div className="rgt-note"><ShieldCheck size={15} /> Payment submitted. The organiser is verifying it. You&apos;ll be confirmed once it&apos;s approved.</div>
           )}
 
           {isIndividualRace && raceCategories.length > 0 && (
@@ -526,7 +526,7 @@ function RaceCategoryPicker({ team, categories, regOpen, pending, onPick }: {
       >
         <option value="">Pick a category…</option>
         {categories.map((c) => (
-          <option key={c.id} value={c.id}>{c.name}{c.distance_label ? ` — ${c.distance_label}` : ""}</option>
+          <option key={c.id} value={c.id}>{c.name}{c.distance_label ? ` (${c.distance_label})` : ""}</option>
         ))}
       </select>
     </div>
@@ -666,8 +666,8 @@ function RosterCard({
           <div className="rgt-step-t" style={{ marginBottom: 2 }}>Players</div>
           <div className="rgt-hint" style={{ margin: 0 }}>
             {filled} of {need} slots filled{belowMin
-              ? ` — at least ${need} players with name and phone are required.`
-              : " — minimum reached."}
+              ? `. At least ${need} players with name and phone are required.`
+              : ". Minimum reached."}
           </div>
         </div>
         {regOpen && drafts.length < maxCards && (

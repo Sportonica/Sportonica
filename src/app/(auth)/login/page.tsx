@@ -73,7 +73,7 @@ function LoginInner() {
   // atmosphere panel on desktop, and again above the card on mobile
   // (where that panel is hidden) so there's always a way back home.
   const brandHome = (
-    <Link href="/" className="auth-brand" aria-label="Sportonica — go to the home page">
+    <Link href="/" className="auth-brand" aria-label="Sportonica, go to the home page">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/icons/mark.png" alt="" className="auth-brand-mark" />
       <div className="auth-brand-name">Sportonica</div>
@@ -87,7 +87,7 @@ function LoginInner() {
         {brandHome}
         <div className="auth-tagline">
           <h2>The game&apos;s already on. <em>Come find it.</em></h2>
-          <p>Book courts, host matches, and fill your ground — all from one place.</p>
+          <p>Book courts, host matches, and fill your ground, all from one place.</p>
         </div>
         <div className="auth-foot">NEPAL · SINCE 2026</div>
       </div>

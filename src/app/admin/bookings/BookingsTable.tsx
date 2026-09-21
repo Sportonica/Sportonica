@@ -97,7 +97,7 @@ export default function BookingsTable({ bookings, courts }: { bookings: CourtBoo
                       )}
                       {canCancel && (
                         <button className="adm-btn sm ghost danger" disabled={pending && busyId === b.id}
-                          onClick={() => cancel(b)} title="Cancel booking — frees this slot for new bookings">
+                          onClick={() => cancel(b)} title="Cancel booking: frees this slot for new bookings">
                           <X size={13} /> Cancel
                         </button>
                       )}

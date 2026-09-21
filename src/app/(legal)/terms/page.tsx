@@ -20,7 +20,7 @@ export default function TermsOfServicePage() {
             <p>
               You have accessed our app and/or our website. The domain name Sportonica is owned by{" "}
               <b>Sport Onica Pvt. Ltd.</b>, a duly incorporated private company under the laws of Nepal
-              (company registration no. — <i>pending, to be added</i>), with its registered address at
+              (company registration no.: <i>pending, to be added</i>), with its registered address at
               Kathmandu Metropolitan City, Ward no. 9, Kathmandu District, Nepal. The website and app are
               internet-based portals owned and operated by Sport Onica Pvt. Ltd. (&quot;Company&quot;,
               &quot;we&quot;, &quot;us&quot;, or &quot;our&quot;).
@@ -33,7 +33,7 @@ export default function TermsOfServicePage() {
               accessing, using, or participating in Sportonica in any manner. If you use Sportonica on
               behalf of an entity, you represent that you have the authority to bind that entity to these
               Terms, and your acceptance is deemed acceptance on its behalf. &quot;User&quot; includes all
-              users of the platform — including people browsing, individuals or family members obtaining or
+              users of the platform, including people browsing, individuals or family members obtaining or
               intending to obtain our services, venue owners, and anyone otherwise connected with or
               contributing to the use of the website, app, or the Services provided through it.
             </p>
@@ -65,7 +65,7 @@ export default function TermsOfServicePage() {
               register to access the Platform Services. Services are available only to persons competent to
               form a legally binding contract under Sections 32 and 33 of the Muluki Civil Code 2074, and
               not to anyone previously suspended or removed from Sportonica. Persons incompetent to contract
-              under the Muluki Civil Code 2074 — including minors and people of unsound mind — are not
+              under the Muluki Civil Code 2074 (including minors and people of unsound mind) are not
               eligible to use the website and/or app.
             </p>
             <p>
@@ -113,7 +113,7 @@ export default function TermsOfServicePage() {
             </p>
             <p>
               Venue owners and service providers are expected to confirm bookings/registrations per their
-              terms of engagement with us, and — once accepted — may not cancel or reschedule them unless
+              terms of engagement with us, and, once accepted, may not cancel or reschedule them unless
               permitted by that engagement or approved in advance in writing by us. Bookings may be put under
               review before acceptance, and we&apos;ll follow up on any non-acceptance. Venue owners agree to
               give preference to booking requests received through Sportonica.
@@ -131,7 +131,7 @@ export default function TermsOfServicePage() {
               Bookings may be cancelled, modified, or rescheduled per Platform policies or venue owner terms.
               For shared games, bookings may be cancelled where sufficient participants aren&apos;t
               available. Refunds, where applicable, are governed by Platform policies, may be conditional,
-              and aren&apos;t guaranteed in every case — we reserve the right to determine refund
+              and aren&apos;t guaranteed in every case. We reserve the right to determine refund
               eligibility.
             </p>
             <p>
@@ -167,12 +167,12 @@ export default function TermsOfServicePage() {
             <ul>
               <li>make any warranty, express or implied, about the quality of venues and events offered by Service Providers;</li>
               <li>endorse or confirm that a product, service, or event meets a certain quality as rated by reviews;</li>
-              <li>assume liability if a product, service, event, or venue doesn&apos;t meet your expectations, or if you suffer loss or damage — including bodily injury — from using it;</li>
+              <li>assume liability if a product, service, event, or venue doesn&apos;t meet your expectations, or if you suffer loss or damage (including bodily injury) from using it;</li>
               <li>assume liability for a change, alteration, amendment, or replacement to services or event structure by a Service Provider; or</li>
               <li>guarantee minimum participation, event/game completion, or the skill level or compatibility of players.</li>
             </ul>
             <p>
-              Sportonica is not equipped or authorized to conclude any financial transaction — all payments
+              Sportonica is not equipped or authorized to conclude any financial transaction. All payments
               are made through the payment gateway. By providing payment details, you represent that
               they&apos;re correct and accurate and that you&apos;re authorized to use the designated payment
               gateway; an unverifiable, invalid, or unacceptable payment method may result in your request
@@ -212,7 +212,7 @@ export default function TermsOfServicePage() {
               We may monitor your messages and interactions on the Platform. If you engage in unauthorized
               advertising or solicitation, we may restrict the number of messages you can send within a
               24-hour period, or take other appropriate action. You authorize us to disclose your
-              information — including your identity — to comply with applicable laws, regulations, legal
+              information (including your identity) to comply with applicable laws, regulations, legal
               process, or governmental requests, including in connection with investigations of alleged
               unlawful activity, court orders or subpoenas, or the investigation, prevention, or resolution
               of suspected illegal activity, particularly where there&apos;s a risk of harm or injury.
@@ -233,15 +233,15 @@ export default function TermsOfServicePage() {
             </p>
             <p>
               Any violation of these Terms or our other policies terminates the permission/consent granted
-              to you, and we may, at our sole discretion, suspend or terminate your registration — such a
+              to you, and we may, at our sole discretion, suspend or terminate your registration. Such a
               decision is final and binding.
             </p>
           </Section>
 
           <Section title="7. Intellectual property">
             <p>
-              The website and/or app — including its underlying processes, arrangement, software, text,
-              graphics, interfaces, audio elements, artwork, and code — is protected by applicable
+              The website and/or app (including its underlying processes, arrangement, software, text,
+              graphics, interfaces, audio elements, artwork, and code) is protected by applicable
               intellectual property rights, including copyright, design rights, database rights, and
               trademarks, all either owned by us or duly licensed for use in connection with the Services.
               Copying, reproduction, distribution, storage, framing, transmission, or commercial exploitation
@@ -254,7 +254,7 @@ export default function TermsOfServicePage() {
               interest in the compilation of content, copyrights and related rights, patents, designs,
               know-how, trade secrets, inventions (including pending ones), goodwill, images, audio,
               downloads, databases, source code, meta tags, and all other materials made available on the
-              Platform. The compilation itself — its collection, arrangement, and assembly — is our exclusive
+              Platform. The compilation itself (its collection, arrangement, and assembly) is our exclusive
               property.
             </p>
             <p>
@@ -272,8 +272,8 @@ export default function TermsOfServicePage() {
             </p>
             <p>
               By submitting or posting content, you irrevocably assign and transfer to Sportonica all
-              rights, title, and interest in it, including present and future intellectual property rights —
-              copyright, moral rights, and related rights — on a worldwide, perpetual, exclusive,
+              rights, title, and interest in it, including present and future intellectual property rights (copyright,
+              moral rights, and related rights) on a worldwide, perpetual, exclusive,
               royalty-free, and transferable basis, with no compensation payable by us. You don&apos;t
               acquire any rights in Sportonica or its group companies&apos; names, trademarks, designs,
               patents, copyrights, or other IP. You grant us the unrestricted right to use, reproduce,
@@ -289,7 +289,7 @@ export default function TermsOfServicePage() {
               We can&apos;t guarantee that other users will comply with these Terms, and you assume all risk
               of loss, harm, or injury from another user&apos;s non-compliance. Any link that redirects you
               away from Sportonica leads to a destination that isn&apos;t controlled by us and may be
-              governed by its own terms and privacy policy — we&apos;re not responsible or liable for the
+              governed by its own terms and privacy policy. We&apos;re not responsible or liable for the
               content, policies, or practices of external websites, and may disable links to or from
               third-party sites at our sole discretion. Please verify the accuracy of information yourself
               before relying on it.
@@ -301,7 +301,7 @@ export default function TermsOfServicePage() {
               We may, at our sole and absolute discretion and without obligation or prior notice, suspend,
               restrict, deactivate, or terminate your account, block your email or IP address, cancel or
               limit your access to Sportonica, or remove and discard content on the Platform
-              (&quot;Termination&quot;), for any reason — including where we believe or have reasonable
+              (&quot;Termination&quot;), for any reason, including where we believe or have reasonable
               grounds to believe you&apos;ve violated these Terms or our policies. Upon termination, your
               right to participate in Sportonica ends automatically; your right to receive Services is
               conditional on your proper use of the Platform, adherence to these Terms, continued account
@@ -327,13 +327,13 @@ export default function TermsOfServicePage() {
               disclaimers extend to and benefit our officers, employees, agents, subsidiaries, successors,
               assigns, and subcontractors. We expressly disclaim, and you release us from, all liability for
               controversies, claims, suits, injuries, losses, harms, or damages arising from the Services or
-              your interactions with other users — online or offline. All use of the Services is at your
+              your interactions with other users, online or offline. All use of the Services is at your
               sole and exclusive risk.
             </p>
             <p>
               While we make reasonable efforts to maintain the integrity of Sportonica, we don&apos;t control
               and assume no responsibility for information made available by users, which may be inaccurate,
-              misleading, offensive, or otherwise objectionable — exercise appropriate caution and judgment
+              misleading, offensive, or otherwise objectionable. Exercise appropriate caution and judgment
               when interacting with other users. You may report offensive or objectionable content, and we
               may remove or disable access to any content at our sole discretion; all content posted,
               including the views expressed in it, remains the sole responsibility of the user who posted
@@ -348,8 +348,8 @@ export default function TermsOfServicePage() {
               We make no representation or warranty about the accuracy, reliability, completeness, or
               timeliness of any content, information, software, or communication made available through
               Sportonica, and don&apos;t warrant uninterrupted or error-free operation. The Services are
-              provided &quot;as is&quot; and &quot;as available&quot;, without warranties of any kind —
-              express, implied, statutory, or otherwise — including implied warranties of merchantability,
+              provided &quot;as is&quot; and &quot;as available&quot;, without warranties of any kind,
+              express, implied, statutory, or otherwise, including implied warranties of merchantability,
               fitness for a particular purpose, or non-infringement.
             </p>
             <p>
@@ -364,16 +364,16 @@ export default function TermsOfServicePage() {
             <p>
               We&apos;re not liable for injury, loss of life, or accident that may occur to any user, Service
               Provider, or third party while engaging in activities or availing services booked through
-              Sportonica, and expressly disclaim all liability — direct or indirect, known or unknown —
+              Sportonica, and expressly disclaim all liability, direct or indirect, known or unknown,
               arising from the Services, including payments made to third-party Service Providers. By using
               Sportonica, you agree to indemnify and hold us harmless from claims, disputes, or damages
               arising from any disagreement between you and other users, Service Providers, or third
               parties.
             </p>
             <p>
-              These Terms constitute a comprehensive limitation of liability for all forms of damages —
+              These Terms constitute a comprehensive limitation of liability for all forms of damages:
               direct, indirect, incidental, special, punitive, consequential, or exemplary, including loss of
-              profits, goodwill, use, data, or other intangible losses — whether arising in contract or
+              profits, goodwill, use, data, or other intangible losses, whether arising in contract or
               under applicable law, to the fullest extent permitted.
             </p>
             <p>
@@ -381,7 +381,7 @@ export default function TermsOfServicePage() {
               enactments, rules, regulations, notifications, guidelines, and orders issued by any
               governmental authority, statutory body, tribunal, board, or court, whether within or outside
               the relevant jurisdiction, in connection with your access to and use of Sportonica, your use of
-              its Services, and any content you post, upload, transmit, or disseminate through it — and to
+              its Services, and any content you post, upload, transmit, or disseminate through it, and to
               ensure your activities don&apos;t violate applicable law or any third party&apos;s rights.
             </p>
           </Section>
@@ -401,7 +401,7 @@ export default function TermsOfServicePage() {
               don&apos;t warrant or represent the accuracy, completeness, reliability, or quality of any
               data, information, service, or content on the Platform. All materials are provided for general
               informational purposes only and shouldn&apos;t be relied on as the sole basis for
-              decision-making — any reliance is strictly at your own risk. We don&apos;t guarantee
+              decision-making. Any reliance is strictly at your own risk. We don&apos;t guarantee
               uninterrupted or error-free availability of the Platform and aren&apos;t responsible for
               non-availability due to scheduled maintenance, technical issues, or causes beyond our
               reasonable control. The internet isn&apos;t a secure medium, and we don&apos;t warrant that
@@ -444,8 +444,8 @@ export default function TermsOfServicePage() {
 
           <Section title="15. Miscellaneous">
             <p>
-              Our rights and remedies under these Terms are cumulative, independent, and in addition to —
-              not in substitution for — any rights or remedies available under applicable law. No waiver of
+              Our rights and remedies under these Terms are cumulative, independent, and in addition to,
+              and not in substitution for, any rights or remedies available under applicable law. No waiver of
               any breach constitutes a waiver of any preceding or subsequent breach, and any delay, failure,
               or omission in enforcing a provision, or any forbearance granted in respect of your
               obligations, isn&apos;t construed as a waiver of our rights. Nothing in these Terms confers any

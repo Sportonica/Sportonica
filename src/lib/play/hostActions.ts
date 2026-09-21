@@ -56,7 +56,7 @@ export async function updateHostedGame(input: {
       .eq("event_id", input.eventId)
       .eq("status", "confirmed");
     if ((count ?? 0) > input.max_players) {
-      return actionError(`${count} players already joined — capacity can't go below that.`);
+      return actionError(`${count} players already joined, so capacity can't go below that.`);
     }
   }
 
@@ -126,7 +126,7 @@ export async function invitePlayers(input: {
     .single();
   const left = Number(evFull?.slots_remaining ?? 0);
   if (emails.length > left) {
-    return actionError(`Only ${left} spot${left === 1 ? "" : "s"} left — you invited ${emails.length}.`);
+    return actionError(`Only ${left} spot${left === 1 ? "" : "s"} left, but you invited ${emails.length}.`);
   }
 
   const { data: hostProfile } = await sb
@@ -162,7 +162,7 @@ export async function invitePlayers(input: {
         ``,
         `Details and RSVP: ${link}`,
         ``,
-        `— Sportonica`,
+        `Sportonica`,
       ].join("\n"),
     }))
   );

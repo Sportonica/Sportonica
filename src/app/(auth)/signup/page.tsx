@@ -89,7 +89,7 @@ function SignupInner() {
       const res = await signUpWithPhone({ name: name.trim(), phone: id, password, role });
       if (isActionError(res)) { setErr(res.message); setLoading(false); return; }
       const { error } = await sb.auth.signInWithPassword({ email: res.email, password });
-      if (error) { setErr("Account created — please sign in."); router.push("/login"); return; }
+      if (error) { setErr("Account created. Please sign in."); router.push("/login"); return; }
       afterAuth();
       return;
     }
@@ -103,7 +103,7 @@ function SignupInner() {
     });
     if (error) { setErr(friendlySignupError(error.message)); setLoading(false); return; }
     if (!data.session) {
-      setNote("Almost there — check your email to confirm your account, then sign in.");
+      setNote("Almost there. Check your email to confirm your account, then sign in.");
       setLoading(false);
       return;
     }
@@ -114,14 +114,14 @@ function SignupInner() {
     <div className="auth">
       <BackButton className="auth-navback" iconSize={17} />
       <div className="auth-stage">
-        <Link href="/" className="auth-brand" aria-label="Sportonica — go to the home page">
+        <Link href="/" className="auth-brand" aria-label="Sportonica, go to the home page">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/mark.png" alt="" className="auth-brand-mark" />
           <div className="auth-brand-name">Sportonica</div>
         </Link>
         <div className="auth-tagline">
           <h2>Find. Book. <em>Play.</em></h2>
-          <p>Join as a player to host and find matches — or list your venue and start taking bookings today.</p>
+          <p>Join as a player to host and find matches, or list your venue and start taking bookings today.</p>
         </div>
         <div className="auth-foot">NEPAL · SINCE 2026</div>
       </div>

@@ -135,7 +135,7 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
       {/* PHOTOS */}
       <div className="adm-card" style={{ marginBottom: 20 }}>
         <div className="adm-card-t">Photos</div>
-        <div className="adm-card-sub">The first photo is your cover — it shows to players browsing. Drag isn&apos;t needed; use &quot;Make cover&quot;.</div>
+        <div className="adm-card-sub">The first photo is your cover, and it shows to players browsing. Drag isn&apos;t needed; use &quot;Make cover&quot;.</div>
 
         {photos.length > 0 && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px,1fr))", gap: 12, marginBottom: 16 }}>
@@ -186,7 +186,7 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
       <div className="adm-card" style={{ marginBottom: 20 }}>
         <div className="adm-card-t"><MapPin size={16} style={{ verticalAlign: -3, marginRight: 6 }} />Location</div>
         <div className="adm-card-sub">
-          On Google Maps, find your venue → tap <b>Share</b> → <b>Copy link</b> → paste it here. We pin your exact spot — no typing coordinates.
+          On Google Maps, find your venue → tap <b>Share</b> → <b>Copy link</b>{" "}→ paste it here. We pin your exact spot, so there&apos;s no need to type coordinates.
         </div>
 
         <div className="adm-flex" style={{ gap: 8, alignItems: "flex-start" }}>

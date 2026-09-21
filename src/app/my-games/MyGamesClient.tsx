@@ -38,7 +38,7 @@ function PaymentBadge({ status }: { status?: string }) {
     return <span className="mg-pay-badge pending"><Clock3 size={11} /> Payment awaiting verification</span>;
   }
   if (status === "rejected") {
-    return <span className="mg-pay-badge rejected"><AlertCircle size={11} /> Payment rejected — resubmit</span>;
+    return <span className="mg-pay-badge rejected"><AlertCircle size={11} /> Payment rejected, resubmit</span>;
   }
   return null;
 }
@@ -510,7 +510,7 @@ function InviteSheet({ game, onClose }: { game: Game; onClose: () => void }) {
             I&apos;m covering their spots.
             <br />
             <span style={{ opacity: .6, fontSize: 12 }}>
-              The usual setup — you book and settle up with them later.
+              The usual setup: you book and settle up with them later.
             </span>
           </span>
         </label>

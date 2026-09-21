@@ -98,7 +98,7 @@ export default function SquadChat({
     <div style={{ border: "1px solid var(--line)", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: 460 }}>
       <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px 8px", display: "flex", flexDirection: "column", gap: 12 }}>
         {messages.length === 0 ? (
-          <div style={{ margin: "auto", color: "var(--faint)", fontSize: 13.5 }}>No messages yet — say hi 👋</div>
+          <div style={{ margin: "auto", color: "var(--faint)", fontSize: 13.5 }}>No messages yet. Say hi 👋</div>
         ) : messages.map((m) => {
           const mine = m.user_id === meId;
           return (

@@ -442,7 +442,7 @@ function MatchDetailModal({ match: m, team, onClose }: {
         </div>
 
         {m.status === "walkover" && (
-          <div className="ev2-empty" style={{ padding: "10px 0 0", textAlign: "left" }}>Walkover — {team(m.winner_team_id)?.name ?? "Unknown"}</div>
+          <div className="ev2-empty" style={{ padding: "10px 0 0", textAlign: "left" }}>Walkover: {team(m.winner_team_id)?.name ?? "Unknown"}</div>
         )}
         {(m.score_a_et != null && m.score_b_et != null) && (
           <div style={{ opacity: 0.65, fontSize: 12.5, marginTop: 8 }}>Extra time: {m.score_a_et} – {m.score_b_et}</div>
@@ -775,7 +775,7 @@ function SquadModal({ team, onClose }: { team: TournamentTeam; onClose: () => vo
               <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid rgba(242,237,230,0.1)" }}>
                 <p style={{ fontSize: 12, opacity: 0.65, marginBottom: 8 }}>
                   Played on this team but registered without an account? Sign in with the same email or phone you
-                  registered with — Sportonica links your stats to your player card automatically.
+                  registered with. Sportonica links your stats to your player card automatically.
                 </p>
                 <Link
                   href={`/login?redirect=${encodeURIComponent(pathname)}`}

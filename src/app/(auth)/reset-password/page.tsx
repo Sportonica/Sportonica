@@ -63,7 +63,7 @@ function ResetPasswordInner() {
       setErr(
         m.includes("different from the old")
           ? "Choose a password you haven't used before."
-          : "Couldn't update your password. Your reset link may have expired — request a new one.",
+          : "Couldn't update your password. Your reset link may have expired. Request a new one.",
       );
       setLoading(false);
       return;
@@ -76,7 +76,7 @@ function ResetPasswordInner() {
     <div className="auth">
       <BackButton className="auth-navback" iconSize={17} />
       <div className="auth-stage">
-        <Link href="/" className="auth-brand" aria-label="Sportonica — go to the home page">
+        <Link href="/" className="auth-brand" aria-label="Sportonica, go to the home page">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/mark.png" alt="" className="auth-brand-mark" />
           <div className="auth-brand-name">Sportonica</div>
@@ -102,7 +102,7 @@ function ResetPasswordInner() {
               <h1>Link expired</h1>
               <p className="sub">
                 This password-reset link is invalid or has already been used. Reset links
-                last one hour — request a fresh one to continue.
+                last one hour. Request a fresh one to continue.
               </p>
               <div className="auth-alt">
                 <Link href="/forgot-password">Send a new reset link</Link>

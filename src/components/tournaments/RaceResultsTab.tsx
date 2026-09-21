@@ -101,7 +101,7 @@ export default function RaceResultsTab({ tournament, teams }: {
       {loading ? (
         <div className="tc-empty">Loading…</div>
       ) : categories.length === 0 ? (
-        <div className="tc-empty">No categories yet — add one above (or leave empty for a single overall race).</div>
+        <div className="tc-empty">No categories yet. Add one above (or leave empty for a single overall race).</div>
       ) : (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "12px 0 20px" }}>
           {categories.map((c) => (

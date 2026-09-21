@@ -117,7 +117,7 @@ export default function SquadsClient({
                     onClick={() => toggle(g)}
                     disabled={pending}
                   >
-                    {isIn ? <><Check size={15} /> Joined — tap to leave</> : <>Join group <ArrowRight size={15} /></>}
+                    {isIn ? <><Check size={15} /> Joined, tap to leave</> : <>Join group <ArrowRight size={15} /></>}
                   </button>
                 </div>
               </div>

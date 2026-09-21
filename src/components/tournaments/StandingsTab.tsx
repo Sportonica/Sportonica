@@ -37,7 +37,7 @@ export default function StandingsTab({ tournament, teams }: {
   }, [tournament.id, tournament.format, groups.join("|")]);
 
   if (tournament.format === "knockout") {
-    return <div className="tc-empty">Knockout tournaments don&apos;t track standings — see the Bracket tab.</div>;
+    return <div className="tc-empty">Knockout tournaments don&apos;t track standings. See the Bracket tab.</div>;
   }
   if (loading) return <div className="tc-empty">Loading standings…</div>;
 
