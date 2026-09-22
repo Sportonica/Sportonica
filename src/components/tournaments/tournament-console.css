@@ -102,6 +102,52 @@
 }
 .tc-member-row button { background: none; border: none; color: #ef4444; opacity: 0.7; cursor: pointer; padding: 4px; }
 
+/* ── Team picker (searchable combobox, replaces a native <select>) ── */
+.tc-teamselect-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  cursor: pointer; text-align: left; font-size: inherit;
+}
+.tc-teamselect-trigger:hover { border-color: rgba(0,98,65,0.5) !important; }
+.tc-teamselect-trigger:focus-visible { outline: 2px solid #006241; outline-offset: 1px; }
+.tc-teamselect-trigger > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.tc-teamselect-placeholder { opacity: 0.55; }
+
+.tc-teamselect-panel {
+  position: absolute; z-index: 50; top: calc(100% + 6px); left: 0;
+  width: max-content; min-width: 100%; max-width: min(320px, 90vw);
+  background: #14171E; border: 1px solid rgba(242,237,230,0.14); border-radius: 12px;
+  box-shadow: 0 16px 36px -14px rgba(0,0,0,0.7);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+[data-theme="paper"] .tc-teamselect-panel {
+  background: #fff; border-color: rgba(20,23,30,0.12); box-shadow: 0 16px 36px -16px rgba(20,23,30,0.3);
+}
+.tc-teamselect-search {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  border-bottom: 1px solid rgba(242,237,230,0.1); flex-shrink: 0;
+}
+[data-theme="paper"] .tc-teamselect-search { border-color: rgba(20,23,30,0.08); }
+.tc-teamselect-search input {
+  flex: 1; min-width: 0; background: none; border: none; color: inherit;
+  font-family: inherit; font-size: 13.5px;
+}
+.tc-teamselect-search input:focus { outline: none; }
+.tc-teamselect-list { overflow-y: auto; max-height: 260px; padding: 6px; }
+.tc-teamselect-group {
+  font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  opacity: 0.5; padding: 10px 10px 4px;
+}
+.tc-teamselect-opt {
+  display: flex; align-items: center; gap: 6px; padding: 9px 10px; border-radius: 8px;
+  font-size: 13.5px; cursor: pointer;
+}
+.tc-teamselect-opt:hover { background: rgba(255,255,255,0.06); }
+[data-theme="paper"] .tc-teamselect-opt:hover { background: rgba(20,23,30,0.05); }
+.tc-teamselect-opt.on { background: rgba(0,98,65,0.16); color: #4ADE80; font-weight: 700; }
+[data-theme="paper"] .tc-teamselect-opt.on { background: rgba(0,98,65,0.1); color: #006241; }
+.tc-teamselect-check { flex-shrink: 0; }
+.tc-teamselect-empty { padding: 16px 10px; text-align: center; font-size: 13px; opacity: 0.55; }
+
 /* ── Narrow screens ────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .tc-card { padding: 16px; overflow-x: auto; }

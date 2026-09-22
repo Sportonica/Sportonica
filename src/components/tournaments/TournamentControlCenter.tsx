@@ -750,10 +750,12 @@ function TeamRosterModal({ team, onClose, onChanged }: {
   const [positionDrafts, setPositionDrafts] = useState<Record<string, string>>({});
   const [managerName, setManagerName] = useState(team.manager_name ?? "");
   const [managerPhone, setManagerPhone] = useState(team.manager_phone ?? "");
+  const [managerEmail, setManagerEmail] = useState(team.manager_email ?? "");
   const [coachName, setCoachName] = useState(team.coach_name ?? "");
   const [coachPhone, setCoachPhone] = useState(team.coach_phone ?? "");
   const [savedManagerName, setSavedManagerName] = useState(team.manager_name);
   const [savedManagerPhone, setSavedManagerPhone] = useState(team.manager_phone);
+  const [savedManagerEmail, setSavedManagerEmail] = useState(team.manager_email);
   const [savedCoachName, setSavedCoachName] = useState(team.coach_name);
   const [savedCoachPhone, setSavedCoachPhone] = useState(team.coach_phone);
   const [editingManager, setEditingManager] = useState(false);
@@ -890,11 +892,12 @@ function TeamRosterModal({ team, onClose, onChanged }: {
     startTransition(async () => {
       const res = await updateTeamManager(
         team.id, managerName.trim() || undefined, managerPhone.trim() || undefined,
-        coachName.trim() || undefined, coachPhone.trim() || undefined,
+        coachName.trim() || undefined, coachPhone.trim() || undefined, managerEmail.trim() || undefined,
       );
       if (isActionError(res)) { setErr(res.message); return; }
       setSavedManagerName(res.manager_name);
       setSavedManagerPhone(res.manager_phone);
+      setSavedManagerEmail(res.manager_email);
       setSavedCoachName(res.coach_name);
       setSavedCoachPhone(res.coach_phone);
       setEditingManager(false);
@@ -914,6 +917,7 @@ function TeamRosterModal({ team, onClose, onChanged }: {
           <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, borderRadius: 10, background: "rgba(0,98,65,0.06)", marginBottom: 16 }}>
             <input value={managerName} onChange={(e) => setManagerName(e.target.value)} placeholder="Team manager's name" style={modalInputStyle} />
             <input value={managerPhone} onChange={(e) => setManagerPhone(e.target.value)} placeholder="Team manager's phone" style={modalInputStyle} />
+            <input type="email" value={managerEmail} onChange={(e) => setManagerEmail(e.target.value)} placeholder="Team manager's email (optional)" style={modalInputStyle} />
             <input value={coachName} onChange={(e) => setCoachName(e.target.value)} placeholder="Coach's name (optional)" style={modalInputStyle} />
             <input value={coachPhone} onChange={(e) => setCoachPhone(e.target.value)} placeholder="Coach's phone (optional)" style={modalInputStyle} />
             <div style={{ display: "flex", gap: 6 }}>
@@ -923,6 +927,7 @@ function TeamRosterModal({ team, onClose, onChanged }: {
                 onClick={() => {
                   setEditingManager(false);
                   setManagerName(savedManagerName ?? ""); setManagerPhone(savedManagerPhone ?? "");
+                  setManagerEmail(savedManagerEmail ?? "");
                   setCoachName(savedCoachName ?? ""); setCoachPhone(savedCoachPhone ?? "");
                 }}
               >
@@ -934,7 +939,7 @@ function TeamRosterModal({ team, onClose, onChanged }: {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 16, fontSize: 12.5 }}>
             {savedManagerName || savedCoachName ? (
               <span className="tc-dim">
-                {savedManagerName && <>Manager: {savedManagerName}{savedManagerPhone ? ` · ${savedManagerPhone}` : ""}</>}
+                {savedManagerName && <>Manager: {savedManagerName}{savedManagerPhone ? ` · ${savedManagerPhone}` : ""}{savedManagerEmail ? ` · ${savedManagerEmail}` : ""}</>}
                 {savedManagerName && savedCoachName && <br />}
                 {savedCoachName && <>Coach: {savedCoachName}{savedCoachPhone ? ` · ${savedCoachPhone}` : ""}</>}
               </span>

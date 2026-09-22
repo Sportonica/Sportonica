@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, X, History, Pencil, Search } from "lucide-react";
+import { Plus, Trash2, X, History, Pencil, Search, ChevronDown, Check } from "lucide-react";
 import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
   getTeamRoster, getMatchPlayerStats, recordMatchPlayerStats,
@@ -45,6 +45,11 @@ function winnerOptions(matches: TournamentMatch[], teamName: (id: string | null)
   return out;
 }
 
+// A native <select> with 20+ teams (plus a "Winners" optgroup) is an
+// unsearchable wall of options once a bracket gets big — this is a
+// custom combobox instead: same value/onChange contract as a <select>
+// (so every call site is untouched), but with a search box and a
+// styled list that actually fits the tc-* design language.
 function TeamSelect({ value, onChange, teams, winners, excludeId, placeholder, style }: {
   value: string;
   onChange: (id: string) => void;
@@ -56,18 +61,95 @@ function TeamSelect({ value, onChange, teams, winners, excludeId, placeholder, s
 }) {
   const winnerOpts = winners.filter((w) => w.id !== excludeId);
   const teamOpts = teams.filter((t) => t.id !== excludeId);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocPointerDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocPointerDown);
+    return () => document.removeEventListener("mousedown", onDocPointerDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const raf = requestAnimationFrame(() => searchRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, [open]);
+
+  const q = query.trim().toLowerCase();
+  const filteredWinners = q ? winnerOpts.filter((w) => w.label.toLowerCase().includes(q)) : winnerOpts;
+  const filteredTeams = q ? teamOpts.filter((t) => t.name.toLowerCase().includes(q)) : teamOpts;
+  const noResults = !!q && filteredWinners.length === 0 && filteredTeams.length === 0;
+
+  const selectedLabel = value === "" ? null : winnerOpts.find((w) => w.id === value)?.label ?? teamOpts.find((t) => t.id === value)?.name ?? null;
+
+  function pick(id: string) {
+    onChange(id);
+    setOpen(false);
+  }
+
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={style}>
-      <option value="">{placeholder}</option>
-      {winnerOpts.length > 0 && (
-        <optgroup label="Winners">
-          {winnerOpts.map((w) => <option key={`w-${w.id}`} value={w.id}>{w.label}</option>)}
-        </optgroup>
+    <div ref={rootRef} style={{ position: "relative", display: "inline-block" }}>
+      <button
+        type="button"
+        className="tc-teamselect-trigger"
+        style={style}
+        onClick={() => { setOpen((v) => !v); setQuery(""); }}
+        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+      >
+        <span className={selectedLabel ? undefined : "tc-teamselect-placeholder"}>{selectedLabel ?? placeholder}</span>
+        <ChevronDown size={14} style={{ opacity: 0.6, flexShrink: 0, transition: "transform .15s", transform: open ? "rotate(180deg)" : undefined }} />
+      </button>
+
+      {open && (
+        <div className="tc-teamselect-panel">
+          <div className="tc-teamselect-search">
+            <Search size={13} style={{ opacity: 0.5, flexShrink: 0 }} />
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+              placeholder="Search teams…"
+              aria-label="Search teams"
+            />
+          </div>
+          <div className="tc-teamselect-list">
+            <div className={`tc-teamselect-opt ${value === "" ? "on" : ""}`} onClick={() => pick("")}>
+              <span className="tc-teamselect-placeholder">{placeholder}</span>
+            </div>
+            {filteredWinners.length > 0 && (
+              <>
+                <div className="tc-teamselect-group">Winners</div>
+                {filteredWinners.map((w) => (
+                  <div key={`w-${w.id}`} className={`tc-teamselect-opt ${value === w.id ? "on" : ""}`} onClick={() => pick(w.id)}>
+                    {value === w.id && <Check size={13} className="tc-teamselect-check" />}
+                    {w.label}
+                  </div>
+                ))}
+              </>
+            )}
+            {filteredTeams.length > 0 && (
+              <>
+                <div className="tc-teamselect-group">All confirmed teams</div>
+                {filteredTeams.map((t) => (
+                  <div key={t.id} className={`tc-teamselect-opt ${value === t.id ? "on" : ""}`} onClick={() => pick(t.id)}>
+                    {value === t.id && <Check size={13} className="tc-teamselect-check" />}
+                    {t.name}
+                  </div>
+                ))}
+              </>
+            )}
+            {noResults && <div className="tc-teamselect-empty">No teams match &quot;{query}&quot;</div>}
+          </div>
+        </div>
       )}
-      <optgroup label="All confirmed teams">
-        {teamOpts.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-      </optgroup>
-    </select>
+    </div>
   );
 }
 
