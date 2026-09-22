@@ -234,7 +234,7 @@ export default function PlayFilters({
           padding:4px; background:rgba(255,255,255,.04);
         }
         .pf-step-box button {
-          width:28px; height:28px; flex-shrink:0; border-radius:8px; cursor:pointer;
+          width:34px; height:34px; flex-shrink:0; border-radius:9px; cursor:pointer;
           display:inline-flex; align-items:center; justify-content:center;
           border:none; background:transparent; color:#006241;
           transition:background .18s;
@@ -245,7 +245,7 @@ export default function PlayFilters({
           flex:1; text-align:center; font-family:'Inter',sans-serif;
           font-size:13px; font-weight:700; white-space:nowrap;
         }
-        .pf-step-v.ph { opacity:.35; font-weight:500; }
+        .pf-step-v.ph { opacity:.7; font-weight:500; }
 
         .pf-find {
           display:inline-flex; align-items:center; gap:7px; flex-shrink:0;

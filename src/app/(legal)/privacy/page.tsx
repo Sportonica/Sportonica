@@ -183,7 +183,7 @@ export default function PrivacyPolicyPage() {
             <p>
               In practice: you can delete your account and its associated data yourself, any time, from{" "}
               <b>Profile → Login &amp; Security</b>. See our{" "}
-              <Link href="/account-deletion" style={{ color: "var(--sodium)" }}>Account Deletion</Link>{" "}
+              <Link href="/account-deletion" style={{ color: "var(--sodium)", textDecoration: "underline", textUnderlineOffset: 2 }}>Account Deletion</Link>{" "}
               page for exactly what&apos;s removed. For anything else, contact us below.
             </p>
           </Section>
@@ -192,7 +192,7 @@ export default function PrivacyPolicyPage() {
             <p>
               For queries, reports, comments, or concerns about our privacy practices and this policy,
               email us at{" "}
-              <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)" }}>info@sportonica.com</a>,
+              <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)", textDecoration: "underline", textUnderlineOffset: 2 }}>info@sportonica.com</a>,
               or write to:
             </p>
             <p>
@@ -202,7 +202,7 @@ export default function PrivacyPolicyPage() {
             </p>
           </Section>
 
-          <p className="hint" style={{ marginTop: 28 }}>
+          <p className="hint legal-foot" style={{ marginTop: 28 }}>
             <Link href="/terms">Terms of Service</Link> · <Link href="/">← Back to Sportonica</Link>
           </p>
         </div>

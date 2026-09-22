@@ -40,11 +40,11 @@ export default function ContactPage() {
           <p className="hint" style={{ marginBottom: 28 }}>
             Questions, feedback, or something not working right? Send us a note and we&apos;ll get
             back to you. You can also reach us directly at{" "}
-            <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)" }}>
+            <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)", textDecoration: "underline", textUnderlineOffset: 2 }}>
               info@sportonica.com
             </a>{" "}
             or{" "}
-            <a href="tel:+9779714593865" style={{ color: "var(--sodium)" }}>
+            <a href="tel:+9779714593865" style={{ color: "var(--sodium)", textDecoration: "underline", textUnderlineOffset: 2 }}>
               +977 971-459-3865
             </a>
             .
@@ -122,7 +122,7 @@ export default function ContactPage() {
             </form>
           )}
 
-          <p className="hint" style={{ marginTop: 28 }}>
+          <p className="hint legal-foot" style={{ marginTop: 28 }}>
             <Link href="/">← Back to Sportonica</Link>
           </p>
         </div>

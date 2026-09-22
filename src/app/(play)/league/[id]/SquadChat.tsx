@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useTransition } from "react";
-import Link from "next/link";
+import ProfileLink from "@/components/ProfileLink";
 import { Send, Lock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { sendSquadMessage } from "@/lib/squads/actions";
@@ -103,14 +103,14 @@ export default function SquadChat({
           const mine = m.user_id === meId;
           return (
             <div key={m.id} style={{ display: "flex", gap: 9, flexDirection: mine ? "row-reverse" : "row" }}>
-              <Link href={m.username ? `/p/${m.username}` : "#"} style={{ flexShrink: 0 }}>
+              <ProfileLink username={m.username} label={`${m.name}'s profile`} style={{ flexShrink: 0 }}>
                 <div style={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", background: "linear-gradient(150deg,#006241,#1e3932)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 800, color: "#ffffff" }}>
                   {m.avatar_url && /\.(jpe?g|png|gif|webp)$/i.test(m.avatar_url)
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={m.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     : m.name.charAt(0).toUpperCase()}
                 </div>
-              </Link>
+              </ProfileLink>
               <div style={{ maxWidth: "72%", textAlign: mine ? "right" : "left" }}>
                 {!mine && <div style={{ fontSize: 11, color: "var(--faint)", marginBottom: 2 }}>{m.name}</div>}
                 <div className="msg-row" style={{ display: "inline-flex", alignItems: "center", gap: 6, flexDirection: mine ? "row-reverse" : "row" }}>

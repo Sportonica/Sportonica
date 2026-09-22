@@ -30,6 +30,8 @@
 .rail-all {
   font-size: 13.5px; font-weight: 700; color: #006241;
   text-decoration: none; margin-left: 6px; white-space: nowrap;
+  /* 44px-tall tap area without changing the header's height */
+  display: inline-flex; align-items: center; padding: 12px 0; margin-block: -12px;
 }
 .rail-all:hover { text-decoration: underline; }
 .rail-scroll {
@@ -219,7 +221,7 @@
 
 .rc-match-pill {
   display: inline-flex; align-items: center; gap: 6px;
-  font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 800; letter-spacing: 0.03em;
+  font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 800; letter-spacing: 0.03em;
   color: rgba(255,255,255,.85); background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
   padding: 4px 12px; border-radius: 999px; white-space: nowrap;
 }
@@ -243,7 +245,7 @@
   font-size: 11.5px; font-weight: 700; position: relative; z-index: 1;
 }
 [data-theme="paper"] .rc-match-foot { border-top-color: rgba(20,23,30,0.12); }
-.rc-match-foot a { color: rgba(255,255,255,0.6); text-decoration: none; transition: color .2s; }
+.rc-match-foot a { color: rgba(255,255,255,0.6); text-decoration: none; transition: color .2s; padding: 12px 6px; margin: -12px -6px; }
 [data-theme="paper"] .rc-match-foot a { color: rgba(20,23,30,0.6); }
 .rc-match-foot a:hover { color: var(--rc-accent); text-decoration: underline; }
 

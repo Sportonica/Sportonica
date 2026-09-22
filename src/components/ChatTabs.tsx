@@ -12,9 +12,11 @@ const TABS = [
 
 export default function ChatTabs() {
   const pathname = usePathname();
+  const heading = TABS.find((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))?.label ?? "Chat";
 
   return (
     <div className="chat-tabs">
+      <h1 className="sr-only">{heading}</h1>
       {TABS.map((t) => {
         const active = pathname === t.href || pathname.startsWith(`${t.href}/`);
         const Icon = t.icon;

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import ProfileLink from "@/components/ProfileLink";
 import { UserPlus, UserMinus, Search, X } from "lucide-react";
 import { removeMember, addMember, searchPlayers } from "@/lib/squads/actions";
 import { isActionError } from "@/lib/actionError";
@@ -47,13 +47,13 @@ export default function MemberManager({
         {members.map((m) => (
           <div key={m.user_id}
             style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 6px", borderBottom: "1px solid var(--line)" }}>
-            <Link href={m.username ? `/p/${m.username}` : "#"} style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, textDecoration: "none", color: "inherit" }}>
+            <ProfileLink username={m.username} style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, textDecoration: "none", color: "inherit" }}>
               <Avatar name={m.name} url={m.avatar_url} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{m.name}</div>
                 {m.username && <div style={{ fontSize: 12, color: "var(--faint)", fontFamily: "'Inter',sans-serif" }}>@{m.username}</div>}
               </div>
-            </Link>
+            </ProfileLink>
 
             {m.role === "admin" ? (
               <span style={{ fontSize: 10.5, fontWeight: 700, color: accentColor, border: `1px solid ${accentColor}55`, background: `${accentColor}14`, padding: "3px 9px", borderRadius: 6 }}>ADMIN</span>

@@ -48,7 +48,7 @@
   position: relative; z-index: 1;
   display: flex; align-items: center; gap: 7px; white-space: nowrap;
   padding: 10px 16px; min-height: 44px; box-sizing: border-box; border-radius: 11px; border: none; background: transparent;
-  color: inherit; opacity: 0.6; font-family: inherit; font-size: 13.5px; font-weight: 700; letter-spacing: -.01em;
+  color: inherit; opacity: 0.78; font-family: inherit; font-size: 13.5px; font-weight: 700; letter-spacing: -.01em;
   cursor: pointer; transition: opacity .2s ease, color .2s ease;
 }
 .ev2-tab:hover { opacity: 0.9; }
@@ -62,7 +62,7 @@
 }
 [data-theme="paper"] .ev2-stat { background: #fff; border-color: rgba(20,23,30,0.08); box-shadow: 0 1px 3px rgba(20,23,30,0.05); }
 .ev2-stat-v { font-family: 'Inter', sans-serif; font-size: 26px; font-weight: 800; color: #00875a; line-height: 1.1; }
-.ev2-stat-l { font-size: 11px; opacity: 0.6; margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.ev2-stat-l { font-size: 11px; opacity: 0.78; margin-top: 4px; text-transform: uppercase; letter-spacing: .04em; }
 
 .ev2-card {
   padding: 22px; border-radius: 16px; margin-bottom: 16px;
@@ -491,7 +491,7 @@
   border: 1px solid rgba(242,237,230,0.09); border-radius: 12px; overflow: hidden;
 }
 .tr-price-table th, .tr-price-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid rgba(242,237,230,0.09); }
-.tr-price-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; opacity: 0.6; font-weight: 700; }
+.tr-price-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .03em; opacity: 0.8; font-weight: 700; }
 .tr-price-table tr:last-child td { border-bottom: none; }
 [data-theme="paper"] .tr-price-table { border-color: rgba(20,23,30,0.08); }
 [data-theme="paper"] .tr-price-table th, [data-theme="paper"] .tr-price-table td { border-color: rgba(20,23,30,0.08); }

@@ -140,9 +140,9 @@ export default function NotificationsPage() {
         .nt-x:hover { opacity: 1; background: rgba(20,23,30,.08); }
         :root:not([data-theme="paper"]) .nt-x:hover { background: rgba(242,237,230,.1); }
 
-        .nt-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 60px 20px; text-align: center; opacity: .55; }
+        .nt-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 60px 20px; text-align: center; opacity: .8; }
         .nt-empty p { font-size: 15px; font-weight: 600; margin: 4px 0 0; }
-        .nt-empty span { font-size: 13px; opacity: .8; max-width: 280px; }
+        .nt-empty span { font-size: 13px; opacity: .9; max-width: 280px; }
       `}</style>
     </div>
   );

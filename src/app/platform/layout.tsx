@@ -34,7 +34,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           <Link href="/discover">↗ App</Link>
         </nav>
       </header>
-      <main className="plt-body">{children}</main>
+      <div className="plt-body">{children}</div>
     </div>
   );
 }
