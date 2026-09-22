@@ -22,7 +22,7 @@ export function notificationHref(n: Notification): string {
   if (n.game_id) return HOST_FACING.includes(n.kind) ? `/play-together/${n.game_id}/manage` : `/play-together/${n.game_id}`;
   if (n.tournament_id) return `/tournaments/${n.tournament_id}`;
   if (n.event_id) return `/game/${n.event_id}`;
-  return "/profile/coming-soon?section=notifications";
+  return "/notifications";
 }
 
 export type NotificationCategory = "games" | "payments" | "tournaments" | "social";

@@ -21,7 +21,7 @@ export async function blockUser(userId: string): Promise<void | ActionError> {
   if (error) return actionError(error.message);
   revalidatePath("/friends");
   revalidatePath("/messages");
-  revalidatePath("/profile/coming-soon");
+  revalidatePath("/profile/privacy");
 }
 
 export async function unblockUser(userId: string): Promise<void | ActionError> {
@@ -29,5 +29,5 @@ export async function unblockUser(userId: string): Promise<void | ActionError> {
   if (!user) return actionError("UNAUTHORIZED");
   const { error } = await sb.rpc("unblock_user", { p_user_id: userId });
   if (error) return actionError(error.message);
-  revalidatePath("/profile/coming-soon");
+  revalidatePath("/profile/privacy");
 }

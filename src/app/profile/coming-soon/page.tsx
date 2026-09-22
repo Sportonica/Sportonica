@@ -2,9 +2,6 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import "../../p/profile.css";
-import "../../(play)/play.css";
-import NotificationsPage from "../../(play)/notifications/page";
-import PrivacySection from "./PrivacySection";
 
 const SECTIONS: Record<string, { title: string; body: string }> = {
   preferences: {
@@ -21,8 +18,6 @@ export async function generateMetadata({
   searchParams,
 }: { searchParams: Promise<{ section?: string }> }): Promise<Metadata> {
   const { section } = await searchParams;
-  if (section === "notifications") return { title: "Notifications — Sportonica" };
-  if (section === "privacy") return { title: "Privacy — Sportonica" };
   const title = (section && SECTIONS[section]?.title) || "Coming soon";
   return { title: `${title} — Sportonica` };
 }
@@ -31,9 +26,6 @@ export default async function ComingSoonPage({
   searchParams,
 }: { searchParams: Promise<{ section?: string }> }) {
   const { section } = await searchParams;
-
-  if (section === "notifications") return <NotificationsPage />;
-  if (section === "privacy") return <PrivacySection />;
 
   const content = (section && SECTIONS[section]) || {
     title: "Coming soon",

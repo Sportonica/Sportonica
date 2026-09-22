@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, X, History, Pencil } from "lucide-react";
+import { Plus, Trash2, X, History, Pencil, Search } from "lucide-react";
 import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
   getTeamRoster, getMatchPlayerStats, recordMatchPlayerStats,
   generateKnockoutBracket, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
-  recordCricketResult, getMatchCricketStats, recordCricketPlayerStats,
+  recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { getSportKind, type SportKind } from "@/lib/sports";
@@ -84,6 +84,15 @@ export default function FixturesTab({
   const [recordingStats, setRecordingStats] = useState<TournamentMatch | null>(null);
   const [mode, setMode] = useState<"choose" | "manual" | "auto">("choose");
   const [regenMsg, setRegenMsg] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [editingRound, setEditingRound] = useState<string | null>(null);
+  const [roundLabelDraft, setRoundLabelDraft] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState<SettableStatus>("scheduled");
+  const [showBulkReschedule, setShowBulkReschedule] = useState(false);
+  const [bulkDate, setBulkDate] = useState("");
+  const [bulkTime, setBulkTime] = useState("17:00");
+  const [bulkCourt, setBulkCourt] = useState("");
   const errRef = useRef<HTMLDivElement | null>(null);
   const sportKind = getSportKind(tournament.sport);
 
@@ -98,12 +107,54 @@ export default function FixturesTab({
   const teamsById = new Map(teams.map((t) => [t.id, t.name]));
   const teamName = (id: string | null) => (id ? teamsById.get(id) ?? "Unknown" : "TBD");
 
+  const filteredMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return matches;
+    return matches.filter((m) => {
+      const haystack = [
+        teamName(m.team_a_id), teamName(m.team_b_id), m.round_label,
+        m.group_name ?? "", m.court_label ?? "", m.status,
+      ].join(" ").toLowerCase();
+      return haystack.includes(q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches, query, teams]);
+
   function run(action: () => Promise<unknown>) {
     setErr(null);
     startTransition(async () => {
       const res = await action();
       if (isActionError(res)) { setErr(res.message); return; }
       router.refresh();
+    });
+  }
+
+  // Fans a bulk action out over every selected match individually — the
+  // existing per-match RPCs (setMatchStatus, deleteMatch, setMatchTime)
+  // already enforce the same permission/validation rules one at a time,
+  // so this reuses them instead of adding new bulk-specific SQL.
+  function runBulk(ids: string[], action: (id: string) => Promise<unknown>) {
+    setErr(null);
+    startTransition(async () => {
+      const results = await Promise.all(ids.map((id) => action(id)));
+      const failed = results.filter(isActionError);
+      if (failed.length) {
+        setErr(
+          failed.length === ids.length
+            ? failed[0].message
+            : `${failed.length} of ${ids.length} failed: ${failed[0].message}`
+        );
+      }
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
     });
   }
 
@@ -123,7 +174,7 @@ export default function FixturesTab({
   }
 
   const rounds = new Map<string, TournamentMatch[]>();
-  for (const m of matches) {
+  for (const m of filteredMatches) {
     if (!rounds.has(m.round_label)) rounds.set(m.round_label, []);
     rounds.get(m.round_label)!.push(m);
   }
@@ -149,12 +200,25 @@ export default function FixturesTab({
 
   return (
     <div className="tc-card">
-      <div className="tc-card-t" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <div className="tc-card-t" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         Fixtures
         {matches.length > 0 && (
-          <button className="tc-btn" disabled={pending} style={{ padding: "6px 10px", fontSize: 12 }} onClick={runRegenerate}>
-            Regenerate fixtures
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <Search size={14} style={{ position: "absolute", left: 8, opacity: 0.5, pointerEvents: "none" }} />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search fixtures…"
+                aria-label="Search fixtures by team, round, or status"
+                style={{ ...inputStyle, paddingLeft: 26, fontSize: 12, width: 180 }}
+              />
+            </div>
+            <button className="tc-btn" disabled={pending} style={{ padding: "6px 10px", fontSize: 12 }} onClick={runRegenerate}>
+              Regenerate fixtures
+            </button>
+          </div>
         )}
       </div>
       <div className="tc-card-sub">
@@ -164,6 +228,86 @@ export default function FixturesTab({
       </div>
       {regenMsg && <div className="tc-card-sub" style={{ marginBottom: 10 }}>{regenMsg}</div>}
       {err && <div ref={errRef} className="tc-err">{err}</div>}
+
+      {filteredMatches.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+            <input
+              type="checkbox"
+              aria-label="Select all fixtures"
+              checked={selected.size > 0 && filteredMatches.every((m) => selected.has(m.id))}
+              ref={(el) => {
+                if (el) el.indeterminate = selected.size > 0 && !filteredMatches.every((m) => selected.has(m.id));
+              }}
+              onChange={(e) => setSelected(e.target.checked ? new Set(filteredMatches.map((m) => m.id)) : new Set())}
+            />
+            Select all{query.trim() ? " (search results)" : ""}
+          </label>
+          {selected.size > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span className="tc-dim" style={{ fontSize: 12 }}>{selected.size} selected</span>
+              <button className="tc-btn" disabled={pending} style={{ padding: "5px 8px", fontSize: 11.5 }} onClick={() => setSelected(new Set())}>
+                Clear
+              </button>
+              <select
+                value={bulkStatus} disabled={pending} aria-label="Bulk status"
+                onChange={(e) => setBulkStatus(e.target.value as SettableStatus)}
+                style={{ ...inputStyle, padding: "5px 6px", fontSize: 11.5 }}
+              >
+                {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+              </select>
+              <button
+                className="tc-btn" disabled={pending} style={{ padding: "5px 8px", fontSize: 11.5 }}
+                onClick={() => {
+                  const ids = [...selected];
+                  if (!window.confirm(`Set status to "${STATUS_LABEL[bulkStatus]}" for ${ids.length} selected match${ids.length > 1 ? "es" : ""}?`)) return;
+                  runBulk(ids, (id) => setMatchStatus(id, bulkStatus));
+                }}
+              >
+                Set status
+              </button>
+              <button
+                className="tc-btn" disabled={pending} style={{ padding: "5px 8px", fontSize: 11.5 }}
+                onClick={() => setShowBulkReschedule((v) => !v)}
+              >
+                Reschedule…
+              </button>
+              <button
+                className="tc-btn" disabled={pending} style={{ padding: "5px 8px", fontSize: 11.5, color: "#ef4444" }}
+                onClick={() => {
+                  const ids = [...selected];
+                  if (!window.confirm(`Delete ${ids.length} selected match${ids.length > 1 ? "es" : ""}? This can't be undone.`)) return;
+                  runBulk(ids, (id) => deleteMatch(id));
+                }}
+              >
+                <Trash2 size={12} style={{ verticalAlign: -2, marginRight: 4 }} />
+                Delete
+              </button>
+            </div>
+          )}
+          {selected.size > 0 && showBulkReschedule && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", width: "100%" }}>
+              <input type="date" value={bulkDate} onChange={(e) => setBulkDate(e.target.value)} style={inputStyle} aria-label="Bulk date" />
+              <input type="time" value={bulkTime} onChange={(e) => setBulkTime(e.target.value)} style={inputStyle} aria-label="Bulk time" />
+              <input
+                value={bulkCourt} onChange={(e) => setBulkCourt(e.target.value)} placeholder="Court (optional)"
+                style={{ ...inputStyle, width: 140 }} aria-label="Bulk court"
+              />
+              <button
+                className="tc-btn primary" disabled={pending || !bulkDate} style={{ padding: "5px 8px", fontSize: 11.5 }}
+                onClick={() => {
+                  const ids = [...selected];
+                  if (!window.confirm(`Set the date/time${bulkCourt.trim() ? " and court" : ""} for ${ids.length} selected match${ids.length > 1 ? "es" : ""}?`)) return;
+                  runBulk(ids, (id) => setMatchTime(id, ktmIso(bulkDate, bulkTime), null, bulkCourt.trim() || undefined, undefined));
+                  setShowBulkReschedule(false);
+                }}
+              >
+                Apply
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {canGenerateBracket && mode === "choose" ? (
         <FixtureModeChooser onChoose={setMode} />
@@ -203,10 +347,46 @@ export default function FixturesTab({
 
       {matches.length === 0 ? (
         <div className="tc-empty">No matches added yet.</div>
+      ) : filteredMatches.length === 0 ? (
+        <div className="tc-empty">No fixtures match your search.</div>
       ) : (
         [...rounds.entries()].map(([label, ms]) => (
           <div key={label} style={{ marginBottom: 26 }}>
-            <div className="tc-card-sub" style={{ fontWeight: 700, opacity: 0.8, marginBottom: 8 }}>{label}</div>
+            {editingRound === label ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                <input
+                  value={roundLabelDraft}
+                  onChange={(e) => setRoundLabelDraft(e.target.value)}
+                  style={{ ...inputStyle, fontWeight: 700, width: 200 }}
+                  aria-label="Round name"
+                  autoFocus
+                />
+                <button
+                  className="tc-btn primary" disabled={pending} style={{ padding: "5px 8px", fontSize: 11.5 }}
+                  onClick={() => {
+                    if (!roundLabelDraft.trim() || roundLabelDraft.trim() === label) { setEditingRound(null); return; }
+                    run(() => renameRound(tournament.id, label, roundLabelDraft.trim()));
+                    setEditingRound(null);
+                  }}
+                >
+                  Save
+                </button>
+                <button className="tc-btn" disabled={pending} style={{ padding: "5px 8px", fontSize: 11.5 }} onClick={() => setEditingRound(null)}>
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="tc-card-sub" style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, opacity: 0.8, marginBottom: 8 }}>
+                {label}
+                <button
+                  aria-label={`Rename ${label}`} disabled={pending}
+                  onClick={() => { setRoundLabelDraft(label); setEditingRound(label); }}
+                  style={{ background: "none", border: "none", color: "inherit", opacity: 0.5, cursor: "pointer", padding: 2, display: "flex" }}
+                >
+                  <Pencil size={12} />
+                </button>
+              </div>
+            )}
             {canAddMatches && (
               <RoundAddMatch
                 tournament={tournament} teams={teams} matches={matches} teamName={teamName} pending={pending}
@@ -215,12 +395,35 @@ export default function FixturesTab({
               />
             )}
             <table className="tc-table">
-              <thead><tr><th>Match</th><th>When</th><th>Score</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select all matches in ${label}`}
+                      checked={ms.length > 0 && ms.every((m) => selected.has(m.id))}
+                      ref={(el) => {
+                        if (el) el.indeterminate = ms.some((m) => selected.has(m.id)) && !ms.every((m) => selected.has(m.id));
+                      }}
+                      onChange={(e) =>
+                        setSelected((prev) => {
+                          const next = new Set(prev);
+                          for (const m of ms) { if (e.target.checked) next.add(m.id); else next.delete(m.id); }
+                          return next;
+                        })
+                      }
+                    />
+                  </th>
+                  <th>Match</th><th>When</th><th>Score</th><th></th>
+                </tr>
+              </thead>
               <tbody>
                 {ms.map((m) => (
                   <MatchRow
                     key={m.id} match={m} teams={teams} matches={matches} teamName={teamName} pending={pending}
                     sportKind={sportKind}
+                    selected={selected.has(m.id)}
+                    onToggleSelect={() => toggleSelected(m.id)}
                     onResult={(a, b, winnerId, et, pens, confirmCascade) => run(() => recordMatchResult(m.id, a, b, winnerId, et, pens, confirmCascade))}
                     onCricketResult={(runsA, wicketsA, oversA, runsB, wicketsB, oversB, winnerId, toss, targetRuns, confirmCascade) =>
                       run(() => recordCricketResult(m.id, runsA, wicketsA, oversA, runsB, wicketsB, oversB, winnerId, toss, targetRuns, confirmCascade))
@@ -490,12 +693,14 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
   teamName: (id: string | null) => string;
   sportKind: SportKind;
+  selected: boolean;
+  onToggleSelect: () => void;
   onResult: (
     a: number | null, b: number | null, winnerId?: string,
     extraTime?: { scoreA: number; scoreB: number }, penalties?: { scoreA: number; scoreB: number },
@@ -595,6 +800,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
 
   return (
     <tr>
+      <td>
+        <input type="checkbox" aria-label={`Select ${teamName(match.team_a_id)} vs ${teamName(match.team_b_id)}`} checked={selected} onChange={onToggleSelect} />
+      </td>
       <td>
         {editingTeams ? (
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
