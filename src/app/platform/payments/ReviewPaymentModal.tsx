@@ -18,7 +18,7 @@ export default function ReviewPaymentModal({
 }: { payment: Row; onClose: () => void; onReviewed: () => void }) {
   const [pending, startTransition] = useTransition();
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
-  const [details, setDetails] = useState<{ venue: string; date: string; time: string } | null>(null);
+  const [details, setDetails] = useState<{ venue: string; date: string; time: string; fullPrice: number | null } | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [reason, setReason] = useState<RejectionReason | "">("");
@@ -84,6 +84,17 @@ export default function ReviewPaymentModal({
         <Row label="Date" value={details?.date ?? "…"} />
         <Row label="Time" value={details?.time ?? "…"} />
         <Row label="Expected amount" value={money(payment.expected_amount)} accent />
+        {payment.advance_choice && payment.advance_choice !== "full" && (
+          <>
+            <Row
+              label="Plan"
+              value={payment.advance_choice === "percent" ? `${payment.advance_choice_value}% advance` : `${payment.advance_choice_value}-hour advance`}
+            />
+            {details?.fullPrice != null && (
+              <Row label="Balance due at venue" value={money(details.fullPrice - payment.expected_amount)} />
+            )}
+          </>
+        )}
 
         <div className="rpm-sec-t">Payment Information</div>
         <Row label="Payment method" value={payment.payment_method === "esewa" ? "eSewa" : "Khalti"} />
@@ -114,6 +125,9 @@ export default function ReviewPaymentModal({
         {confirming && (
           <div className="rpm-confirm">
             <p><ShieldCheck size={14} /> Confirm that you have verified this payment against the Sportonica merchant account.</p>
+            {payment.advance_choice && payment.advance_choice !== "full" && (
+              <p>This is an advance payment — approving marks the booking &quot;partial&quot; and notifies the venue owner that {payment.advance_choice === "percent" ? `${payment.advance_choice_value}%` : `${payment.advance_choice_value} hour(s)`} was paid, with the rest due at the venue.</p>
+            )}
             <div className="rpm-actions">
               <button className="dt-btn ok" disabled={pending} onClick={approve}>
                 {pending ? "Approving…" : "Approve Payment"}

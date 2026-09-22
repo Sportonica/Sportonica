@@ -11,6 +11,8 @@ export type BookingState =
 export type PayoutStatus = "pending" | "processing" | "settled" | "failed";
 export type PricingKind = "multiplier" | "fixed" | "discount_pct";
 
+export type AdvancePaymentMode = "full" | "percent" | "hours";
+
 export interface Venue {
   id: string;
   owner_id: string;
@@ -32,6 +34,12 @@ export interface Venue {
   cancellation_policy: string;
   house_rules: string | null;
   status: VenueStatus;
+  // 'full' = players always pay the whole price. 'percent'/'hours' offer
+  // a configured advance alongside full payment (never instead of it) —
+  // see RUN_ME_advance_payment.sql.
+  advance_payment_mode: AdvancePaymentMode;
+  advance_payment_percent: number | null;
+  advance_payment_hours: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -95,6 +103,13 @@ export interface CourtBooking {
   state: BookingState;
   payment_status: "unpaid" | "paid" | "partial" | "refunded" | "pending_verification" | "rejected";
   source: "platform" | "walk_in" | "phone";
+  // Set on payment approval when an advance (not full price) was paid —
+  // see RUN_ME_advance_payment.sql / review_payment().
+  advance_choice: AdvancePaymentMode | null;
+  advance_choice_value: number | null;
+  advance_amount: number | null;
+  balance_collected_at: string | null;
+  balance_collected_by: string | null;
   created_at: string;
   updated_at: string;
 }

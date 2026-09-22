@@ -49,6 +49,10 @@ export interface Payment {
   expected_amount: number;
   transaction_id: string;
   screenshot_path: string;
+  // What the player chose at checkout — 'full' unless a venue-configured
+  // advance option was picked. See RUN_ME_advance_payment.sql.
+  advance_choice: "full" | "percent" | "hours" | null;
+  advance_choice_value: number | null;
   status: PaymentStatus;
   rejection_reason: RejectionReason | null;
   rejection_note: string | null;
@@ -93,6 +97,9 @@ export const PAYMENT_ERROR_MESSAGES: Record<string, string> = {
   SLOT_ALREADY_BOOKED: "Another payment for this time slot was already approved. Reject this one.",
   REJECTION_REASON_REQUIRED: "Pick a reason before rejecting a payment.",
   INVALID_ACTION: "Something went wrong. Please try again.",
+  NO_ADVANCE_OPTION: "This venue doesn't offer an advance-payment option — pay in full instead.",
+  ADVANCE_NOT_SUPPORTED: "An advance payment isn't available for this kind of booking.",
+  NOT_PARTIALLY_PAID: "This booking isn't waiting on a remaining balance.",
 };
 
 export function friendlyPaymentError(message: string): string {

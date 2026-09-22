@@ -59,7 +59,11 @@ export async function submitPayment(
   bookingId: string,
   method: PaymentMethod,
   transactionId: string,
-  screenshotPath: string
+  screenshotPath: string,
+  // false = pay the venue's configured advance instead of the full price.
+  // Only meaningful for booking_type "court_booking" — see submit_payment()
+  // in RUN_ME_advance_payment.sql.
+  payFull: boolean = true
 ): Promise<Payment | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
@@ -70,6 +74,7 @@ export async function submitPayment(
     p_payment_method: method,
     p_transaction_id: transactionId,
     p_screenshot_path: screenshotPath,
+    p_pay_full: payFull,
   });
   if (error) return actionError(friendlyPaymentError(error.message));
 

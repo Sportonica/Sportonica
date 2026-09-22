@@ -6,6 +6,7 @@ import { notifyCourtBooked } from "@/lib/mail/notify";
 import { actionError, type ActionError } from "@/lib/actionError";
 import { friendlyBookingError } from "@/lib/bookings/types";
 import { isValidLocalPhone } from "@/lib/validation/identity";
+import { friendlyPaymentError } from "@/lib/payments/types";
 
 // Columns a venue owner may set/change themselves. verification_status,
 // payout_cap, owner_id, status and the like are platform-controlled —
@@ -14,7 +15,9 @@ import { isValidLocalPhone } from "@/lib/validation/identity";
 const VENUE_OWNER_FIELDS = new Set([
   "name", "venue_type", "address", "phone", "sports", "amenities",
   "lat", "lng", "maps_url", "description", "photos", "opening_hours",
+  "advance_payment_mode", "advance_payment_percent", "advance_payment_hours",
 ]);
+const ADVANCE_PAYMENT_MODES = new Set(["full", "percent", "hours"]);
 function pickVenueFields(patch: Record<string, unknown>) {
   return Object.fromEntries(
     Object.entries(patch).filter(([k]) => VENUE_OWNER_FIELDS.has(k)),
@@ -100,6 +103,26 @@ export async function updateVenue(id: string, patch: Record<string, unknown>) {
   const safe = pickVenueFields(patch);
   if (typeof safe.phone === "string" && !isValidLocalPhone(safe.phone)) {
     return actionError("Phone number must contain exactly 10 digits.");
+  }
+  // Mirrors the DB's venues_advance_payment_shape_check constraint — catch
+  // a bad payload here with a friendly message instead of a raw Postgres
+  // constraint-violation error.
+  if ("advance_payment_mode" in safe) {
+    const mode = safe.advance_payment_mode;
+    if (typeof mode !== "string" || !ADVANCE_PAYMENT_MODES.has(mode)) {
+      return actionError("That isn't a valid advance-payment option.");
+    }
+    const percent = safe.advance_payment_percent;
+    const hours = safe.advance_payment_hours;
+    if (mode === "percent" && !(typeof percent === "number" && percent > 0 && percent < 100)) {
+      return actionError("Enter a percentage between 1 and 99.");
+    }
+    if (mode === "hours" && !(typeof hours === "number" && hours > 0)) {
+      return actionError("Enter how many hours' worth of the price to charge upfront.");
+    }
+    if (mode === "full") { safe.advance_payment_percent = null; safe.advance_payment_hours = null; }
+    if (mode === "percent") safe.advance_payment_hours = null;
+    if (mode === "hours") safe.advance_payment_percent = null;
   }
   if (Object.keys(safe).length === 0) return actionError("Nothing to update.");
   const { data, error } = await sb.from("venues").update(safe).eq("id", id).select().single();
@@ -339,6 +362,22 @@ export async function setBookingState(id: string, venue_id: string, state: strin
   if (error) { console.error("[setBookingState]", error.message); return actionError("Could not update that booking."); }
   revalidatePath(`/admin/venues/${venue_id}/bookings`);
   revalidatePath(`/admin/venues/${venue_id}/calendar`);
+}
+
+// Marks a partially-paid booking's remaining balance as collected in
+// person (cash etc. at the venue) — the advance-payment counterpart to
+// setBookingState() above, same staff gate. See RUN_ME_advance_payment.sql
+// / mark_balance_collected().
+export async function markBalanceCollected(id: string, venue_id: string) {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venue_id, "staff"))) return actionError("FORBIDDEN");
+  const { data, error } = await sb.rpc("mark_balance_collected", { p_booking_id: id });
+  if (error) return actionError(friendlyPaymentError(error.message));
+  revalidatePath("/admin/bookings");
+  revalidatePath(`/admin/venues/${venue_id}/bookings`);
+  revalidatePath(`/admin/venues/${venue_id}/calendar`);
+  return data;
 }
 
 // ── PRICING RULES ────────────────────────────────────────────────

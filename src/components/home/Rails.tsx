@@ -14,7 +14,10 @@ function when(iso: string) {
   const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: KTM });
   if (key(d) === key(new Date())) return `Tonight · ${time}`;
   if (key(d) === key(new Date(Date.now() + 864e5))) return `Tomorrow · ${time}`;
-  return `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: KTM })} · ${time}`;
+  // No weekday here (unlike the fixtures list elsewhere) — this pill sits
+  // in a narrow column between two team badges, and "Thu 24 Sept · 08:00"
+  // was wide enough to overflow the pill and overlap the team names below it.
+  return `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: KTM })} · ${time}`;
 }
 
 /** Shared shell: title, "see all" link, arrows, horizontal scroller. */
