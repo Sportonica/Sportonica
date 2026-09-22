@@ -134,6 +134,7 @@ export interface TournamentTeam {
   // meant to be visible to anyone browsing the tournament.
   manager_name: string | null;
   manager_phone: string | null;
+  manager_email: string | null;
   coach_name: string | null;
   coach_phone: string | null;
   logo_url: string | null;

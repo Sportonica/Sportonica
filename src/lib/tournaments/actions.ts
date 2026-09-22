@@ -800,13 +800,13 @@ export async function deleteTournamentTeam(teamId: string): Promise<void | Actio
 // coach) after the fact (registered without one, or fixing a typo).
 export async function updateTeamManager(
   teamId: string, managerName?: string, managerPhone?: string,
-  coachName?: string, coachPhone?: string,
+  coachName?: string, coachPhone?: string, managerEmail?: string,
 ): Promise<TournamentTeam | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb.rpc("update_team_manager", {
     p_team_id: teamId, p_manager_name: managerName || null, p_manager_phone: managerPhone || null,
-    p_coach_name: coachName || null, p_coach_phone: coachPhone || null,
+    p_coach_name: coachName || null, p_coach_phone: coachPhone || null, p_manager_email: managerEmail || null,
   });
   if (error) return actionError(friendlyTournamentError(error.message));
   return data as TournamentTeam;
