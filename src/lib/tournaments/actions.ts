@@ -866,6 +866,24 @@ export async function createMatch(input: {
   return data as TournamentMatch;
 }
 
+// Renames every match sharing a round label at once — e.g. after
+// auto-generating "Round of 64", an organizer who wants "Phase 1"
+// instead doesn't have to edit each match by hand.
+export async function renameRound(
+  tournamentId: string, oldLabel: string, newLabel: string
+): Promise<TournamentMatch[] | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("rename_round", {
+    p_tournament_id: tournamentId, p_old_label: oldLabel, p_new_label: newLabel,
+  });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  revalidatePath(`/organize/tournaments/${tournamentId}`);
+  revalidatePath(`/platform/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return data as TournamentMatch[];
+}
+
 export async function deleteMatch(matchId: string): Promise<void | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
