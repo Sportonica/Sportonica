@@ -63,6 +63,31 @@ Sportonica`,
   };
 }
 
+// ── 2b. Venue owner: an advance payment was approved ────────────
+// Sent instead of/alongside the normal "new booking" mail when the
+// player paid only the venue's configured advance — tells the owner
+// how much is still owed and that it's collected in person.
+export function venueAdvancePaymentApproved(p: {
+  to: string; venue: string; court: string; playerName: string;
+  startsAt: string; amountPaid: number; balanceDue: number; plan: string;
+}): Mail {
+  return {
+    to: p.to,
+    subject: `Advance paid: ${p.court}, ${fmtWhen(p.startsAt)}`,
+    body: `${p.playerName} paid the advance for their booking at ${p.venue} — the slot is confirmed.
+
+  Court        ${p.court}
+  When         ${fmtWhen(p.startsAt)}
+  Plan         ${p.plan}
+  Paid now     ${rs(p.amountPaid)}
+  Balance due  ${rs(p.balanceDue)} (collect at the venue)
+
+Once you've collected the rest, mark it as paid from your Bookings list.
+
+— Sportonica`,
+  };
+}
+
 // ── 3. Host opened their game to players ────────────────────────
 export function hostGameLive(p: {
   to: string; hostName: string; sport: string; venue: string;

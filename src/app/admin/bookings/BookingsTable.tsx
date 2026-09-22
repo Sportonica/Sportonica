@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, UserX, LogIn, X } from "lucide-react";
-import { setBookingState } from "@/lib/admin/actions";
+import { setBookingState, markBalanceCollected } from "@/lib/admin/actions";
 import { isActionError } from "@/lib/actionError";
 import type { CourtBooking, Court } from "@/lib/admin/types";
 import { BookingBadge, PaymentStatusBadge, money, timeRange, dayLabel } from "../ui";
@@ -30,6 +30,19 @@ export default function BookingsTable({ bookings, courts }: { bookings: CourtBoo
     const who = b.source === "walk_in" ? "walk-in" : b.source === "phone" ? "phone" : "player";
     if (!window.confirm(`Cancel this ${who} booking? The slot becomes available again immediately.`)) return;
     act(b, "cancelled");
+  }
+
+  function collectBalance(b: CourtBooking) {
+    const balance = Number(b.price) - Number(b.advance_amount ?? 0);
+    if (!window.confirm(`Mark the remaining Rs ${Math.round(balance).toLocaleString("en-IN")} as collected for this booking?`)) return;
+    setBusyId(b.id);
+    setErr(null);
+    startTransition(async () => {
+      const res = await markBalanceCollected(b.id, b.venue_id);
+      setBusyId(null);
+      if (isActionError(res)) { setErr(res.message); return; }
+      router.refresh();
+    });
   }
 
   const filtered = bookings.filter((b) => {
@@ -76,7 +89,14 @@ export default function BookingsTable({ bookings, courts }: { bookings: CourtBoo
                   </td>
                   <td className="adm-num">{money(Number(b.price))}</td>
                   <td><BookingBadge state={b.state} /></td>
-                  <td><PaymentStatusBadge status={b.payment_status} /></td>
+                  <td>
+                    <PaymentStatusBadge status={b.payment_status} />
+                    {b.payment_status === "partial" && (
+                      <div className="adm-num adm-dim" style={{ fontSize: 11, marginTop: 2 }}>
+                        {money(Number(b.advance_amount ?? 0))} of {money(Number(b.price))} paid
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <div className="adm-flex" style={{ gap: 6, justifyContent: "flex-end" }}>
                       {canCheckIn && (
@@ -99,6 +119,12 @@ export default function BookingsTable({ bookings, courts }: { bookings: CourtBoo
                         <button className="adm-btn sm ghost danger" disabled={pending && busyId === b.id}
                           onClick={() => cancel(b)} title="Cancel booking: frees this slot for new bookings">
                           <X size={13} /> Cancel
+                        </button>
+                      )}
+                      {b.payment_status === "partial" && (
+                        <button className="adm-btn sm ghost" disabled={pending && busyId === b.id}
+                          onClick={() => collectBalance(b)} title="Mark the remaining balance as collected">
+                          <Check size={13} /> Mark balance collected
                         </button>
                       )}
                     </div>

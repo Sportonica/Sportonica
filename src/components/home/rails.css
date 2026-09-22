@@ -220,10 +220,16 @@
 .rc-match-bigscore.vs { font-size: 15px; opacity: 0.75; letter-spacing: 0.08em; }
 
 .rc-match-pill {
-  display: inline-flex; align-items: center; gap: 6px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 800; letter-spacing: 0.03em;
   color: rgba(255,255,255,.85); background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
-  padding: 4px 12px; border-radius: 999px; white-space: nowrap;
+  padding: 4px 10px; border-radius: 12px; text-align: center; line-height: 1.4;
+  /* No white-space: nowrap / border-radius: 999px here on purpose — this
+     pill sits in a narrow column between two team badges. Nowrap text
+     ignores the flex item's stretched width (min-width:auto) and overflows
+     past it, overlapping the team names below; wrapping onto a second line
+     instead keeps it inside its own box no matter how long the date text
+     gets in any locale. */
 }
 [data-theme="paper"] .rc-match-pill {
   color: rgba(20,23,30,.75); background: rgba(20,23,30,0.06); border-color: rgba(20,23,30,0.16);

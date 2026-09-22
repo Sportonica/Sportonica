@@ -14,6 +14,7 @@ import WeekStrip from "./WeekStrip";
 import type { PricingRule } from "@/lib/play/pricing";
 import { priceFor, offerLabel, whenLabel } from "@/lib/play/priceCalc";
 import type { Court, CourtHours } from "@/lib/admin/types";
+import { computeAdvanceOption, type AdvanceConfig } from "@/lib/play/advancePayment";
 import type { SkillLevel } from "@/lib/playTogether/types";
 import SkillLevelPicker, { SKILL_LEVEL_LABEL } from "@/components/playTogether/SkillLevelPicker";
 import { useHardwareBack } from "@/lib/capacitor/hardwareBack";
@@ -46,7 +47,7 @@ function fmtHM(hour: number) {
 const JOIN_DEADLINE_BUFFER_MINS = 15;
 
 export default function BookingFlow({
-  venueName, courts, hoursByCourt, initialDate, initialHour, rules = [],
+  venueName, courts, hoursByCourt, initialDate, initialHour, rules = [], advancePayment,
 }: {
   venueName: string;
   courts: Court[];
@@ -54,6 +55,7 @@ export default function BookingFlow({
   initialDate?: string;
   initialHour?: number;
   rules?: PricingRule[];
+  advancePayment: AdvanceConfig;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -368,6 +370,9 @@ export default function BookingFlow({
             bookingType="court_booking"
             bookingId={awaitingPayment.id}
             amount={awaitingPayment.price}
+            // Play Together host bookings keep the existing "host pays
+            // full, players reimburse a share" model — no advance choice.
+            advanceOption={!needPlayers ? computeAdvanceOption(awaitingPayment.price, duration, advancePayment) : null}
             summary={[
               { label: "Venue", value: venueName },
               { label: "Sport", value: court?.sport ?? "—" },

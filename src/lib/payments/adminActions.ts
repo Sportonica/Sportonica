@@ -235,6 +235,10 @@ async function attachDisplayInfo(
 // venue/date details.
 export async function getPaymentBookingDetails(paymentId: string): Promise<{
   venue: string; date: string; time: string;
+  // The booking's full contracted price — only set for court_booking, so
+  // the reviewer can tell an advance-payment amount apart from the total
+  // (see advance_choice/advance_choice_value on the Payment itself).
+  fullPrice: number | null;
 } | ActionError> {
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.error;
@@ -250,7 +254,7 @@ export async function getPaymentBookingDetails(paymentId: string): Promise<{
 
   if (payment.booking_type === "court_booking") {
     const { data: booking } = await sb
-      .from("court_bookings").select("starts_at, ends_at, venue_id").eq("id", payment.court_booking_id).maybeSingle();
+      .from("court_bookings").select("starts_at, ends_at, venue_id, price").eq("id", payment.court_booking_id).maybeSingle();
     const { data: venue } = booking?.venue_id
       ? await sb.from("venues").select("name").eq("id", booking.venue_id).maybeSingle()
       : { data: null };
@@ -260,6 +264,7 @@ export async function getPaymentBookingDetails(paymentId: string): Promise<{
       time: booking?.starts_at && booking?.ends_at
         ? `${fmt(booking.starts_at).split(", ").pop()} – ${fmt(booking.ends_at).split(", ").pop()}`
         : "—",
+      fullPrice: booking?.price != null ? Number(booking.price) : null,
     };
   }
 
@@ -274,6 +279,7 @@ export async function getPaymentBookingDetails(paymentId: string): Promise<{
       venue: t?.venues?.name ?? "—",
       date: t?.starts_at ? fmt(t.starts_at) : "—",
       time: team?.name ? `Team: ${team.name}` : "—",
+      fullPrice: null,
     };
   }
 
@@ -285,6 +291,7 @@ export async function getPaymentBookingDetails(paymentId: string): Promise<{
     venue: event?.venue ?? "—",
     date: event?.event_date ? fmt(event.event_date) : "—",
     time: event?.event_date ? fmt(event.event_date).split(", ").pop() ?? "—" : "—",
+    fullPrice: null,
   };
 }
 

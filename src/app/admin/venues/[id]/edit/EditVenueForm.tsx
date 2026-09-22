@@ -8,7 +8,7 @@ import { Upload, Link2, X, Check, Trash2, Star, MapPin, ExternalLink } from "luc
 import { updateVenue, uploadVenuePhoto, addVenuePhotoUrl, removeVenuePhoto } from "@/lib/admin/actions";
 import { saveVenueLocation } from "@/lib/admin/location";
 import { isActionError } from "@/lib/actionError";
-import type { Venue } from "@/lib/admin/types";
+import type { Venue, AdvancePaymentMode } from "@/lib/admin/types";
 
 
 const AMENITIES = ["Floodlights", "Parking", "Changing room", "Water", "Showers", "Seating", "Equipment rental"];
@@ -40,6 +40,11 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
   );
   const [locBusy, setLocBusy] = useState(false);
   const [locErr, setLocErr] = useState<string | null>(null);
+
+  // Advance payment
+  const [advMode, setAdvMode] = useState<AdvancePaymentMode>(venue.advance_payment_mode);
+  const [advPercent, setAdvPercent] = useState(venue.advance_payment_percent?.toString() ?? "");
+  const [advHours, setAdvHours] = useState(venue.advance_payment_hours?.toString() ?? "");
 
   function captureLocation() {
     if (!mapsUrl.trim()) return;
@@ -113,12 +118,23 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
 
   function save() {
     setMsg(null);
+    if (advMode === "percent" && !(Number(advPercent) > 0 && Number(advPercent) < 100)) {
+      setMsg("Enter a percentage between 1 and 99.");
+      return;
+    }
+    if (advMode === "hours" && !(Number(advHours) > 0)) {
+      setMsg("Enter how many hours' worth of the price to charge upfront.");
+      return;
+    }
     startTransition(async () => {
       try {
         const res = await updateVenue(venue.id, {
           name: name.trim(), venue_type: type, address: address.trim() || null,
           phone: phone.trim() || null, description: description.trim() || null,
           sports, amenities,
+          advance_payment_mode: advMode,
+          advance_payment_percent: advMode === "percent" ? Number(advPercent) : null,
+          advance_payment_hours: advMode === "hours" ? Number(advHours) : null,
         });
         if (isActionError(res)) { setMsg(res.message); return; }
         setSaved(true);
@@ -226,6 +242,44 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
             >
               <ExternalLink size={13} /> Preview
             </a>
+          </div>
+        )}
+      </div>
+
+      {/* ADVANCE PAYMENT */}
+      <div className="adm-card" style={{ marginBottom: 20 }}>
+        <div className="adm-card-t">Advance payment</div>
+        <div className="adm-card-sub">
+          Players always see the option to pay in full. You can also offer one alternative — a percentage of the price, or the cost of a set number of hours — to secure a slot with less upfront. Any remaining balance is settled however you normally collect it at the venue; mark it collected from your Bookings list once you have.
+        </div>
+
+        <div className="adm-field">
+          <label className="adm-label">Alternative to full payment</label>
+          <select className="adm-select" value={advMode} onChange={(e) => setAdvMode(e.target.value as AdvancePaymentMode)}>
+            <option value="full">None — full payment only</option>
+            <option value="percent">Percentage of price</option>
+            <option value="hours">Cost of a set number of hours</option>
+          </select>
+        </div>
+
+        {advMode === "percent" && (
+          <div className="adm-field">
+            <label className="adm-label">Advance percentage (e.g. 20)</label>
+            <input
+              className="adm-input" type="number" min={1} max={99} value={advPercent}
+              onChange={(e) => setAdvPercent(e.target.value)} placeholder="20"
+              style={{ maxWidth: 140 }}
+            />
+          </div>
+        )}
+        {advMode === "hours" && (
+          <div className="adm-field">
+            <label className="adm-label">Advance = cost of how many hours (e.g. 1)</label>
+            <input
+              className="adm-input" type="number" min={0.5} step={0.5} value={advHours}
+              onChange={(e) => setAdvHours(e.target.value)} placeholder="1"
+              style={{ maxWidth: 140 }}
+            />
           </div>
         )}
       </div>

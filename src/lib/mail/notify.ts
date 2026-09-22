@@ -9,7 +9,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { sendMail } from "./mailer";
 import {
-  playerBooked, venueNewBooking, hostGameLive, playerJoined, hostSomeoneJoined,
+  playerBooked, venueNewBooking, venueAdvancePaymentApproved, hostGameLive, playerJoined, hostSomeoneJoined,
   paymentSubmitted, paymentApproved, paymentRejected,
   playTogetherGamePublished, playTogetherPlayerJoined, playTogetherHostRosterChanged,
   playTogetherGameCancelled, playTogetherJoinRequested, playTogetherJoinRejected,
@@ -597,17 +597,23 @@ async function paymentContext(paymentId: string) {
       endsAt: t?.ends_at ?? null,
       tournamentId: t?.id ?? null,
       tournamentOwnerId: t?.owner_id ?? null,
+      venueOwnerId: null as string | null,
+      courtName: null as string | null,
+      fullPrice: null as number | null,
     };
   }
 
   if (payment.booking_type === "court_booking") {
     const { data: booking } = await sb
       .from("court_bookings")
-      .select("starts_at, ends_at, venue_id")
+      .select("starts_at, ends_at, venue_id, price, court_id")
       .eq("id", payment.court_booking_id)
       .maybeSingle();
     const { data: venue } = booking?.venue_id
-      ? await sb.from("venues").select("name").eq("id", booking.venue_id).maybeSingle()
+      ? await sb.from("venues").select("name, owner_id").eq("id", booking.venue_id).maybeSingle()
+      : { data: null };
+    const { data: court } = booking?.court_id
+      ? await sb.from("courts").select("name").eq("id", booking.court_id).maybeSingle()
       : { data: null };
     return {
       payment, label, customerName,
@@ -616,6 +622,10 @@ async function paymentContext(paymentId: string) {
       endsAt: booking?.ends_at ?? new Date().toISOString(),
       tournamentId: null as string | null,
       tournamentOwnerId: null as string | null,
+      // advance-payment additions
+      venueOwnerId: venue?.owner_id ?? null,
+      courtName: court?.name ?? "Court",
+      fullPrice: booking?.price != null ? Number(booking.price) : null,
     };
   }
 
@@ -635,6 +645,9 @@ async function paymentContext(paymentId: string) {
     startsAt, endsAt,
     tournamentId: null as string | null,
     tournamentOwnerId: null as string | null,
+    venueOwnerId: null as string | null,
+    courtName: null as string | null,
+    fullPrice: null as number | null,
   };
 }
 
@@ -720,6 +733,34 @@ export async function notifyPaymentReviewed(paymentId: string) {
         : `Payment verified. Your booking is confirmed. Rs ${Math.round(ctx.payment.expected_amount)} · ${ctx.label}`,
       tournamentId: ctx.tournamentId,
     });
+
+    // Advance payment (not full price) on a court booking — tell the
+    // venue owner how much came in and what's still owed, since
+    // otherwise they'd only see "confirmed" with no hint it's partial.
+    if (
+      ctx.payment.booking_type === "court_booking"
+      && ctx.payment.advance_choice && ctx.payment.advance_choice !== "full"
+      && ctx.venueOwnerId && ctx.fullPrice != null
+    ) {
+      const balanceDue = ctx.fullPrice - ctx.payment.expected_amount;
+      const plan = ctx.payment.advance_choice === "percent"
+        ? `${ctx.payment.advance_choice_value}% advance`
+        : `${ctx.payment.advance_choice_value}-hour advance`;
+      const ownerEmail = await emailFor(ctx.venueOwnerId);
+      if (ownerEmail) {
+        await sendMail(venueAdvancePaymentApproved({
+          to: ownerEmail, venue: ctx.venueName, court: ctx.courtName ?? "Court",
+          playerName: ctx.customerName, startsAt: ctx.startsAt,
+          amountPaid: ctx.payment.expected_amount, balanceDue, plan,
+        }));
+      }
+      await writeNotification(sb, {
+        userId: ctx.venueOwnerId,
+        kind: "advance_payment_received",
+        title: "Advance payment received",
+        body: `${ctx.customerName} paid the ${plan} — Rs ${Math.round(ctx.payment.expected_amount)} now, Rs ${Math.round(balanceDue)} due at the venue. ${ctx.label}`,
+      });
+    }
   } else if (ctx.payment.status === "REJECTED") {
     const isTournament = ctx.payment.booking_type === "tournament_registration";
     const reason = REJECTION_REASONS[ctx.payment.rejection_reason ?? "other"] ?? "Payment could not be verified";

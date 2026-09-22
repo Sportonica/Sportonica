@@ -87,6 +87,11 @@ export default async function VenueBookingPage({
           initialDate={date}
           initialHour={timeMins != null ? timeMins / 60 : undefined}
           rules={pricingRules}
+          advancePayment={{
+            mode: venue.advance_payment_mode,
+            percent: venue.advance_payment_percent,
+            hours: venue.advance_payment_hours,
+          }}
         />
       </div>
     </div>

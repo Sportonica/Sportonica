@@ -49,9 +49,12 @@ export default function PaymentStep({
   summary,
   footer,
   hostMethod,
+  advanceOption,
+  fullLabel = "Pay in full",
 }: {
   bookingType: BookingType;
   bookingId: string;
+  /** The full/contracted price — stays this even when an advance option is offered. */
   amount: number;
   /** Booking summary rows (venue, date, time, court/sport…) shown above the amount — whatever context the caller already has. */
   summary?: { label: string; value: string }[];
@@ -59,9 +62,14 @@ export default function PaymentStep({
   footer?: React.ReactNode;
   /** Pay a fixed recipient (tournament host QR) instead of the platform method picker. */
   hostMethod?: HostMethod;
+  /** When set, the player can choose this venue-configured advance amount instead of paying in full. Full payment is always offered alongside it. */
+  advanceOption?: { label: string; amount: number } | null;
+  fullLabel?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [choice, setChoice] = useState<"full" | "advance">("full");
+  const payAmount = choice === "advance" && advanceOption ? advanceOption.amount : amount;
   // Paying a tournament host directly — the recipient is fixed, so there's
   // no platform-method lookup to wait on.
   const [methods, setMethods] = useState<PaymentMethodConfig[] | null>(hostMethod ? [] : null);
@@ -126,7 +134,7 @@ export default function PaymentStep({
           if (path.message === "UNAUTHORIZED") { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
           setErr(path.message); return;
         }
-        const payment = await submitPayment(bookingType, bookingId, method, transactionId.trim(), path);
+        const payment = await submitPayment(bookingType, bookingId, method, transactionId.trim(), path, choice === "full");
         if (isActionError(payment)) {
           if (payment.message === "UNAUTHORIZED") { router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`); return; }
           setErr(payment.message); return;
@@ -149,6 +157,12 @@ export default function PaymentStep({
             <Row label="Booking" value={bookingLabel(bookingType, bookingId)} />
             {summary?.map((s) => <Row key={s.label} label={s.label} value={s.value} />)}
             <Row label="Amount" value={rs(submitted.expected_amount)} />
+            {submitted.advance_choice && submitted.advance_choice !== "full" && (
+              <>
+                <Row label="Plan" value={advanceOption?.label ?? "Advance payment"} />
+                <Row label="Balance due at venue" value={rs(amount - submitted.expected_amount)} />
+              </>
+            )}
             <Row label="Payment" value={METHOD_LABELS[submitted.payment_method]} />
             <Row label="Transaction" value={submitted.transaction_id} />
             <Row label="Status" value="Awaiting Verification" accent />
@@ -173,9 +187,35 @@ export default function PaymentStep({
         </div>
       )}
 
+      {advanceOption && (
+        <div className="pymt-methods" role="radiogroup" aria-label="How much to pay now">
+          <button
+            type="button"
+            className={`pymt-method ${choice === "full" ? "on" : ""}`}
+            aria-pressed={choice === "full"}
+            onClick={() => setChoice("full")}
+          >
+            {fullLabel} — {rs(amount)}
+          </button>
+          <button
+            type="button"
+            className={`pymt-method ${choice === "advance" ? "on" : ""}`}
+            aria-pressed={choice === "advance"}
+            onClick={() => setChoice("advance")}
+          >
+            {advanceOption.label} — {rs(advanceOption.amount)}
+          </button>
+        </div>
+      )}
+
       <div className="pymt-amt">
         <span className="pymt-amt-lbl">Amount to Pay</span>
-        <span className="pymt-amt-val">{rs(amount)}</span>
+        <span className="pymt-amt-val">{rs(payAmount)}</span>
+        {advanceOption && choice === "advance" && (
+          <div className="pymt-hint" style={{ marginTop: 4 }}>
+            Rs {(amount - advanceOption.amount).toLocaleString("en-IN")} due at the venue
+          </div>
+        )}
       </div>
 
       {!hostMethod && methods === null ? (
@@ -224,7 +264,7 @@ export default function PaymentStep({
               <div className="pymt-done-rows" style={{ marginTop: 14 }}>
                 <Row label={hostMethod ? "Pay to" : "Merchant"} value={panelMerchant || "—"} />
                 <Row label={METHOD_LABELS[(hostMethod ? hostMethod.method : active!.method)]} value={panelAccount || "—"} />
-                <Row label="Amount" value={rs(amount)} accent />
+                <Row label="Amount" value={rs(payAmount)} accent />
               </div>
 
               <ol className="pymt-steps">
