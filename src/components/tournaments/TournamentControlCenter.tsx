@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Plus, Trash2, X, Users, UserPlus, Pencil, Download } from "lucide-react";
@@ -26,6 +26,8 @@ import StandingsTab from "./StandingsTab";
 import RaceResultsTab from "./RaceResultsTab";
 import AnnouncementsTab from "./AnnouncementsTab";
 import TournamentAccessTab from "./TournamentAccessTab";
+import TeamBulkBar, { type BulkNote } from "./TeamBulkBar";
+import { sortTeamsByName, canMarkWalkinPaid, runOneByOne, describeBulkResult, SIGNED_OUT_MESSAGE } from "@/lib/tournaments/teamBulk";
 import ReviewPaymentModal from "@/app/platform/payments/ReviewPaymentModal";
 import TournamentPaymentReviewModal from "./TournamentPaymentReviewModal";
 import "./tournament-console.css";
@@ -84,6 +86,9 @@ export default function TournamentControlCenter({
   const [managingRoster, setManagingRoster] = useState<TeamRow | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());   // Registrations table selection
+  const [bulkProgress, setBulkProgress] = useState<string | null>(null);
+  const [bulkNote, setBulkNote] = useState<BulkNote | null>(null);
 
   const confirmedTeams = teams.filter((t) => t.status === "confirmed").length;
   const finesByTeam = new Map((teamFines ?? []).map((f) => [f.team_id, f.total_fine]));
@@ -103,6 +108,64 @@ export default function TournamentControlCenter({
       const res = await action();
       if (isActionError(res)) { setErr(res.message); return; }
       if (successMsg) { setConfirmMsg(successMsg); setTimeout(() => setConfirmMsg(null), 4000); }
+      router.refresh();
+    });
+  }
+
+  // Registrations table: alphabetical by team name, with bulk selection. `selected` can still hold
+  // ids of teams that have since been deleted, so only teams still in the list count.
+  const sortedTeams = useMemo(() => sortTeamsByName(teams), [teams]);
+  const selectedTeams = sortedTeams.filter((t) => selected.has(t.id));
+  const markableTeams = selectedTeams.filter(canMarkWalkinPaid);
+  const allSelected = sortedTeams.length > 0 && selectedTeams.length === sortedTeams.length;
+
+  function toggleTeam(id: string) {
+    setSelected((prev) => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next; });
+  }
+  function toggleAllTeams() {
+    setSelected(allSelected ? new Set() : new Set(sortedTeams.map((t) => t.id)));
+  }
+
+  // Bulk "Mark paid" / "Delete": the same actions as the row buttons, run one team at a time
+  // (deleting rebuilds unplayed fixtures, so parallel runs could race), with progress, and any
+  // team that can't be processed is named instead of silently skipped.
+  function runBulk(kind: "paid" | "delete") {
+    const targets = kind === "paid" ? markableTeams : selectedTeams;
+    const n = targets.length;
+    if (n === 0) return;
+    const noun = `${n} team${n === 1 ? "" : "s"}`;
+    const skipped = selectedTeams.length - n;
+    const question = kind === "paid"
+      ? `Mark ${noun} as paid? ${n === 1 ? "It" : "They"} will be confirmed for the tournament.`
+        + (skipped > 0 ? ` ${skipped} other selected team${skipped === 1 ? " isn't a walk-in waiting for payment and is" : "s aren't walk-ins waiting for payment and are"} left as they are.` : "")
+      : `Delete ${n > 1 && n === sortedTeams.length ? `EVERY team in this tournament (${n})` : noun}? This permanently removes ${n === 1 ? "it and its roster" : "them and their rosters"}, and unplayed fixtures will be rebuilt. A team that has already played a match can't be deleted and will be skipped.`;
+    if (!window.confirm(question)) return;
+
+    const verb = kind === "paid" ? "Marking as paid" : "Deleting";
+    const names = new Map(targets.map((t) => [t.id, t.name]));
+    setErr(null);
+    setConfirmMsg(null);
+    setBulkNote(null);
+    startTransition(async () => {
+      setBulkProgress(`${verb} 0 of ${n}…`);
+      const result = await runOneByOne(
+        targets.map((t) => t.id),
+        async (id) => {
+          const res = kind === "paid" ? await markWalkinTeamPaid(id, tournament.id) : await deleteTournamentTeam(id);
+          if (!isActionError(res)) return null;
+          return res.message === "UNAUTHORIZED" ? SIGNED_OUT_MESSAGE : res.message;
+        },
+        { onProgress: (done, total) => setBulkProgress(`${verb} ${done} of ${total}…`), stopOn: (m) => m === SIGNED_OUT_MESSAGE },
+      );
+      setBulkProgress(null);
+      // Teams that went through are done; any that failed stay selected so they are easy to spot and retry.
+      setSelected((prev) => { const next = new Set(prev); result.done.forEach((id) => next.delete(id)); return next; });
+      const { ok, problem } = describeBulkResult(kind === "paid" ? "marked as paid" : "deleted", result, (id) => names.get(id) ?? "A team");
+      if (problem) setBulkNote({ kind: "problem", text: [ok, problem].filter(Boolean).join(" ") });
+      else if (ok) {
+        setBulkNote({ kind: "ok", text: ok });
+        setTimeout(() => setBulkNote((cur) => (cur?.kind === "ok" ? null : cur)), 6000);
+      }
       router.refresh();
     });
   }
@@ -230,15 +293,29 @@ export default function TournamentControlCenter({
               </button>
             </div>
           </div>
+          {teams.length > 0 && (
+            <TeamBulkBar
+              total={sortedTeams.length} selectedCount={selectedTeams.length} markableCount={markableTeams.length}
+              allSelected={allSelected} busy={pending} progress={bulkProgress} note={bulkNote}
+              onToggleAll={toggleAllTeams} onMarkPaid={() => runBulk("paid")} onDelete={() => runBulk("delete")}
+              onDismissNote={() => setBulkNote(null)}
+            />
+          )}
           {teams.length === 0 ? (
             <div className="tc-empty">No teams have registered yet.</div>
           ) : (
             <table className="tc-table stk">
               <thead><tr><th>Team</th><th>Roster</th><th>Status</th>{trackingFines && <th>Fines</th>}<th></th></tr></thead>
               <tbody>
-                {teams.map((t) => (
-                  <tr key={t.id}>
+                {sortedTeams.map((t) => (
+                  <tr key={t.id} className={selected.has(t.id) ? "tc-sel" : undefined}>
                     <td style={{ fontWeight: 600 }}>
+                      <label className="tc-pick">
+                        <input
+                          type="checkbox" className="tc-check" checked={selected.has(t.id)} disabled={pending}
+                          onChange={() => toggleTeam(t.id)} aria-label={`Select ${t.name}`}
+                        />
+                      </label>
                       {renamingId === t.id ? (
                         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                           <input

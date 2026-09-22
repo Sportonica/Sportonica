@@ -9,7 +9,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "mailcheck": "node scripts/mailcheck.mjs",
-    "test:validation": "node --experimental-strip-types scripts/validate-identity.mjs"
+    "test:validation": "node --experimental-strip-types scripts/validate-identity.mjs",
+    "test:bulk": "node --experimental-strip-types scripts/validate-team-bulk.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
