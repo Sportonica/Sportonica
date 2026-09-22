@@ -28,7 +28,7 @@ export default async function MessagesPage() {
       <ChatTabs />
 
       {conversations.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "48px 20px", opacity: 0.5 }}>
+        <div style={{ textAlign: "center", padding: "48px 20px", opacity: 0.8 }}>
           <MessageCircle size={26} style={{ opacity: 0.5, marginBottom: 10 }} />
           <div style={{ fontSize: 13.5 }}>No conversations yet. Message a friend from their player card.</div>
         </div>

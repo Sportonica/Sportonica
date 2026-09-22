@@ -534,7 +534,7 @@ export default function PlayTogetherWizard({
         }
         [data-theme="paper"] .bkw-bar { background: rgba(248,245,240,0.94); }
         .bkw-price { display: flex; flex-direction: column; line-height: 1.25; }
-        .bkw-price .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .5; }
+        .bkw-price .lbl { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .75; }
         .bkw-price .val { font-family: 'Inter', sans-serif; font-size: 19px; font-weight: 700; }
         .bkw-price .sub { font-size: 11.5px; opacity: .55; }
         .bkw-nav { display: flex; gap: 8px; }
@@ -549,7 +549,7 @@ export default function PlayTogetherWizard({
           .bkw-bar { gap: 8px; padding-left: 16px; padding-right: 16px; }
           .bkw-price { min-width: 0; }
           .bkw-price .lbl {
-            font-size: 9px; letter-spacing: .06em; max-width: 90px;
+            font-size: 11px; letter-spacing: .04em; max-width: 130px;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
           }
           .bkw-nav { gap: 6px; }

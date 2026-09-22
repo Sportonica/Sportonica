@@ -59,8 +59,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       {/* Extensions inject attributes into body before React hydrates. */}
       <body suppressHydrationWarning>
+        <a href="#main-content" className="skip-link">Skip to content</a>
         <NavWrapper />
-        <PageTransition>{children}</PageTransition>
+        <PageTransition>
+          <main id="main-content" tabIndex={-1}>{children}</main>
+        </PageTransition>
         <PWARegister />
         <CapacitorBridge />
         <Onboarding />

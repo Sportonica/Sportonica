@@ -24,8 +24,8 @@
 [data-theme="paper"] .pf {
   --pf-bg:    #F2EDE6;
   --pf-text:  #1e3932;
-  --pf-dim:   rgba(95,117,109,0.85);
-  --pf-faint: rgba(95,117,109,0.65);
+  --pf-dim:   #4c5e57;
+  --pf-faint: #52655f;
   --pf-hair:  rgba(30,57,50,0.16);
   --pf-accent:#006241;
 }

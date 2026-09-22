@@ -19,6 +19,8 @@
   background: var(--ink);
   color: var(--paper);
   font-family: 'Inter', system-ui, sans-serif;
+  /* keep clear of the fixed side dock (--dock-gutter, globals.css) */
+  padding-right: var(--dock-gutter, 0px);
 }
 
 /* Top padding only needs to clear the fixed nav (65px elsewhere, see
@@ -142,7 +144,7 @@
 
 .play-btn {
   display: inline-flex; align-items: center; gap: 8px;
-  background: var(--pink); color: var(--paper); border: none;
+  background: var(--pink); color: var(--ink); border: none;
   padding: 13px 24px; border-radius: 12px; font-size: 15px; font-weight: 700;
   font-family: inherit; cursor: pointer; text-decoration: none;
   transition: transform 0.4s cubic-bezier(0.22,1,0.36,1), filter 0.3s ease;
@@ -163,7 +165,9 @@
    Booking detail (/create/[id])
    ================================================================ */
 .bk-back {
-  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 24px;
+  display: inline-flex; align-items: center; gap: 6px;
+  /* 44px-tall hit area; net spacing unchanged (24px below) */
+  padding: 12px 0; margin: -12px 0 12px;
   color: var(--dim); text-decoration: none; font-size: 14px; font-weight: 600;
   transition: color 0.2s;
 }
@@ -235,7 +239,7 @@
 }
 .bk-chip.on { background: rgba(0,98,65,0.14); color: var(--sodium); border-color: rgba(0,98,65,0.4); }
 .bk-chip small { display: block; font-size: 11px; font-weight: 400; color: var(--faint); margin-top: 2px; }
-.bk-chip.on small { color: rgba(0,98,65,0.7); }
+.bk-chip.on small { color: #005a3b; }
 
 .bk-times { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px,1fr)); gap: 9px; }
 .bk-time {
@@ -253,6 +257,7 @@
 .bk-sum-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 9px 0; font-size: 14px; }
 .bk-sum-row .lbl { color: var(--dim); flex-shrink: 0; }
 .bk-sum-row .val { font-family: 'Inter', sans-serif; font-weight: 600; text-align: right; }
+.bk-sum-row a.val { display: inline-block; padding: 10px 0; margin: -10px 0; }
 /* Long freeform values (e.g. a catch-all "Other" prize entry) can't sit
    flush against the label on one baseline without crowding or
    overlapping it — stack label above value instead of fighting for
@@ -379,8 +384,8 @@
   --ink-2: #FFFFFF;
   --ink-3: #E7E0D3;
   --paper: #1e3932;
-  --dim:   rgba(95,117,109,0.85);
-  --faint: rgba(95,117,109,0.65);
+  --dim:   #4c5e57;   /* 5.2:1+ on every paper surface (was 3.3:1) */
+  --faint: #52655f;
   --line:  rgba(30,57,50,0.14);
 }
 

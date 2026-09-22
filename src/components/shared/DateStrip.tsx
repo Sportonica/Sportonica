@@ -117,7 +117,7 @@ export default function DateStrip({
         .ds-cell { position: relative; flex: 0 0 auto; }
         .ds-monthmark {
           position: absolute; top: -3px; left: 50%; transform: translateX(-50%);
-          font-size: 9px; font-weight: 800; letter-spacing: .14em;
+          font-size: 11px; font-weight: 800; letter-spacing: .1em;
           text-transform: uppercase; color: #006241; opacity: .8;
         }
 
@@ -152,7 +152,7 @@ export default function DateStrip({
         [data-theme="paper"] .ds-day.on .ds-num { color: #ffffff; }
 
         /* Weekends read warmer, so the week has a rhythm. */
-        .ds-day.wknd .ds-dow { color: #006241; opacity: .75; }
+        .ds-day.wknd .ds-dow { color: #006241; opacity: 1; }
 
         .ds-day.on {
           border-color: transparent; color: #ffffff; transform: translateY(-4px);
@@ -164,7 +164,7 @@ export default function DateStrip({
         }
         .ds-day.on .ds-dow { color: rgba(255,255,255,.75); opacity: 1; }
 
-        .ds-dow { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; opacity: .55; }
+        .ds-dow { font-size: 11px; font-weight: 700; letter-spacing: .04em; opacity: .75; }
         .ds-num {
           font-family: 'Inter', sans-serif;
           font-size: 22px; font-weight: 800; letter-spacing: -1px; line-height: 1;

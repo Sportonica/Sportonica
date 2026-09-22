@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useTransition } from "react";
-import Link from "next/link";
+import ProfileLink from "@/components/ProfileLink";
 import { Send, ShieldCheck, ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { sendEncryptedMessage, markConversationRead } from "@/lib/dm/actions";
@@ -121,14 +121,14 @@ export default function DMThread({
   return (
     <div style={{ border: "1px solid var(--border-line)", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", height: "70vh", minHeight: 460 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: "1px solid var(--border-line)" }}>
-        <Link href={peer.username ? `/p/${peer.username}` : "#"} style={{ flexShrink: 0 }}>
+        <ProfileLink username={peer.username} label={`${name}'s profile`} style={{ flexShrink: 0 }}>
           <div style={{ width: 34, height: 34, borderRadius: "50%", overflow: "hidden", background: "linear-gradient(150deg,#006241,#1e3932)", display: "grid", placeItems: "center", fontSize: 13, fontWeight: 800, color: "#ffffff" }}>
             {peer.avatar_url
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={peer.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               : name.charAt(0).toUpperCase()}
           </div>
-        </Link>
+        </ProfileLink>
         <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700 }}>{name}</div>
         <BlockButton profileId={peer.id} initialBlocked={blocked} name={name} onChange={setBlocked} />
         <ReportButton targetType="user" targetId={peer.id} label="" />

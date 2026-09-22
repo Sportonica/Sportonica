@@ -62,7 +62,7 @@ export default function SquadsClient({
       </div>
 
       {initialSquads.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 20px", opacity: 0.6 }}>
+        <div style={{ textAlign: "center", padding: "60px 20px", opacity: 0.8 }}>
           <Users size={30} style={{ marginBottom: 12, opacity: 0.5 }} />
           <p style={{ fontSize: 15 }}>No groups yet. Be the first to make one.</p>
         </div>

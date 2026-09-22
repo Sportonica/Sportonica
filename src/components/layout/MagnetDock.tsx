@@ -34,7 +34,7 @@ function magnify(distance: number) {
 export default function MagnetDock() {
   const pathname = usePathname();
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLElement>(null);
 
   // Hide dock on admin/organizer/platform consoles, auth pages (they have their own chrome).
   const hidden =
@@ -176,7 +176,7 @@ export default function MagnetDock() {
           .dock-label, [data-theme="paper"] .dock-label {
             position: relative; inset: auto; z-index: 1; transform: none; opacity: 1;
             background: none; border: none; box-shadow: none; padding: 0;
-            font-size: 9.5px; font-weight: 650; color: inherit; letter-spacing: -0.1px;
+            font-size: 11px; font-weight: 650; color: inherit; letter-spacing: -0.1px;
           }
           .dock-item.active .dock-label { font-weight: 800; }
           .dock-label::after { display: none; }
@@ -192,7 +192,7 @@ export default function MagnetDock() {
         }
       `}</style>
 
-      <div className="dock" ref={rootRef} onMouseLeave={() => setHoverIdx(null)}>
+      <nav className="dock" aria-label="Primary" ref={rootRef} onMouseLeave={() => setHoverIdx(null)}>
         {LINKS.map((item, i) => {
           const scale = hoverIdx === null ? 1 : magnify(i - hoverIdx);
           return (
@@ -200,6 +200,7 @@ export default function MagnetDock() {
               key={item.href}
               href={item.href}
               className={`dock-item ${isActive(item.href) ? "active" : ""}`}
+              aria-current={isActive(item.href) ? "page" : undefined}
               style={{ transform: `scale(${scale})` }}
               onMouseEnter={() => setHoverIdx(i)}
             >
@@ -208,7 +209,7 @@ export default function MagnetDock() {
             </Link>
           );
         })}
-      </div>
+      </nav>
     </>
   );
 }

@@ -156,7 +156,7 @@ function DiscoverInner() {
   };
 
   return (
-    <main className="disc-root">
+    <div className="disc-root">
       <style>{CSS}</style>
 
       {/* ── Hero header ──
@@ -496,7 +496,7 @@ function DiscoverInner() {
           </Link>
         </div>
       </section>
-    </main >
+    </div>
   );
 }
 
@@ -887,7 +887,7 @@ const CSS = `
   justify-content: center;
   gap: 10px;
   padding: 40px 20px;
-  color: color-mix(in srgb, var(--chalk) 55%, transparent);
+  color: color-mix(in srgb, var(--chalk) 80%, transparent);
   text-align: center;
 }
 .disc-empty a { color: var(--lime); font-weight: 700; text-decoration: none; }

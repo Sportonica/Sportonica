@@ -30,6 +30,7 @@ export default function AppHeader() {
   const [checkingOrganizer, setCheckingOrganizer] = useState(false);
   const [showOrganizerModal, setShowOrganizerModal] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const pickRef = useRef<HTMLButtonElement>(null);
 
   const hidden =
     pathname.startsWith("/admin") ||
@@ -86,6 +87,20 @@ export default function AppHeader() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
+
+  // Escape closes the city picker / first-visit sheet and hands focus back to
+  // the button that opens it, so keyboard users are never stuck inside.
+  useEffect(() => {
+    if (!open && !ask) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      setAsk(false);
+      pickRef.current?.focus();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, ask]);
 
   if (hidden) return null;
 
@@ -174,7 +189,7 @@ export default function AppHeader() {
               </p>
 
               <div className="ah-city" ref={boxRef}>
-                <button className="ah-pick" onClick={() => setOpen((v) => !v)}>
+                <button ref={pickRef} className="ah-pick" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
                   <MapPin size={13} style={{ flexShrink: 0 }} />
                   <span className="ah-pick-name">{area?.name ?? city?.name ?? "Choose city"}</span>
                   {city && <em>{area ? `, ${city.name}` : `, ${city.province}`}</em>}
@@ -285,13 +300,13 @@ export default function AppHeader() {
 
       {ask && (
         <div className="ah-scrim" onClick={() => setAsk(false)}>
-          <div className="ah-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="ah-sheet" role="dialog" aria-modal="true" aria-labelledby="ah-ask-title" onClick={(e) => e.stopPropagation()}>
             <p className="ah-namaste">नमस्ते</p>
-            <h2>Where do you play?</h2>
+            <h2 id="ah-ask-title">Where do you play?</h2>
             <p className="ah-sub">
               We&apos;ll put your city&apos;s courts and games first. Change it any time.
             </p>
-            <button className="ah-detect big" onClick={detect} disabled={locating}>
+            <button className="ah-detect big" onClick={detect} disabled={locating} autoFocus>
               {locating ? <Loader2 size={15} className="spin" /> : <Navigation size={15} />}
               {locating ? "Finding you…" : "Use my location"}
             </button>
@@ -365,7 +380,7 @@ export default function AppHeader() {
         .ah-city { position:relative; min-width:0; }
         .ah-pick {
           display:inline-flex; align-items:center; gap:5px; cursor:pointer;
-          background:none; border:none; padding:0; color:inherit; font-family:inherit;
+          background:none; border:none; padding:10px 0; margin:-10px 0; color:inherit; font-family:inherit;
           font-size:16px; font-weight:800; letter-spacing:-.3px; max-width:100%; min-width:0;
         }
         .ah-pick-name {

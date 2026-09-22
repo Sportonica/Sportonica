@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import Link from "next/link";
+import ProfileLink from "@/components/ProfileLink";
 import { Search, UserSearch } from "lucide-react";
 import { searchPlayersAction } from "@/lib/friends/actions";
 import FriendRequestButton from "@/components/FriendRequestButton";
@@ -50,7 +50,7 @@ export default function PlayersClient({ initial }: { initial: PlayerListItem[] }
             const name = p.full_name ?? p.username ?? "Player";
             return (
               <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid var(--line, rgba(255,255,255,.1))" }}>
-                <Link href={p.username ? `/p/${p.username}` : "#"} style={{ flexShrink: 0 }}>
+                <ProfileLink username={p.username} label={`${name}'s profile`} style={{ flexShrink: 0 }}>
                   <div style={{
                     width: 44, height: 44, borderRadius: "50%", overflow: "hidden",
                     background: "linear-gradient(150deg,#006241,#1e3932)", display: "grid", placeItems: "center",
@@ -61,11 +61,11 @@ export default function PlayersClient({ initial }: { initial: PlayerListItem[] }
                       ? <img src={p.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       : name.charAt(0).toUpperCase()}
                   </div>
-                </Link>
-                <Link href={p.username ? `/p/${p.username}` : "#"} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
+                </ProfileLink>
+                <ProfileLink username={p.username} label={`${name}'s profile`} style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{name}</div>
                   {p.username && <div style={{ fontSize: 12, opacity: 0.55 }}>@{p.username}</div>}
-                </Link>
+                </ProfileLink>
                 <FriendRequestButton profileId={p.id} initial={p.relationship} />
               </div>
             );

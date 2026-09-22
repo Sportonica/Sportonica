@@ -68,7 +68,7 @@ export default function MyGamesClient({
   >(null);
 
   return (
-    <main className="mg">
+    <div className="mg">
       <header className="mg-head">
         <p className="mg-eyebrow">Your games</p>
         <h1 className="mg-h1">My <em>games</em></h1>
@@ -379,7 +379,7 @@ export default function MyGamesClient({
           .mg-sheet { padding: 20px 16px; }
         }
       `}</style>
-    </main>
+    </div>
   );
 }
 

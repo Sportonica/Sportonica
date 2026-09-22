@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import ProfileLink from "@/components/ProfileLink";
 import { Check, X } from "lucide-react";
 import { respondToRequest } from "@/lib/friends/actions";
 import { isActionError } from "@/lib/actionError";
@@ -29,7 +29,7 @@ export default function FriendRequestRow({ request }: { request: PendingRequest 
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: "1px solid var(--border-line)" }}>
-      <Link href={requester.username ? `/p/${requester.username}` : "#"} style={{ flexShrink: 0 }}>
+      <ProfileLink username={requester.username} label={`${name}'s profile`} style={{ flexShrink: 0 }}>
         <div style={{
           width: 44, height: 44, borderRadius: "50%", overflow: "hidden",
           background: "linear-gradient(150deg,#006241,#1e3932)", display: "grid", placeItems: "center",
@@ -40,7 +40,7 @@ export default function FriendRequestRow({ request }: { request: PendingRequest 
             ? <img src={requester.avatar_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             : name.charAt(0).toUpperCase()}
         </div>
-      </Link>
+      </ProfileLink>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 700 }}>{name}</div>
         {requester.username && <div style={{ fontSize: 12, opacity: 0.55 }}>@{requester.username}</div>}

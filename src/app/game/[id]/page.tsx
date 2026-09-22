@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ProfileLink from "@/components/ProfileLink";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, MapPin, Clock, Users, Wallet, ShieldCheck, Zap, ExternalLink } from "lucide-react";
@@ -119,7 +120,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
               ) : (
                 <div className="gm-players">
                   {players.map((p) => (
-                    <Link key={p.user_id} href={p.username ? `/p/${p.username}` : "#"} className="gm-player">
+                    <ProfileLink key={p.user_id} username={p.username} className="gm-player">
                       <Avatar name={p.name} url={p.avatar_url} size={40} />
                       <div>
                         <div className="gm-player-n">{p.name}</div>
@@ -127,7 +128,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
                           {p.user_id === game.host_id ? "Host" : `Trust ${p.trust_score}`}
                         </div>
                       </div>
-                    </Link>
+                    </ProfileLink>
                   ))}
                 </div>
               )}

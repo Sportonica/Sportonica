@@ -269,7 +269,7 @@ function OverviewTab({ tournament, teams, matches, awards }: {
         </div>
         {tournament.description && <FormattedText text={tournament.description} />}
         {tournament.organizer_name && (
-          <div style={{ marginTop: 14, fontSize: 12.5, opacity: 0.6 }}>Organised by <b style={{ opacity: 1 }}>{tournament.organizer_name}</b></div>
+          <div style={{ marginTop: 14, fontSize: 12.5, opacity: 0.8 }}>Organised by <b style={{ opacity: 1 }}>{tournament.organizer_name}</b></div>
         )}
       </div>
 

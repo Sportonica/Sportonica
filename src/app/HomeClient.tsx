@@ -161,7 +161,7 @@ const CSS = `
   .p-sportchip-shade { position:absolute; inset:0; background:linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.55) 30%, rgba(0,0,0,0.12) 60%, rgba(0,0,0,0.4) 100%); }
   .p-sportchip-label { position:absolute; left:14px; bottom:14px; right:14px; z-index:1; color:#fff; font-size:18px; font-weight:800; font-family:'Inter',sans-serif; letter-spacing:-0.5px; line-height:1.05; }
   [data-theme="paper"] .p-sportbar-title { color:#14171E; }
-  [data-theme="paper"] .p-sportbar-hint { color:rgba(20,23,30,0.55); }
+  [data-theme="paper"] .p-sportbar-hint { color:rgba(20,23,30,0.72); }
   [data-theme="paper"] .p-sportchip { border-color:rgba(20,23,30,0.12); }
   [data-theme="paper"] .p-sportchip:hover { border-color:rgba(20,23,30,0.3); }
   @media (max-width:900px){
@@ -250,7 +250,7 @@ const CSS = `
     .p-hero-aside { flex:0 1 auto; min-width:0; }
     .p-book-in { padding:10px 12px 10px 14px; gap:8px; }
     .p-book-txt b { font-size:13px; }
-    .p-book-txt small { font-size:9px; white-space:nowrap; }
+    .p-book-txt small { font-size:11px; white-space:nowrap; }
     .p-book-go { width:26px; height:26px; }
 
     /* Page edges: 16px, matching the site-wide mobile spacing scale
@@ -463,7 +463,7 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
               { label:"Privacy Policy", href:"/privacy" },
               { label:"Admin", href:"/admin" },
             ].map(l => (
-              <a key={l.label} href={l.href} style={{ color:"var(--muted)", textDecoration:"none", fontSize:"13px", fontWeight:600, transition:"color 0.2s" }}
+              <a key={l.label} href={l.href} style={{ color:"var(--muted)", textDecoration:"none", fontSize:"13px", fontWeight:600, transition:"color 0.2s", padding:"12px 4px", margin:"-12px -4px" }}
                 onMouseEnter={e => (e.currentTarget.style.color="var(--chalk)")}
                 onMouseLeave={e => (e.currentTarget.style.color="var(--muted)")}>
                 {l.label}

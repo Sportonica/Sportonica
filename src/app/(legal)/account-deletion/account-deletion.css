@@ -126,7 +126,7 @@
   grid-column: 3; grid-row: 1; justify-self: end;
   display: inline-flex; align-items: center;
   padding: 4px 10px; border-radius: 999px; white-space: nowrap;
-  font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
 }
 .adp-tag.del  { color: var(--adp-red);   background: rgba(192,57,47,0.10);  }
 .adp-tag.anon { color: var(--adp-amber); background: rgba(178,107,0,0.12);  }
@@ -234,11 +234,11 @@
   display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: center;
   font-size: 13px; color: var(--adp-dim);
 }
-.adp-foot a { color: var(--adp-green); text-decoration: none; font-weight: 600; }
+.adp-foot a { color: var(--adp-green); text-decoration: none; font-weight: 600; padding: 10px 2px; margin: -10px -2px; }
 .adp-foot a:hover { text-decoration: underline; }
 .adp-foot .adp-sep { width: 4px; height: 4px; border-radius: 50%; background: var(--adp-faint); }
 
-.adp a.adp-inline { color: var(--adp-green); font-weight: 600; text-decoration: none; }
+.adp a.adp-inline { color: var(--adp-green); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .adp a.adp-inline:hover { text-decoration: underline; }
 
 /* ── Motion ── */

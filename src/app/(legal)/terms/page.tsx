@@ -43,7 +43,7 @@ export default function TermsOfServicePage() {
               Platform&quot;). By downloading, installing, accessing, or using the Platform in any manner,
               you agree to be legally bound by these Terms and all policies incorporated by reference,
               including the{" "}
-              <Link href="/privacy" style={{ color: "var(--sodium)" }}>Privacy Policy</Link>. If you do not
+              <Link href="/privacy" style={{ color: "var(--sodium)", textDecoration: "underline", textUnderlineOffset: 2 }}>Privacy Policy</Link>. If you do not
               agree, please discontinue accessing or using Sportonica immediately.
             </p>
           </Section>
@@ -438,7 +438,7 @@ export default function TermsOfServicePage() {
             </p>
             <p>
               Disputes and questions about these Terms or our other policies can be sent by email to{" "}
-              <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)" }}>info@sportonica.com</a>.
+              <a href="mailto:info@sportonica.com" style={{ color: "var(--sodium)", textDecoration: "underline", textUnderlineOffset: 2 }}>info@sportonica.com</a>.
             </p>
           </Section>
 
@@ -457,7 +457,7 @@ export default function TermsOfServicePage() {
             </p>
           </Section>
 
-          <p className="hint" style={{ marginTop: 28 }}>
+          <p className="hint legal-foot" style={{ marginTop: 28 }}>
             <Link href="/privacy">Privacy Policy</Link> ·{" "}
             <Link href="/account-deletion">Account Deletion</Link> ·{" "}
             <Link href="/">← Back to Sportonica</Link>

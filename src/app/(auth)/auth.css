@@ -415,7 +415,7 @@
   background: var(--sodium); color: #04140d;
 }
 .afield-eye {
-  display: flex; padding: 4px; border: none; background: none; cursor: pointer;
+  display: flex; padding: 10px; margin: -6px; border: none; background: none; cursor: pointer;
   color: var(--faint); transition: color .2s ease;
 }
 .afield-eye:hover { color: var(--text); }
@@ -527,7 +527,7 @@
   --line-2:    rgba(40,32,18,0.16);
   --text:      #211d14;
   --dim:       #6a6353;
-  --faint:     #9a9282;
+  --faint:     #6b6455;
   --sodium:    #067a50;
   --sodium-2:  #0a8f5f;
   --pink:      #067a50;

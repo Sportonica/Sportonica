@@ -158,8 +158,8 @@ body {
   --paper:    var(--color-dark);
   --chalk:    var(--color-dark);
   --bg:       #F2EDE6;
-  --muted:    rgba(95,117,109,0.78);
-  --faint:    rgba(95,117,109,0.6);
+  --muted:    #50625c;   /* 4.8:1+ on every paper surface (was 2.9:1) */
+  --faint:    #52655f;   /* 4.6:1+ (was 2.4:1) */
   --border-line: rgba(30,57,50,0.14);
 }
 [data-theme="paper"] body {
@@ -195,3 +195,28 @@ html, body { max-width: 100%; overflow-x: hidden; }
   outline: 2px solid var(--color-primary, #006241);
   outline-offset: 2px;
 }
+
+/* The desktop side dock is fixed to the right edge (16px gap + ~68px pill), so
+   page wrappers reserve --dock-gutter on that side and never run underneath it.
+   Below 781px the dock becomes a bottom bar and needs no gutter. */
+:root { --dock-gutter: 0px; }
+@media (min-width: 781px) { :root { --dock-gutter: 96px; } }
+
+/* Visually hidden, still announced by screen readers. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* Keyboard users can jump past the header/dock straight to the page. */
+.skip-link {
+  position: fixed; top: 8px; left: 8px; z-index: 10000;
+  padding: 10px 16px; border-radius: 10px; background: #006241; color: #fff;
+  font-size: 14px; font-weight: 700; text-decoration: none;
+  transform: translateY(-160%); transition: transform .15s ease;
+}
+.skip-link:focus { transform: translateY(0); }
+#main-content:focus { outline: none; }
+
+/* Footer link rows on the legal pages: a comfortable tap area, same layout. */
+.legal-foot a { display: inline-block; padding: 10px 2px; margin: -10px -2px; }

@@ -437,7 +437,7 @@ export default function BookFilters({
           flex:1; text-align:center; font-family:'Inter',sans-serif;
           font-size:13px; font-weight:700; white-space:nowrap;
         }
-        .bf-step-v.ph { opacity:.35; font-weight:500; }
+        .bf-step-v.ph { opacity:.7; font-weight:500; }
 
         @media (max-width:620px) {
           .bf-find { font-size: 13px; }

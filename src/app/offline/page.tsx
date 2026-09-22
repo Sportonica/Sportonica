@@ -23,7 +23,7 @@ export default function OfflinePage() {
         }}>
           You&apos;re offline
         </h1>
-        <p style={{ fontSize: 14.5, lineHeight: 1.6, opacity: 0.65, margin: "0 0 26px" }}>
+        <p style={{ fontSize: 14.5, lineHeight: 1.6, opacity: 0.82, margin: "0 0 26px" }}>
           Sportonica needs a connection to show live games and court availability.
           Check your network and try again.
         </p>

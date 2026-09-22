@@ -30,7 +30,7 @@ export default function OrganizeLayout({ children }: { children: React.ReactNode
           <Link href="/discover">↗ App</Link>
         </nav>
       </header>
-      <main className="plt-body">{children}</main>
+      <div className="plt-body">{children}</div>
     </div>
   );
 }
