@@ -492,6 +492,8 @@ export const TOURNAMENT_ERROR_MESSAGES: Record<string, string> = {
   CONTACT_PHONE_REQUIRED: "Enter a contact phone number.",
   CONTACT_EMAIL_REQUIRED: "Enter a contact email.",
   JERSEY_NUMBER_TAKEN: "Another player on this team already has that jersey number.",
+  ROUND_LABEL_REQUIRED: "Enter a name for this round.",
+  ROUND_NOT_FOUND: "That round doesn't have any matches to rename.",
 };
 
 export function friendlyTournamentError(message: string): string {
