@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
+import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, X, History, Pencil } from "lucide-react";
+import { Plus, Trash2, X, History, Pencil, Search } from "lucide-react";
 import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
   getTeamRoster, getMatchPlayerStats, recordMatchPlayerStats,
@@ -84,6 +84,7 @@ export default function FixturesTab({
   const [recordingStats, setRecordingStats] = useState<TournamentMatch | null>(null);
   const [mode, setMode] = useState<"choose" | "manual" | "auto">("choose");
   const [regenMsg, setRegenMsg] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const errRef = useRef<HTMLDivElement | null>(null);
   const sportKind = getSportKind(tournament.sport);
 
@@ -97,6 +98,19 @@ export default function FixturesTab({
 
   const teamsById = new Map(teams.map((t) => [t.id, t.name]));
   const teamName = (id: string | null) => (id ? teamsById.get(id) ?? "Unknown" : "TBD");
+
+  const filteredMatches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return matches;
+    return matches.filter((m) => {
+      const haystack = [
+        teamName(m.team_a_id), teamName(m.team_b_id), m.round_label,
+        m.group_name ?? "", m.court_label ?? "", m.status,
+      ].join(" ").toLowerCase();
+      return haystack.includes(q);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches, query, teams]);
 
   function run(action: () => Promise<unknown>) {
     setErr(null);
@@ -123,7 +137,7 @@ export default function FixturesTab({
   }
 
   const rounds = new Map<string, TournamentMatch[]>();
-  for (const m of matches) {
+  for (const m of filteredMatches) {
     if (!rounds.has(m.round_label)) rounds.set(m.round_label, []);
     rounds.get(m.round_label)!.push(m);
   }
@@ -149,12 +163,25 @@ export default function FixturesTab({
 
   return (
     <div className="tc-card">
-      <div className="tc-card-t" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+      <div className="tc-card-t" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         Fixtures
         {matches.length > 0 && (
-          <button className="tc-btn" disabled={pending} style={{ padding: "6px 10px", fontSize: 12 }} onClick={runRegenerate}>
-            Regenerate fixtures
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <Search size={14} style={{ position: "absolute", left: 8, opacity: 0.5, pointerEvents: "none" }} />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search fixtures…"
+                aria-label="Search fixtures by team, round, or status"
+                style={{ ...inputStyle, paddingLeft: 26, fontSize: 12, width: 180 }}
+              />
+            </div>
+            <button className="tc-btn" disabled={pending} style={{ padding: "6px 10px", fontSize: 12 }} onClick={runRegenerate}>
+              Regenerate fixtures
+            </button>
+          </div>
         )}
       </div>
       <div className="tc-card-sub">
@@ -203,6 +230,8 @@ export default function FixturesTab({
 
       {matches.length === 0 ? (
         <div className="tc-empty">No matches added yet.</div>
+      ) : filteredMatches.length === 0 ? (
+        <div className="tc-empty">No fixtures match your search.</div>
       ) : (
         [...rounds.entries()].map(([label, ms]) => (
           <div key={label} style={{ marginBottom: 26 }}>
