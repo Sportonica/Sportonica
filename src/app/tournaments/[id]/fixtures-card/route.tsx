@@ -36,9 +36,7 @@ function errorCard() {
   );
 }
 
-const MAX_ROWS = 14;
-
-// 4:5 "matchday" card — every fixture on one day, in one compact list,
+// "Matchday" card — every fixture on one day, in one compact list,
 // rather than one poster per match (that read as an oversized, mostly
 // empty card for a single 1v1 — this is what actually gets shared:
 // "here's the whole day's schedule"). Satori (the renderer): every
@@ -81,21 +79,25 @@ export async function GET(
     weekday: "long", day: "numeric", month: "long", timeZone: KTM_TZ,
   });
 
-  const overflow = dayMatches.length > MAX_ROWS;
-  const shown = overflow ? dayMatches.slice(0, MAX_ROWS - 1) : dayMatches;
-  const rowSlots = overflow ? MAX_ROWS : dayMatches.length;
-
-  // Available list height is fixed regardless of row count — rows shrink
-  // to fit a busy day, but are capped well below that ceiling so a quiet
-  // day (1-2 matches) doesn't stretch into a few giant rows floating in
-  // an otherwise empty card; the list is top-anchored (see justifyContent
-  // below) so any leftover room falls as a plain gap above the footer,
-  // not as padding squeezed around the rows themselves.
-  const AVAILABLE = 802;
-  const rowHeight = Math.max(56, Math.min(84, AVAILABLE / rowSlots));
+  // Every match of the day is always on the card — nothing is cut off
+  // behind a "+N more". Up to 14 matches fit the 4:5 feed size (1080×1350);
+  // rows are capped at 84px so a quiet day (1-2 matches) doesn't stretch
+  // into a few giant rows, and the list is top-anchored (see
+  // justifyContent below) so leftover room falls as a gap above the
+  // footer. A busier day grows the card instead: rows shrink toward 44px
+  // while the card grows to story height (1920), and past ~31 matches it
+  // simply keeps getting taller.
+  const CHROME = 548;          // padding + header + footer, everything but the list
+  const FEED_H = 1350, STORY_H = 1920;
+  const n = dayMatches.length;
+  const rowHeight = n <= 14
+    ? Math.max(56, Math.min(84, (FEED_H - CHROME) / n))
+    : Math.max(44, Math.min(56, (STORY_H - CHROME) / n));
+  const cardHeight = n <= 14 ? FEED_H : Math.max(FEED_H, Math.ceil(CHROME + n * rowHeight));
   const size = rowHeight >= 78 ? { time: 21, team: 25, round: 15, score: 24 }
     : rowHeight >= 66 ? { time: 19, team: 22, round: 13, score: 22 }
-    : { time: 17, team: 19, round: 12, score: 19 };
+    : rowHeight >= 52 ? { time: 17, team: 19, round: 12, score: 19 }
+    : { time: 16, team: 17, round: 11, score: 17 };
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   const qrTarget = `${siteUrl}/tournaments/${tournament.id}?tab=fixtures`;
@@ -125,7 +127,7 @@ export async function GET(
             the brand footer", not as a couple of rows floating in the
             middle of a mostly-empty card. */}
         <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, justifyContent: "flex-start", marginTop: 32 }}>
-          {shown.map((m, i) => {
+          {dayMatches.map((m, i) => {
             const teamA = teamName(m, "a");
             const teamB = teamName(m, "b");
             const showScore = m.status === "completed" && m.score_a !== null && m.score_b !== null;
@@ -159,11 +161,6 @@ export async function GET(
               </div>
             );
           })}
-          {overflow && (
-            <div style={{ display: "flex", alignItems: "center", height: rowHeight, borderTop: `1px solid ${C.hair}`, fontSize: size.team, fontWeight: 700, color: C.dim }}>
-              +{dayMatches.length - shown.length} more matches
-            </div>
-          )}
         </div>
 
         {/* footer brand */}
@@ -188,6 +185,6 @@ export async function GET(
         </div>
       </div>
     ),
-    { width: 1080, height: 1350 }
+    { width: 1080, height: cardHeight }
   );
 }
