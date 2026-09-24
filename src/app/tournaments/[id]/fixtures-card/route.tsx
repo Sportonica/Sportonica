@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { getTournament, getTournamentMatches, getTeamNames, getDisplayVenueName } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { sportColor } from "@/lib/sports";
-import type { TournamentMatch } from "@/lib/tournaments/types";
+import { compareStageRound, type TournamentMatch } from "@/lib/tournaments/types";
 
 export const runtime = "nodejs";
 
@@ -60,7 +60,7 @@ export async function GET(
   const allMatches = isActionError(matchesRes) ? [] : matchesRes;
   const dayMatches = allMatches
     .filter((m) => m.starts_at && dayKey(m.starts_at) === date)
-    .sort((a, b) => a.starts_at!.localeCompare(b.starts_at!));
+    .sort((a, b) => compareStageRound(a, b) || a.starts_at!.localeCompare(b.starts_at!));
   if (dayMatches.length === 0) return errorCard();
 
   const teamIds = [...new Set(dayMatches.flatMap((m) => [m.team_a_id, m.team_b_id]).filter((t): t is string => !!t))];
