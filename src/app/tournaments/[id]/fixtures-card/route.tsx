@@ -80,24 +80,35 @@ export async function GET(
   });
 
   // Every match of the day is always on the card — nothing is cut off
-  // behind a "+N more". Up to 14 matches fit the 4:5 feed size (1080×1350);
-  // rows are capped at 84px so a quiet day (1-2 matches) doesn't stretch
-  // into a few giant rows, and the list is top-anchored (see
-  // justifyContent below) so leftover room falls as a gap above the
-  // footer. A busier day grows the card instead: rows shrink toward 44px
-  // while the card grows to story height (1920), and past ~31 matches it
-  // simply keeps getting taller.
+  // behind a "+N more". Up to 14 matches read as one list; a busier day
+  // switches to 2 columns (≤ 28) or 3 columns of compact two-line cells,
+  // filled top-to-bottom so each column reads in order, and all of it
+  // still fits the 4:5 feed size (1080×1350). Only past 42 matches does
+  // the card grow taller. Rows are capped at 84px so a quiet day (1-2
+  // matches) doesn't stretch into a few giant rows, and the list is
+  // top-anchored (see justifyContent below) so leftover room falls as a
+  // gap above the footer.
   const CHROME = 548;          // padding + header + footer, everything but the list
-  const FEED_H = 1350, STORY_H = 1920;
+  const FEED_H = 1350;
   const n = dayMatches.length;
-  const rowHeight = n <= 14
-    ? Math.max(56, Math.min(84, (FEED_H - CHROME) / n))
-    : Math.max(44, Math.min(56, (STORY_H - CHROME) / n));
-  const cardHeight = n <= 14 ? FEED_H : Math.max(FEED_H, Math.ceil(CHROME + n * rowHeight));
+  const cols = n <= 14 ? 1 : n <= 28 ? 2 : 3;
+  const perCol = Math.ceil(n / cols);
+  const minRow = cols === 1 ? 56 : 58;
+  const rowHeight = Math.max(minRow, Math.min(84, (FEED_H - CHROME) / perCol));
+  const cardHeight = Math.max(FEED_H, Math.ceil(CHROME + perCol * rowHeight));
+  const columns = Array.from({ length: cols }, (_, c) => dayMatches.slice(c * perCol, (c + 1) * perCol));
   const size = rowHeight >= 78 ? { time: 21, team: 25, round: 15, score: 24 }
     : rowHeight >= 66 ? { time: 19, team: 22, round: 13, score: 22 }
-    : rowHeight >= 52 ? { time: 17, team: 19, round: 12, score: 19 }
-    : { time: 16, team: 17, round: 11, score: 17 };
+    : { time: 17, team: 19, round: 12, score: 19 };
+  // Grid cells: meta line (time · round) over a teams line.
+  const cell = cols === 2 ? { meta: 15, team: 19, score: 19, nameMax: 17 } : { meta: 13, team: 16, score: 16, nameMax: 11 };
+
+  const middle = (m: TournamentMatch, fontSize: number) => {
+    const showScore = m.status === "completed" && m.score_a !== null && m.score_b !== null;
+    if (showScore) return <span style={{ display: "flex", fontSize, fontWeight: 800, color: accent }}>{m.score_a}–{m.score_b}</span>;
+    if (m.status === "walkover") return <span style={{ display: "flex", fontSize: Math.round(fontSize * 0.7), color: accent, fontWeight: 700 }}>w/o</span>;
+    return <span style={{ display: "flex", color: C.dim, opacity: 0.6 }}>vs</span>;
+  };
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   const qrTarget = `${siteUrl}/tournaments/${tournament.id}?tab=fixtures`;
@@ -126,41 +137,50 @@ export async function GET(
             couple of matches should read as "a couple of matches, then
             the brand footer", not as a couple of rows floating in the
             middle of a mostly-empty card. */}
-        <div style={{ display: "flex", flexDirection: "column", flexGrow: 1, justifyContent: "flex-start", marginTop: 32 }}>
-          {dayMatches.map((m, i) => {
-            const teamA = teamName(m, "a");
-            const teamB = teamName(m, "b");
-            const showScore = m.status === "completed" && m.score_a !== null && m.score_b !== null;
-            return (
-              <div
-                key={m.id}
-                style={{
-                  display: "flex", alignItems: "center", height: rowHeight,
-                  borderTop: i === 0 ? "none" : `1px solid ${C.hair}`,
-                }}
-              >
-                <div style={{ width: 96, flexShrink: 0, fontSize: size.time, fontWeight: 700, color: C.dim, display: "flex" }}>
-                  {rowTime(m.starts_at!)}
+        <div style={{ display: "flex", flexGrow: 1, alignItems: "flex-start", marginTop: 32, gap: 36 }}>
+          {columns.map((col, c) => (
+            <div key={c} style={{ display: "flex", flexDirection: "column", flexGrow: 1, flexBasis: 0, minWidth: 0 }}>
+              {col.map((m, i) => (cols === 1 ? (
+                <div
+                  key={m.id}
+                  style={{
+                    display: "flex", alignItems: "center", height: rowHeight,
+                    borderTop: i === 0 ? "none" : `1px solid ${C.hair}`,
+                  }}
+                >
+                  <div style={{ width: 96, flexShrink: 0, fontSize: size.time, fontWeight: 700, color: C.dim, display: "flex" }}>
+                    {rowTime(m.starts_at!)}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", flexGrow: 1, minWidth: 0, fontSize: size.team, fontWeight: 700, gap: 10 }}>
+                    <span style={{ display: "flex" }}>{trim(teamName(m, "a"), 20)}</span>
+                    {middle(m, size.score)}
+                    <span style={{ display: "flex" }}>{trim(teamName(m, "b"), 20)}</span>
+                  </div>
+                  <div style={{ width: 70, flexShrink: 0, textAlign: "right", justifyContent: "flex-end", fontSize: size.round, color: C.dim, fontWeight: 700, display: "flex" }}>
+                    {roundShortCode(m.round_label)}
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", flexGrow: 1, minWidth: 0, fontSize: size.team, fontWeight: 700, gap: 10 }}>
-                  <span style={{ display: "flex" }}>{trim(teamA, 20)}</span>
-                  {showScore ? (
-                    <span style={{ display: "flex", fontSize: size.score, fontWeight: 800, color: accent }}>
-                      {m.score_a}–{m.score_b}
-                    </span>
-                  ) : m.status === "walkover" ? (
-                    <span style={{ display: "flex", fontSize: size.round, color: accent, fontWeight: 700 }}>w/o</span>
-                  ) : (
-                    <span style={{ display: "flex", color: C.dim, opacity: 0.6 }}>vs</span>
-                  )}
-                  <span style={{ display: "flex" }}>{trim(teamB, 20)}</span>
+              ) : (
+                <div
+                  key={m.id}
+                  style={{
+                    display: "flex", flexDirection: "column", justifyContent: "center", height: rowHeight,
+                    borderTop: i === 0 ? "none" : `1px solid ${C.hair}`,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: cell.meta, fontWeight: 700, color: C.dim }}>
+                    <span style={{ display: "flex" }}>{rowTime(m.starts_at!)}</span>
+                    <span style={{ display: "flex" }}>{roundShortCode(m.round_label)}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: cell.team, fontWeight: 700 }}>
+                    <span style={{ display: "flex" }}>{trim(teamName(m, "a"), cell.nameMax)}</span>
+                    {middle(m, cell.score)}
+                    <span style={{ display: "flex" }}>{trim(teamName(m, "b"), cell.nameMax)}</span>
+                  </div>
                 </div>
-                <div style={{ width: 70, flexShrink: 0, textAlign: "right", justifyContent: "flex-end", fontSize: size.round, color: C.dim, fontWeight: 700, display: "flex" }}>
-                  {roundShortCode(m.round_label)}
-                </div>
-              </div>
-            );
-          })}
+              )))}
+            </div>
+          ))}
         </div>
 
         {/* footer brand */}
