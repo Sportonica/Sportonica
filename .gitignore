@@ -45,3 +45,10 @@ RUN_ME*.sql
 
 # Snapshots of deleted user data from cleanup scripts — contains PII, never committed
 /backups/
+
+# Signing keys and release bundles never belong in this (public) repo.
+*.jks
+*.keystore
+*.p12
+*.aab
+keystore.properties
