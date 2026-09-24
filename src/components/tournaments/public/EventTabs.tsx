@@ -11,7 +11,7 @@ import { isActionError } from "@/lib/actionError";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { getSportKind } from "@/lib/sports";
 import {
-  FORMAT_LABELS,
+  FORMAT_LABELS, compareStageRound,
   type Tournament, type TournamentTeam, type TournamentMatch,
   type TournamentStanding, type TournamentPlayerStatRow, type TournamentAwards, type RaceResultRow,
 } from "@/lib/tournaments/types";
@@ -477,11 +477,15 @@ function FixturesPublicTab({ tournamentId, matches, teams }: {
   const team = (id: string | null) => (id ? teams.find((t) => t.id === id) : undefined);
   const teamName = (id: string | null) => team(id)?.name ?? "Unknown";
 
+  // Day by day; within a day, round by round (Phase 1 before Round of
+  // 32), then by kick-off time. Unscheduled matches go last.
+  const day = (m: TournamentMatch) => (m.starts_at ? new Date(m.starts_at).toLocaleDateString("en-CA", { timeZone: KTM }) : null);
   const sorted = [...matches].sort((a, b) => {
-    if (!a.starts_at && !b.starts_at) return a.created_at.localeCompare(b.created_at);
-    if (!a.starts_at) return 1;
-    if (!b.starts_at) return -1;
-    return a.starts_at.localeCompare(b.starts_at);
+    const da = day(a), db = day(b);
+    if (!da && !db) return compareStageRound(a, b) || a.created_at.localeCompare(b.created_at);
+    if (!da) return 1;
+    if (!db) return -1;
+    return da.localeCompare(db) || compareStageRound(a, b) || a.starts_at!.localeCompare(b.starts_at!);
   });
 
   // Grouped by the ISO calendar date (KTM) so each group's "Share this
@@ -489,7 +493,7 @@ function FixturesPublicTab({ tournamentId, matches, teams }: {
   // display label above is just for the header, not what's queried on.
   const groups = new Map<string, { label: string; matches: TournamentMatch[] }>();
   for (const m of sorted) {
-    const key = m.starts_at ? new Date(m.starts_at).toLocaleDateString("en-CA", { timeZone: KTM }) : "tbd";
+    const key = day(m) ?? "tbd";
     const label = m.starts_at
       ? new Date(m.starts_at).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: KTM })
       : "Date to be announced";

@@ -152,6 +152,13 @@ export interface TournamentTeam {
 export const MATCH_STAGES = ["group", "league", "knockout"] as const;
 export type MatchStage = (typeof MATCH_STAGES)[number];
 
+// Within one day's fixtures, earlier stages/rounds come first (group
+// before knockout, Phase 1 before Round of 32 …), then kick-off time.
+// Callers put the day grouping ahead of this themselves.
+export function compareStageRound(a: Pick<TournamentMatch, "stage" | "round">, b: Pick<TournamentMatch, "stage" | "round">): number {
+  return MATCH_STAGES.indexOf(a.stage) - MATCH_STAGES.indexOf(b.stage) || a.round - b.round;
+}
+
 export const MATCH_STATUS = ["unscheduled", "scheduled", "live", "postponed", "completed", "walkover", "cancelled"] as const;
 export type MatchStatus = (typeof MATCH_STATUS)[number];
 
