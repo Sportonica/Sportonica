@@ -4,11 +4,11 @@ import { SPORT_NAMES as SPORTS, SPORT_COLORS as SPORT_COLOR } from "@/lib/sports
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Clock, X } from "lucide-react";
-import { createCourt, setCourtHours } from "@/lib/admin/actions";
+import { Plus, Clock, X, Trash2, Power } from "lucide-react";
+import { createCourt, setCourtHours, deleteCourt, setCourtActive } from "@/lib/admin/actions";
 import { isActionError } from "@/lib/actionError";
 import type { Court, CourtHours } from "@/lib/admin/types";
-import { DOW_LABELS } from "@/lib/admin/types";
+import { DOW_LABELS, COURT_HAS_HISTORY } from "@/lib/admin/types";
 
 
 
@@ -25,6 +25,29 @@ export default function CourtManager({
   const [adding, setAdding] = useState(false);
   const [editingHours, setEditingHours] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Per-court error (e.g. "has history, deactivate instead"), keyed by court id.
+  const [courtErr, setCourtErr] = useState<{ id: string; message: string } | null>(null);
+
+  function removeCourt(c: Court) {
+    if (!window.confirm(`Delete ${c.name}? Its hours and pricing rules go with it. This can't be undone.`)) return;
+    setCourtErr(null);
+    startTransition(async () => {
+      const res = await deleteCourt(c.id, venueId);
+      if (isActionError(res)) { setCourtErr({ id: c.id, message: res.message }); return; }
+      router.refresh();
+    });
+  }
+
+  function toggleCourt(c: Court) {
+    const active = c.status !== "active";
+    if (!active && !window.confirm(`Deactivate ${c.name}? Players won't be able to book it until you turn it back on.`)) return;
+    setCourtErr(null);
+    startTransition(async () => {
+      const res = await setCourtActive(c.id, venueId, active);
+      if (isActionError(res)) { setCourtErr({ id: c.id, message: res.message }); return; }
+      router.refresh();
+    });
+  }
 
   const sportOpts = venueSports.length ? venueSports : SPORTS;
   const [name, setName] = useState("Court 1");
@@ -89,16 +112,34 @@ export default function CourtManager({
           {courts.map((c) => (
             <div key={c.id}>
               <div className="adm-between" style={{ padding: "12px 14px", background: "var(--a-bg)", borderRadius: 10, border: "1px solid var(--a-line)" }}>
-                <div>
-                  <div style={{ fontWeight: 600 }}>{c.name} <span className="adm-dim" style={{ fontWeight: 400, fontSize: 12 }}>· {c.sport}</span></div>
+                <div style={{ opacity: c.status === "active" ? 1 : 0.6 }}>
+                  <div style={{ fontWeight: 600 }}>
+                    {c.name} <span className="adm-dim" style={{ fontWeight: 400, fontSize: 12 }}>· {c.sport}</span>
+                    {c.status !== "active" && <span className="adm-badge neutral" style={{ marginLeft: 8 }}>{c.status === "maintenance" ? "Maintenance" : "Inactive"}</span>}
+                  </div>
                   <div className="adm-num adm-dim" style={{ fontSize: 12, marginTop: 2 }}>
                     Rs {c.base_price}/hr · {(hoursByCourt[c.id]?.length ?? 0)} day{(hoursByCourt[c.id]?.length ?? 0) !== 1 ? "s" : ""} open
                   </div>
                 </div>
-                <button className="adm-btn sm ghost" onClick={() => setEditingHours(editingHours === c.id ? null : c.id)}>
-                  <Clock size={13} /> Hours
-                </button>
+                <div className="adm-flex" style={{ gap: 6 }}>
+                  <button className="adm-btn sm ghost" onClick={() => setEditingHours(editingHours === c.id ? null : c.id)}>
+                    <Clock size={13} /> Hours
+                  </button>
+                  <button
+                    className={`adm-btn sm ghost${courtErr?.id === c.id && courtErr.message === COURT_HAS_HISTORY ? " primary" : ""}`}
+                    onClick={() => toggleCourt(c)} disabled={pending}
+                    title={c.status === "active" ? "Hide from players" : "Take bookings again"}
+                  >
+                    <Power size={13} /> {c.status === "active" ? "Deactivate" : "Activate"}
+                  </button>
+                  <button className="adm-btn sm ghost danger" onClick={() => removeCourt(c)} disabled={pending} aria-label={`Delete ${c.name}`} title="Delete court">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
+              {courtErr?.id === c.id && (
+                <div className="adm-badge danger" style={{ marginTop: 6, whiteSpace: "normal", lineHeight: 1.45 }}>{courtErr.message}</div>
+              )}
               {editingHours === c.id && (
                 <HoursEditor
                   courtId={c.id}

@@ -6,6 +6,7 @@ import { getVenue, getCourts } from "@/lib/admin/queries";
 import type { CourtHours } from "@/lib/admin/types";
 import { Topbar, VerifyBadge } from "../../ui";
 import CourtManager from "./CourtManager";
+import VenueDangerZone from "./VenueDangerZone";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export default async function VenueDetail({ params }: { params: Promise<{ id: st
         crumb="MANAGE / VENUES"
         action={
           <div className="adm-flex" style={{ gap: 10 }}>
+            {venue.status === "closed" && <span className="adm-badge neutral">Closed</span>}
             <Link href={`/admin/venues/${venue.id}/edit`} className="adm-btn sm">Edit venue</Link>
             <VerifyBadge status={venue.verification_status} />
           </div>
@@ -83,6 +85,8 @@ export default async function VenueDetail({ params }: { params: Promise<{ id: st
             </div>
           </div>
         )}
+
+        <VenueDangerZone venueId={venue.id} venueName={venue.name} status={venue.status} />
       </div>
     </>
   );

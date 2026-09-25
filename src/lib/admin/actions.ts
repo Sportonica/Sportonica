@@ -3,10 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { notifyCourtBooked } from "@/lib/mail/notify";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, safeActionError, type ActionError } from "@/lib/actionError";
 import { friendlyBookingError } from "@/lib/bookings/types";
 import { isValidLocalPhone } from "@/lib/validation/identity";
 import { friendlyPaymentError } from "@/lib/payments/types";
+import { VENUE_HAS_HISTORY, COURT_HAS_HISTORY } from "@/lib/admin/types";
 
 // Columns a venue owner may set/change themselves. verification_status,
 // payout_cap, owner_id, status and the like are platform-controlled —
@@ -132,6 +133,48 @@ export async function updateVenue(id: string, patch: Record<string, unknown>) {
   return data;
 }
 
+// Delete is for venues that never got going (a test venue, a duplicate).
+// Anything with history gets closed instead: court_bookings and payouts
+// cascade on delete, so they're counted up front — a silent cascade would
+// wipe revenue records. games/events/tournaments/payments reference the
+// venue without a cascade, so Postgres refuses (23503) and that maps to
+// the same message.
+export async function deleteVenue(id: string) {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  // venues_owner_del (admin_schema.sql) is owner-only.
+  if (!(await requireVenueAccess(sb, id, "owner"))) return actionError("FORBIDDEN");
+  const [bookings, payouts] = await Promise.all([
+    sb.from("court_bookings").select("id", { count: "exact", head: true }).eq("venue_id", id),
+    sb.from("payouts").select("id", { count: "exact", head: true }).eq("venue_id", id),
+  ]);
+  if (bookings.error || payouts.error) {
+    return safeActionError(bookings.error ?? payouts.error, "Could not delete that venue.");
+  }
+  if ((bookings.count ?? 0) > 0 || (payouts.count ?? 0) > 0) return actionError(VENUE_HAS_HISTORY);
+  const { data: deleted, error } = await sb.from("venues").delete().eq("id", id).select("id");
+  if (error) {
+    if (error.code === "23503") return actionError(VENUE_HAS_HISTORY);
+    return safeActionError(error, "Could not delete that venue.");
+  }
+  // RLS filters rather than errors — zero rows back means it wasn't ours to delete.
+  if (!deleted?.length) return actionError("Could not delete that venue.");
+  revalidatePath("/admin/venues");
+  revalidatePath("/admin");
+}
+
+// Closing hides the venue from players (discovery filters status='open')
+// while keeping every record. Owner-only, like delete.
+export async function setVenueOpen(id: string, open: boolean) {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, id, "owner"))) return actionError("FORBIDDEN");
+  const { error } = await sb.from("venues").update({ status: open ? "open" : "closed" }).eq("id", id);
+  if (error) return safeActionError(error, "Could not update that venue.");
+  revalidatePath(`/admin/venues/${id}`);
+  revalidatePath("/admin/venues");
+}
+
 // Upload a venue photo to Supabase Storage and append its public URL to the
 // venue's photos array. Expects a 'venue-photos' storage bucket (public).
 export async function uploadVenuePhoto(venueId: string, file: File): Promise<string | ActionError> {
@@ -214,6 +257,37 @@ export async function updateCourt(id: string, venue_id: string, patch: Record<st
   if (Object.keys(safe).length === 0) return actionError("Nothing to update.");
   const { error } = await sb.from("courts").update(safe).eq("id", id).eq("venue_id", venue_id);
   if (error) return actionError(error.message);
+  revalidatePath(`/admin/venues/${venue_id}`);
+}
+
+// Same rule as deleteVenue(): court_bookings cascade, so check first;
+// games reference the court without a cascade (23503).
+export async function deleteCourt(id: string, venue_id: string) {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
+  const { count, error: countError } = await sb
+    .from("court_bookings").select("id", { count: "exact", head: true }).eq("court_id", id);
+  if (countError) return safeActionError(countError, "Could not delete that court.");
+  if ((count ?? 0) > 0) return actionError(COURT_HAS_HISTORY);
+  const { data: deleted, error } = await sb.from("courts").delete().eq("id", id).eq("venue_id", venue_id).select("id");
+  if (error) {
+    if (error.code === "23503") return actionError(COURT_HAS_HISTORY);
+    return safeActionError(error, "Could not delete that court.");
+  }
+  if (!deleted?.length) return actionError("Could not delete that court.");
+  revalidatePath(`/admin/venues/${venue_id}`);
+}
+
+// Inactive courts drop out of player discovery (status='active' filter)
+// but keep their bookings and hours.
+export async function setCourtActive(id: string, venue_id: string, active: boolean) {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
+  const { error } = await sb
+    .from("courts").update({ status: active ? "active" : "inactive" }).eq("id", id).eq("venue_id", venue_id);
+  if (error) return safeActionError(error, "Could not update that court.");
   revalidatePath(`/admin/venues/${venue_id}`);
 }
 
