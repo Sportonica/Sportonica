@@ -129,3 +129,11 @@ export interface Payout {
 }
 
 export const DOW_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// deleteVenue()/deleteCourt() return exactly these messages when the row
+// has booking/payment history, so the UI can offer "close instead"
+// rather than just showing an error.
+export const VENUE_HAS_HISTORY =
+  "This venue has bookings, payments or games on record, so it can't be deleted. Close it instead: players won't see it, and your records stay intact.";
+export const COURT_HAS_HISTORY =
+  "This court has bookings or games on record, so it can't be deleted. Deactivate it instead: players won't be able to book it, and your records stay intact.";

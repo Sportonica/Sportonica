@@ -47,6 +47,7 @@ export default async function VenuesPage() {
                       </div>
                     </div>
                     <div className="adm-flex">
+                      {v.status === "closed" && <span className="adm-badge neutral">Closed</span>}
                       <VerifyBadge status={v.verification_status} />
                       <ChevronRight size={18} className="adm-dim" />
                     </div>

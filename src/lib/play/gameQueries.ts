@@ -84,6 +84,7 @@ export async function getNearbyVenues(game: GameFull, limit = 4) {
     .from("venues")
     .select("id, name, address, photos, lat, lng, maps_url")
     .eq("verification_status", "verified")
+    .eq("status", "open")
     .not("lat", "is", null)
     .limit(40);
 
