@@ -10,6 +10,7 @@ import {
   recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
+import { friendlyTournamentError } from "@/lib/tournaments/types";
 import { getSportKind, type SportKind } from "@/lib/sports";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry } from "@/lib/tournaments/types";
 
@@ -206,7 +207,7 @@ export default function FixturesTab({
     setErr(null);
     startTransition(async () => {
       const res = await action();
-      if (isActionError(res)) { setErr(res.message); return; }
+      if (isActionError(res)) { setErr(friendlyTournamentError(res.message)); return; }
       router.refresh();
     });
   }
@@ -274,7 +275,7 @@ export default function FixturesTab({
     setRegenMsg(null);
     startTransition(async () => {
       const res = await regenerateTournamentFixtures(tournament.id);
-      if (isActionError(res)) { setErr(res.message); return; }
+      if (isActionError(res)) { setErr(friendlyTournamentError(res.message)); return; }
       setRegenMsg(REGEN_MESSAGES[res] ?? res);
       router.refresh();
     });
@@ -1359,7 +1360,7 @@ function MatchPlayerStatsModal({
         red_card: !!reds[p.id],
       }));
       const res = await recordMatchPlayerStats(match.id, stats);
-      if (isActionError(res)) { setErr(res.message); return; }
+      if (isActionError(res)) { setErr(friendlyTournamentError(res.message)); return; }
       onSaved();
     });
   }
@@ -1532,7 +1533,7 @@ function CricketPlayerStatsModal({
         is_mom: p.id === mom,
       }));
       const res = await recordCricketPlayerStats(match.id, stats);
-      if (isActionError(res)) { setErr(res.message); return; }
+      if (isActionError(res)) { setErr(friendlyTournamentError(res.message)); return; }
       onSaved();
     });
   }
