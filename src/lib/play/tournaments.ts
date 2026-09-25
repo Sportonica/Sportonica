@@ -10,7 +10,7 @@ import type { RailEvent } from "@/lib/play/homeRails";
 export type TournamentBrowseItem =
   | { kind: "event"; id: string; sport: string; sportColor: string; title: string; organizerName: string | null; venue: string; when: string; slotsRemaining: number; fee: number; badge: "official" | "platform"; bannerUrl: string | null }
   // when: null = the tournament's dates are still TBD.
-  | { kind: "tournament"; id: string; sport: string; sportColor: string; title: string; organizerName: string | null; venue: string; when: string | null; maxTeams: number | null; fee: number; bannerUrl: string | null; completed: boolean };
+  | { kind: "tournament"; id: string; sport: string; sportColor: string; title: string; organizerName: string | null; venue: string; when: string | null; maxTeams: number | null; fee: number; bannerUrl: string | null; completed: boolean; live: boolean };
 
 // Cookie-free so /tournaments can be edge-cached (revalidate) instead of
 // re-rendered against Sydney every request. Both queries are the same
@@ -65,7 +65,7 @@ export async function listTournaments(): Promise<TournamentBrowseItem[]> {
     kind: "tournament", id: t.id, sport: t.sport, sportColor: sportColor(t.sport),
     title: t.name, organizerName: t.organizer_name, venue: t.venue_name, when: t.starts_at,
     maxTeams: t.max_teams, fee: Number(t.fee), bannerUrl: t.banner_url ?? null,
-    completed: t.status === "completed",
+    completed: t.status === "completed", live: t.status === "live",
   }));
 
   // Upcoming/live first (soonest first); completed tournaments sink to

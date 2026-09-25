@@ -19,6 +19,15 @@ function when(iso: string | null) {
   return `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: KTM })} · ${time}`;
 }
 
+// Which day of a live tournament it is, counted in Kathmandu calendar
+// days — "Day 2" says more on a running event than its start date does.
+function liveDay(iso: string | null) {
+  if (!iso) return null;
+  const day = (x: Date) => Date.parse(x.toLocaleDateString("en-CA", { timeZone: KTM }));
+  const n = Math.round((day(new Date()) - day(new Date(iso))) / 864e5) + 1;
+  return n >= 1 ? n : null;
+}
+
 export default function TournamentsClient({ items }: { items: TournamentBrowseItem[] }) {
   const [sport, setSport] = useState<string | null>(null);
 
@@ -76,6 +85,8 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
             {shown.map((item) => {
               const href = item.kind === "tournament" ? `/tournaments/${item.id}` : `/game/${item.id}`;
               const completed = item.kind === "tournament" && item.completed;
+              const live = item.kind === "tournament" && item.live;
+              const day = live ? liveDay(item.when) : null;
               const hasImg = item.bannerUrl && /^https?:\/\//i.test(item.bannerUrl);
               // The "Completed" chip above already says the status — repeating
               // the word here instead of the actual date it happened is just
@@ -84,7 +95,7 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
               return (
                 <Link
                   key={`${item.kind}-${item.id}`} href={href} className="tc-card"
-                  data-completed={completed} style={{ ["--tc-accent" as string]: item.sportColor }}
+                  data-completed={completed} data-live={live} style={{ ["--tc-accent" as string]: item.sportColor }}
                 >
                   <div className="tc-media">
                     {hasImg ? (
@@ -97,9 +108,11 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
                     ) : (
                       <div className="tc-media-empty"><Trophy size={30} /></div>
                     )}
-                    <span className={`tc-status${completed ? " done" : ""}`}>
+                    <span className={`tc-status${completed ? " done" : live ? " live" : ""}`}>
                       {completed
                         ? <><Check size={11} /> Completed</>
+                        : live
+                        ? <><span className="tc-live-dot" aria-hidden="true" /> Live{day && <span className="tc-live-day">Day {day}</span>}</>
                         : item.kind === "tournament"
                         ? <><Trophy size={11} /> Tournament</>
                         : item.badge === "platform" ? <><Star size={11} /> Sportonica</> : <><Check size={11} /> Official</>}
@@ -113,7 +126,15 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
                     {item.organizerName && <div className="tc-org">By {item.organizerName}</div>}
 
                     <div className="tc-loc"><MapPin size={13} /><span>{item.venue}</span></div>
-                    <div className={`tc-date${!item.when ? " tbd" : ""}`}>{dateLabel}</div>
+                    {live ? (
+                      <div className="tc-date tc-date-live">
+                        <span className="tc-eq" aria-hidden="true"><i /><i /><i /></span>
+                        Happening now
+                        {item.when && <span className="tc-date-since">since {dateLabel.split(" · ")[0]}</span>}
+                      </div>
+                    ) : (
+                      <div className={`tc-date${!item.when ? " tbd" : ""}`}>{dateLabel}</div>
+                    )}
 
                     <div className="tc-foot">
                       {item.kind === "tournament"
