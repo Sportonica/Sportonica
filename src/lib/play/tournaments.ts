@@ -40,7 +40,9 @@ async function listPublicTournamentRows(): Promise<(Tournament & { venue_name: s
     // A TBD tournament has no ends_at yet to compare against — keep it
     // listed (it's neither past nor completed) rather than letting a
     // null fail the "still upcoming" check and vanish from the page.
-    .or(`ends_at.gte.${nowIso},ends_at.is.null,status.eq.completed`)
+    // Likewise a live tournament stays listed past ends_at — organizers
+    // often run over or forget to mark it completed.
+    .or(`ends_at.gte.${nowIso},ends_at.is.null,status.in.(live,completed)`)
     .order("starts_at", { ascending: true, nullsFirst: false })
     .limit(100);
   return ((data ?? []) as unknown as (Tournament & { venues: { name: string } | null })[]).map((t) => {
