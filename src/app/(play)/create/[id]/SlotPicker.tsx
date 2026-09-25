@@ -189,7 +189,7 @@ export default function SlotPicker({
     return <div className="sp-msg"><Loader2 size={16} className="sp-spin" /> Checking what&apos;s free…</div>;
   }
   if (slots.length === 0) {
-    return <div className="sp-msg"><CalendarX size={18} style={{ opacity: .6 }} /> Closed on this day. Try another date.</div>;
+    return <div className="sp-msg"><CalendarX size={18} style={{ opacity: .6 }} /> Coming soon.</div>;
   }
 
   const free = liveSlots.filter((s) => s.available);
