@@ -92,8 +92,13 @@ export default function SportonicaMap({
         }
       ).addTo(map);
 
-      // Add pins
-      pins.forEach(pin => {
+      // ── Pins, clustered ──
+      // Several games (or an event and its venue) often share the exact
+      // same coordinates — plain markers would stack invisibly on top of
+      // each other. Group by on-screen pixel distance instead of by
+      // coordinate so it works the same whether pins merely overlap at
+      // this zoom or sit on literally the same point.
+      function pinMarker(pin: MapPin) {
         const color = pin.flash ? "#E85D24" : (pin.color ?? sportColor(normalizeSport(pin.sport)));
         const svgIcon = L.divIcon({
           className: "",
@@ -119,14 +124,72 @@ export default function SportonicaMap({
         });
 
         const marker = L.marker([pin.lat, pin.lng], { icon: svgIcon })
-          .addTo(map)
           .bindPopup(`
             <div style="font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:#1e293b;">
               ${pin.label}${pin.sport ? `<br><span style="color:${color};font-weight:700">${pin.sport}</span>` : ""}
+              <br><a href="https://www.google.com/maps/dir/?api=1&destination=${pin.lat},${pin.lng}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;color:#006241;font-weight:700;text-decoration:none;font-size:12px;">Get directions →</a>
             </div>
           `);
         if (onPinClick) marker.on("click", () => onPinClick(pin.id));
-      });
+        return marker;
+      }
+
+      function clusterMarker(group: MapPin[]) {
+        const lat = group.reduce((s, p) => s + p.lat, 0) / group.length;
+        const lng = group.reduce((s, p) => s + p.lng, 0) / group.length;
+        const color = group[0].color ?? sportColor(normalizeSport(group[0].sport));
+        const icon = L.divIcon({
+          className: "",
+          html: `
+            <div style="
+              width:34px;height:34px;border-radius:50%;
+              background:${color};color:#fff;
+              display:flex;align-items:center;justify-content:center;
+              font-weight:800;font-size:13px;font-family:'Inter',sans-serif;
+              box-shadow:0 2px 14px rgba(0,0,0,0.55);border:2px solid rgba(255,255,255,0.85);
+            ">${group.length}</div>
+          `,
+          iconSize: [34, 34],
+          iconAnchor: [17, 17],
+        });
+        const marker = L.marker([lat, lng], { icon });
+        marker.on("click", () => {
+          const bounds = L.latLngBounds(group.map((p) => [p.lat, p.lng] as [number, number]));
+          // Every pin in the cluster sits on (near enough) the same point —
+          // fitBounds has nothing to zoom into, so step in manually instead.
+          if (bounds.getNorthEast().equals(bounds.getSouthWest())) {
+            map.setView(bounds.getCenter(), Math.min(map.getZoom() + 3, 18));
+          } else {
+            map.fitBounds(bounds.pad(0.3));
+          }
+        });
+        return marker;
+      }
+
+      const CLUSTER_PX = 42;
+      function groupByPixel(): MapPin[][] {
+        const clusters: { pt: import("leaflet").Point; items: MapPin[] }[] = [];
+        for (const pin of pins) {
+          const pt = map.latLngToContainerPoint([pin.lat, pin.lng]);
+          const near = clusters.find((c) => c.pt.distanceTo(pt) <= CLUSTER_PX);
+          if (near) near.items.push(pin);
+          else clusters.push({ pt, items: [pin] });
+        }
+        return clusters.map((c) => c.items);
+      }
+
+      const pinsLayer = L.layerGroup().addTo(map);
+      function renderPins() {
+        pinsLayer.clearLayers();
+        for (const group of groupByPixel()) {
+          (group.length === 1 ? pinMarker(group[0]) : clusterMarker(group)).addTo(pinsLayer);
+        }
+      }
+      renderPins();
+      // Pixel positions (and so which pins overlap) shift with every pan
+      // and zoom — recompute clusters each time instead of only once.
+      map.on("zoomend", renderPins);
+      map.on("moveend", renderPins);
 
       // Pick mode
       if (pickMode) {
