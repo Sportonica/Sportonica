@@ -513,9 +513,9 @@
 }
 .fcard-sports .more { background: transparent; color: var(--accent); border: 1px solid currentColor; }
 
-/* actions — book + map */
+/* actions — book + distance */
 .fcard-actions { display: flex; align-items: center; gap: 8px; }
-.fcard-book, .fcard-map {
+.fcard-book, .fcard-km {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 9px 14px; border-radius: 11px;
   font-size: 12.5px; font-weight: 800; cursor: pointer;
@@ -523,8 +523,7 @@
 }
 .fcard-book { background: var(--accent); color: var(--panel); }
 .fcard:hover .fcard-book, .fcard.is-open .fcard-book { transform: translateY(-1px); }
-.fcard-map { background: var(--chip); color: var(--dim); }
-.fcard-map:hover { color: var(--fg); transform: translateY(-1px); }
+.fcard-km { background: var(--chip); color: var(--dim); cursor: inherit; }
 
 /* ── Phones: one card per row. Two columns left the panel far too
    short, so the buttons were being clipped. ── */
@@ -559,13 +558,13 @@
   /* Book/Map are compact secondary taps (the whole card is the primary
      target already) — nudged toward, not fully to, the 44px touch-target
      bar so the card doesn't have to grow taller to fit them. */
-  .fcard-book, .fcard-map { padding: 11px 14px; }
+  .fcard-book, .fcard-km { padding: 11px 14px; }
 }
 
 @media (max-width: 380px) {
   .fcard { aspect-ratio: 1 / 1; }
   .fcard-name { font-size: 16px; }
-  .fcard-book, .fcard-map { padding: 10px 12px; font-size: 12px; }
+  .fcard-book, .fcard-km { padding: 10px 12px; font-size: 12px; }
 }
 
 /* ── Search ── */
@@ -621,7 +620,7 @@
   /* Book/Map are compact secondary taps (the whole card is the primary
      target already) — nudged toward, not fully to, the 44px touch-target
      bar so the card doesn't have to grow taller to fit them. */
-  .fcard-book, .fcard-map { padding: 11px 14px; font-size: 12.5px; }
+  .fcard-book, .fcard-km { padding: 11px 14px; font-size: 12.5px; }
 }
 
 /* This is the block that actually wins the cascade at narrow widths (it's
@@ -631,7 +630,7 @@
 @media (max-width: 380px) {
   .fcard-name { font-size: 16.5px; }
   .fcard-price { font-size: 17px; }
-  .fcard-book, .fcard-map { padding: 10px 12px; font-size: 12px; }
+  .fcard-book, .fcard-km { padding: 10px 12px; font-size: 12px; }
 }
 
 /* ── Where it is: address + distance, under the name ── */
