@@ -21,6 +21,13 @@ function km(aLat: number, aLng: number, bLat: number, bLng: number) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// How many (already distance-sorted) results to hand back. Generous on
+// purpose: the caller (NearbyPopup) re-filters this same list as the
+// visitor changes the radius chip, rather than re-querying the database
+// on every change, so it needs enough candidates to still have some
+// left at the widest radius.
+const RESULT_LIMIT = 30;
+
 // Closest approved venues + closest upcoming games to a point. The two
 // queries are independent on purpose (Promise.allSettled, not
 // Promise.all) — a transient failure on one (a slow/overloaded
@@ -55,7 +62,7 @@ export async function nearbyVenuesAndGames(lat: number, lng: number): Promise<Ne
         km: km(lat, lng, v.lat as number, v.lng as number),
       }))
       .sort((a, b) => a.km - b.km)
-      .slice(0, 8),
+      .slice(0, RESULT_LIMIT),
     games: (games ?? [])
       .map((g) => ({
         id: g.id, title: g.title, sport: g.sport, venue: g.venue,
@@ -64,6 +71,6 @@ export async function nearbyVenuesAndGames(lat: number, lng: number): Promise<Ne
         km: km(lat, lng, g.venue_lat as number, g.venue_lng as number),
       }))
       .sort((a, b) => a.km - b.km)
-      .slice(0, 8),
+      .slice(0, RESULT_LIMIT),
   };
 }
