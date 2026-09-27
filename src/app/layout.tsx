@@ -3,6 +3,7 @@ import './globals.css'
 import NavWrapper from '@/components/NavWrapper'
 import PWARegister from '@/components/PWARegister'
 import CapacitorBridge from '@/components/CapacitorBridge'
+import PushBridge from '@/components/PushBridge'
 import PageTransition from '@/components/PageTransition'
 import Onboarding from '@/components/onboarding/Onboarding'
 
@@ -66,6 +67,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </PageTransition>
         <PWARegister />
         <CapacitorBridge />
+        <PushBridge />
         <Onboarding />
       </body>
     </html>
