@@ -6,28 +6,44 @@ import { actionError, type ActionError } from "@/lib/actionError";
 import { isValidLocalPhone, normalizePhone } from "@/lib/validation/identity";
 
 // Internal e-mail synthesised for a phone-only account. The user never
-// sees or types it — phone login resolves it back via email_for_phone().
-// A dedicated subdomain keeps it from ever colliding with a real address.
+// sees or types it. A dedicated subdomain keeps it from ever colliding
+// with a real address. Deterministic, so the login page can sign a
+// phone-signup account in directly without any lookup.
 function syntheticEmailForPhone(digits: string): string {
   return `${digits}@phone.sportonica.com`;
 }
 
-// Phone-based login: the app stores phone on `profiles`, not in Supabase
-// Auth, so "sign in with phone + password" is a two-step — map the phone
-// to its account email here (via a SECURITY DEFINER RPC that can read
-// auth.users), then the client does the normal password sign-in.
-export async function resolveEmailForPhone(
+// Phone login for accounts whose email ISN'T the synthetic one (an email
+// signup that later added a phone, or a phone-signup that changed its
+// number). The login page tries the synthetic address first and only
+// falls back here. The phone -> email lookup and the password sign-in
+// both happen server-side, so the email never reaches the browser —
+// email_for_phone() is service-role only for exactly that reason. The
+// session lands in cookies; the caller does a full navigation to pick
+// it up.
+export async function signInWithPhone(
   phone: string,
-): Promise<{ email: string } | ActionError> {
-  if (!isValidLocalPhone(phone)) return actionError("INVALID_PHONE");
+  password: string,
+): Promise<{ role: string | null } | ActionError> {
+  if (!isValidLocalPhone(phone) || !password) return actionError("BAD_CREDENTIALS");
+  const digits = normalizePhone(phone);
+
+  let admin;
+  try {
+    admin = createServiceClient();
+  } catch {
+    return actionError("UNAVAILABLE");
+  }
+  const { data: email } = await admin.rpc("email_for_phone", { p_phone: digits });
+  // The page already tried the synthetic address with this password —
+  // don't burn a second attempt on the same account.
+  if (!email || email === syntheticEmailForPhone(digits)) return actionError("BAD_CREDENTIALS");
 
   const sb = await createClient();
-  const { data, error } = await sb.rpc("email_for_phone", {
-    p_phone: normalizePhone(phone),
-  });
-  if (error || !data) return actionError("NOT_FOUND");
+  const { data, error } = await sb.auth.signInWithPassword({ email: String(email), password });
+  if (error) return actionError("BAD_CREDENTIALS");
 
-  return { email: String(data) };
+  return { role: (data.user?.user_metadata?.role as string | undefined) ?? null };
 }
 
 // Phone-only signup. Supabase's own phone provider needs an SMS gateway

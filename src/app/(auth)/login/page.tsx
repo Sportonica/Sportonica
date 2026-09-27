@@ -13,10 +13,10 @@ import SubmitButton from "@/components/auth/SubmitButton";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
-  normalizeEmail, isValidEmail, isValidLocalPhone, looksLikeEmail,
+  normalizeEmail, normalizePhone, isValidEmail, isValidLocalPhone, looksLikeEmail,
 } from "@/lib/validation/identity";
 import { safeRedirect } from "@/lib/validation/redirect";
-import { resolveEmailForPhone } from "@/lib/auth/actions";
+import { signInWithPhone } from "@/lib/auth/actions";
 import { isActionError } from "@/lib/actionError";
 
 // Shown for any failed sign-in regardless of cause, so an attacker can't
@@ -44,29 +44,40 @@ function LoginInner() {
     const id = identifier.trim();
     if (!id || !password) { setErr("Enter your mobile number or email, and your password."); return; }
 
+    const target = (role: unknown) =>
+      redirect ? safeRedirect(redirect) : role === "venue_owner" || role === "admin" ? "/admin" : "/discover";
+
     let signInEmail: string;
     if (looksLikeEmail(id)) {
       if (!isValidEmail(id)) { setErr(BAD_IDENTIFIER); return; }
       signInEmail = normalizeEmail(id);
     } else {
       if (!isValidLocalPhone(id)) { setErr(BAD_IDENTIFIER); return; }
-      setLoading(true); setErr(null);
-      const resolved = await resolveEmailForPhone(id);
-      if (isActionError(resolved)) { setErr(BAD_CREDENTIALS); setLoading(false); return; }
-      signInEmail = resolved.email;
+      // Phone-signup accounts use a deterministic internal address.
+      signInEmail = `${normalizePhone(id)}@phone.sportonica.com`;
     }
 
     setLoading(true); setErr(null);
     const { data, error } = await sb.auth.signInWithPassword({ email: signInEmail, password });
-    if (error) { setErr(BAD_CREDENTIALS); setLoading(false); return; }
-
-    if (redirect) {
-      router.push(safeRedirect(redirect));
-    } else {
-      const role = data.user?.user_metadata?.role;
-      router.push(role === "venue_owner" || role === "admin" ? "/admin" : "/discover");
+    if (!error) {
+      router.push(target(data.user?.user_metadata?.role));
+      router.refresh();
+      return;
     }
-    router.refresh();
+
+    // A phone that belongs to an account with a real email: resolved and
+    // signed in server-side so that email is never sent to the browser.
+    if (!looksLikeEmail(id)) {
+      const res = await signInWithPhone(id, password).catch(() => null);
+      if (res && !isActionError(res)) {
+        // Session was set as cookies by the server — a full load makes the
+        // in-memory auth client pick it up.
+        window.location.assign(target(res.role));
+        return;
+      }
+    }
+    setErr(BAD_CREDENTIALS);
+    setLoading(false);
   }
 
   // The brand lockup doubles as a link home. Rendered in the left
