@@ -162,6 +162,25 @@ export function nearestArea(city: City, lat: number, lng: number): Area | null {
   return best;
 }
 
+/**
+ * Where someone is standing, as the header names it. Picks the closest
+ * *area* across every city and takes its city — the valley's city centres
+ * are only a few km apart, so choosing the city first put people on
+ * Bhaktapur's west side into Kathmandu or Lalitpur. A coarse fix (wifi/IP
+ * guesses are often km off) only claims the city, not a neighbourhood.
+ */
+export function nearestPlace(lat: number, lng: number, accuracyM = 0): { city: City; area: Area | null } {
+  let best: { city: City; area: Area; km: number } | null = null;
+  for (const c of CITIES) {
+    for (const a of c.areas ?? []) {
+      const km = kmFrom(lat, lng, a.lat, a.lng);
+      if (!best || km < best.km) best = { city: c, area: a, km };
+    }
+  }
+  if (!best || best.km > AREA_RADIUS_KM * 2) return { city: nearestCity(lat, lng), area: null };
+  return { city: best.city, area: accuracyM > 2000 ? null : best.area };
+}
+
 /** Nearest listed city to a pair of coordinates. */
 export function nearestCity(lat: number, lng: number): City {
   let best = CITIES[0];

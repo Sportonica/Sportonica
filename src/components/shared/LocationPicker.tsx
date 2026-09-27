@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, MapPin, Check, Navigation, Loader2 } from "lucide-react";
-import { CITIES, useCity, nearestCity, nearestArea, type City, type Area } from "@/lib/city";
+import { CITIES, useCity, nearestPlace, type City, type Area } from "@/lib/city";
 
 /**
  * Drops the header's "where do you play" picker into any search bar, so
@@ -33,12 +33,12 @@ export default function LocationPicker() {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        const c = nearestCity(p.coords.latitude, p.coords.longitude);
-        setCity(c, nearestArea(c, p.coords.latitude, p.coords.longitude));
+        const { city: c, area: a } = nearestPlace(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
+        setCity(c, a);
         setLocating(false); setOpen(false);
       },
       () => setLocating(false),
-      { timeout: 8000 }
+      { timeout: 8000, enableHighAccuracy: true }
     );
   }
   function pickCity(c: City) {
