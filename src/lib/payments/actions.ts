@@ -2,10 +2,13 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { friendlyPaymentError } from "./types";
+import { friendlyPaymentError, bookingLabel, PAYMENT_METHOD_LABEL } from "./types";
 import type { BookingType, Payment, PaymentMethod, PaymentMethodConfig } from "./types";
 import { notifyPaymentSubmitted, notifyHostedEventIfPublished, notifyPlayTogetherGamePublishedIfAny } from "@/lib/mail/notify";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { sendMail } from "@/lib/mail/mailer";
+import { bookingReceipt } from "@/lib/mail/templates";
+import { STATUS_LABEL, getReceiptData } from "./statement";
+import { actionError, safeActionError, isActionError, type ActionError } from "@/lib/actionError";
 
 async function requireUser() {
   const sb = await createClient();
@@ -131,4 +134,40 @@ export async function getMyPaymentStatus(bookingType: BookingType, bookingId: st
     .maybeSingle();
   if (error) return actionError(error.message);
   return data as Payment | null;
+}
+
+// Self-service "email me a copy" from /profile/payments — separate from
+// the automatic paymentApproved notification (src/lib/mail/notify.ts),
+// which fires once on approval. Court bookings only: a Play Together
+// contribution is paid host-to-player and never gets a payments row.
+export async function emailMyReceipt(courtBookingId: string): Promise<{ ok: true } | ActionError> {
+  const { user } = await requireUser();
+  if (!user) return actionError("Sign in to email a receipt.");
+  if (!user.email) return actionError("Your account has no email on file.");
+
+  const receipt = await getReceiptData(courtBookingId, user.id);
+  if (isActionError(receipt)) return receipt;
+  const { booking: b, payment, playerName } = receipt;
+
+  try {
+    await sendMail(bookingReceipt({
+      to: user.email,
+      playerName,
+      bookingLabel: bookingLabel("court_booking", b.id),
+      venue: b.venues?.name ?? "Venue",
+      court: b.courts?.name ?? "Court",
+      sport: b.courts?.sport ?? "",
+      startsAt: b.starts_at,
+      endsAt: b.ends_at,
+      amount: Number(b.price) || 0,
+      advanceAmount: b.advance_amount != null ? Number(b.advance_amount) : null,
+      paymentMethod: payment ? (PAYMENT_METHOD_LABEL[payment.payment_method as PaymentMethod] ?? payment.payment_method) : null,
+      transactionId: payment?.transaction_id ?? null,
+      status: STATUS_LABEL[b.payment_status] ?? b.payment_status,
+    }));
+  } catch (e) {
+    return safeActionError(e, "Couldn't send the receipt. Try again in a moment.");
+  }
+
+  return { ok: true };
 }

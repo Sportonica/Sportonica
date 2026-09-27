@@ -5,6 +5,16 @@
 export const PAYMENT_METHODS = ["esewa", "khalti", "fonepay", "bank_transfer"] as const;
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
+// Shared by the receipt route and its email (src/app/profile/payments/
+// [id]/receipt/route.tsx, src/lib/payments/actions.ts's emailMyReceipt)
+// so the two can't show a different label for the same method. Several
+// older, unrelated spots in the app (checkout, admin review modals) keep
+// their own copy of this same map — left alone here rather than folded
+// in, since that's a wider cleanup than this one touches.
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  esewa: "eSewa", khalti: "Khalti", fonepay: "FonePay", bank_transfer: "Bank transfer",
+};
+
 export const PAYMENT_STATUS = {
   PENDING_VERIFICATION: "PENDING_VERIFICATION",
   APPROVED: "APPROVED",

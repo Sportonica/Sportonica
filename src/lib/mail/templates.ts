@@ -209,6 +209,47 @@ Sportonica`,
   };
 }
 
+// ── 7b. Customer: a copy of their receipt, on request ──────────────
+// Self-service resend from /profile/payments (src/app/profile/payments/
+// ReceiptActions.tsx) — separate from paymentApproved above, which fires
+// once automatically on approval. This is for whenever they want another
+// copy later (an expense claim, their own records).
+export function bookingReceipt(p: {
+  to: string; playerName: string; bookingLabel: string; venue: string;
+  court: string; sport: string; startsAt: string; endsAt: string;
+  amount: number; advanceAmount: number | null;
+  paymentMethod: string | null; transactionId: string | null; status: string;
+}): Mail {
+  const when = `${fmtWhen(p.startsAt)} – ${fmtWhen(p.endsAt).split(", ").pop()}`;
+  // Matches the printable receipt's "Advance paid" line (see
+  // src/app/profile/payments/[id]/receipt/route.tsx) — without this, a
+  // partial/advance-paid booking would show its full price here with no
+  // sign that only part of it was actually collected.
+  const paymentLines = [
+    p.paymentMethod ? `  Method      ${p.paymentMethod}` : null,
+    p.transactionId ? `  Transaction ${p.transactionId}` : null,
+    p.advanceAmount != null ? `  Advance     ${rs(p.advanceAmount)} paid` : null,
+  ].filter(Boolean).join("\n");
+  return {
+    to: p.to,
+    subject: `Your receipt: ${p.bookingLabel}`,
+    body: `Hi ${p.playerName},
+
+Here's a copy of your receipt.
+
+  Receipt   ${p.bookingLabel}
+  Venue     ${p.venue}
+  Court     ${p.court}${p.sport ? ` (${p.sport})` : ""}
+  When      ${when}
+  Amount    ${rs(p.amount)}
+${paymentLines ? paymentLines + "\n" : ""}  Status    ${p.status}
+
+Keep this for your records.
+
+Sportonica`,
+  };
+}
+
 // ── 8. Customer: payment rejected ─────────────────────────────────
 export function paymentRejected(p: {
   to: string; playerName: string; bookingLabel: string; reason: string;
