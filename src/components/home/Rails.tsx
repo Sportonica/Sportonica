@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRef } from "react";
-import { MapPin, Users, ChevronLeft, ChevronRight, ImageIcon, ShieldCheck, Star, Check } from "lucide-react";
+import { MapPin, Users, ChevronLeft, ChevronRight, ImageIcon, ShieldCheck, Star, Check, Sparkles } from "lucide-react";
 import { sportColor } from "@/lib/sports";
 import type { RailEvent, RailVenue, RailMatch } from "@/lib/play/homeRails";
+import type { RecommendedVenue } from "@/lib/play/recommendations";
 
 const KTM = "Asia/Kathmandu";
 
@@ -76,6 +77,46 @@ export function EventsRail({ events }: { events: RailEvent[] }) {
             <div className="rc-foot">
               <span style={{ color: c }}>{e.slots_remaining} spots left</span>
               <span>{Number(e.fee) === 0 ? "Free" : `Rs ${e.fee}`}</span>
+            </div>
+          </Link>
+        );
+      })}
+    </Rail>
+  );
+}
+
+/** Same card as VenuesRail, plus a reason chip explaining the pick (see src/lib/play/recommendations.ts). */
+export function RecommendedRail({ venues }: { venues: RecommendedVenue[] }) {
+  if (venues.length === 0) return null;
+  return (
+    <Rail
+      title="Recommended for you"
+      sub="Matched to the sports you play, with popular grounds filling any gaps."
+      href="/create" hrefLabel="See all grounds"
+    >
+      {venues.map((v) => {
+        const accent = sportColor(v.sports?.[0]);
+        const photo = v.photos?.[0];
+        return (
+          <Link key={v.id} href={`/create/${v.id}`} className="rc rc-venue" style={{ ["--rc-accent" as string]: accent }}>
+            <div className="rc-img">
+              {photo
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={photo} alt={v.name} loading="lazy" />
+                : <div className="rc-img-empty"><ImageIcon size={24} /></div>}
+            </div>
+            <div className="rc-badge" style={{
+              color: accent,
+              borderColor: `color-mix(in srgb, ${accent} 45%, transparent)`,
+              background: `color-mix(in srgb, ${accent} 12%, transparent)`,
+            }}>
+              <Sparkles size={11} /> {v.reason}
+            </div>
+            <div className="rc-title">{v.name}</div>
+            <div className="rc-meta">{(v.sports ?? []).slice(0, 3).join(" · ") || v.venue_type}</div>
+            <div className="rc-foot">
+              <span>{v.address ?? "Kathmandu"}</span>
+              {v.from_price && <span style={{ color: "#006241" }}>from Rs {v.from_price}/hr</span>}
             </div>
           </Link>
         );
