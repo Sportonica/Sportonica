@@ -54,7 +54,7 @@ export async function proxy(request: NextRequest) {
   // round-trip at all, so trusting it here was a direct privilege-escalation
   // path independent of anything on the profiles table itself.
   if (path.startsWith('/admin')) {
-    if (!user) {
+    if (!isRealUser) {
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', path)
       return NextResponse.redirect(loginUrl)
@@ -77,7 +77,7 @@ export async function proxy(request: NextRequest) {
   // visitor was reliably bounced to /login. Doing it here, before any
   // page code runs, is the same mechanism that already works for /admin.
   if (path.startsWith('/platform')) {
-    if (!user) {
+    if (!isRealUser) {
       const loginUrl = new URL('/login', request.url)
       loginUrl.searchParams.set('redirect', path)
       return NextResponse.redirect(loginUrl)

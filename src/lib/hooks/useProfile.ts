@@ -50,17 +50,22 @@ async function loadProfile(): Promise<void> {
     .eq("id", u.id)
     .maybeSingle();
 
-  if (error || !data) {
-    // Profile doesn't exist yet — create it
-    const { data: created } = await sb()
+  if (error) {
+    // A failed read is not a missing row — writing here used to overwrite
+    // the user's edited name with their signup metadata on any blip.
+    setSnapshot({ profile: null, loading: false });
+  } else if (!data) {
+    // Profile doesn't exist yet — create it. Role is left to the column
+    // default: user_metadata is client-editable, so it must never seed a
+    // role. ignoreDuplicates makes a concurrent create a no-op, not an update.
+    await sb()
       .from("profiles")
       .upsert({
         id:        u.id,
         full_name: u.user_metadata?.full_name ?? u.email ?? null,
-        role:      u.user_metadata?.role ?? "player",
-      }, { onConflict: "id" })
-      .select()
-      .single();
+      }, { onConflict: "id", ignoreDuplicates: true });
+    const { data: created } = await sb()
+      .from("profiles").select("*").eq("id", u.id).maybeSingle();
     setSnapshot({ profile: created as Profile | null, loading: false });
   } else {
     setSnapshot({ profile: data as Profile, loading: false });
