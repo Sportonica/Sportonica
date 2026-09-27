@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "821835484637",
+    "project_id": "sportonica-3ee6e",
+    "storage_bucket": "sportonica-3ee6e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:821835484637:android:4cc8e467a35b395594ba34",
+        "android_client_info": {
+          "package_name": "com.sportonica.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBg8KbNpICayntxyZnuaXkpzqPw_UqbCX8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
