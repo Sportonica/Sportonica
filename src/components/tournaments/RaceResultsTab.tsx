@@ -8,6 +8,7 @@ import {
   setTeamRaceCategory, recordRaceResult, getRaceResults,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
+import { friendlyTournamentError } from "@/lib/tournaments/types";
 import { RACE_RESULT_STATUS, RACE_RESULT_STATUS_LABELS } from "@/lib/tournaments/types";
 import type { Tournament, TournamentTeam, TournamentRaceCategory, RaceResultRow, RaceResultStatus } from "@/lib/tournaments/types";
 
@@ -67,7 +68,7 @@ export default function RaceResultsTab({ tournament, teams }: {
     setErr(null);
     startTransition(async () => {
       const res = await action();
-      if (isActionError(res)) { setErr(res.message); return; }
+      if (isActionError(res)) { setErr(friendlyTournamentError(res.message)); return; }
       load();
       router.refresh();
     });

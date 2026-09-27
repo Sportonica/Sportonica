@@ -436,6 +436,9 @@ export type TournamentDraftInput = Partial<{
 
 export const TOURNAMENT_ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN: "You don't have permission to do that.",
+  // Returned by the server actions themselves (not the DB) when the
+  // request arrives with no session — almost always an expired login.
+  UNAUTHORIZED: "You've been signed out. Log in again, then retry.",
   NOT_FOUND: "Tournament not found.",
   VENUE_NOT_FOUND: "That venue couldn't be found.",
   VENUE_NOT_CONFIRMED: "The venue hasn't confirmed hosting this tournament yet. Check back once they respond, or pick another venue.",
