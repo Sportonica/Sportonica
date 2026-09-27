@@ -2,10 +2,17 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { friendlyPaymentError } from "./types";
+import { friendlyPaymentError, bookingLabel } from "./types";
 import type { BookingType, Payment, PaymentMethod, PaymentMethodConfig } from "./types";
 import { notifyPaymentSubmitted, notifyHostedEventIfPublished, notifyPlayTogetherGamePublishedIfAny } from "@/lib/mail/notify";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { sendMail } from "@/lib/mail/mailer";
+import { bookingReceipt } from "@/lib/mail/templates";
+import { STATUS_LABEL } from "./statement";
+import { actionError, safeActionError, type ActionError } from "@/lib/actionError";
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  esewa: "eSewa", khalti: "Khalti", fonepay: "FonePay", bank_transfer: "Bank transfer",
+};
 
 async function requireUser() {
   const sb = await createClient();
@@ -131,4 +138,57 @@ export async function getMyPaymentStatus(bookingType: BookingType, bookingId: st
     .maybeSingle();
   if (error) return actionError(error.message);
   return data as Payment | null;
+}
+
+// Self-service "email me a copy" from /profile/payments — separate from
+// the automatic paymentApproved notification (src/lib/mail/notify.ts),
+// which fires once on approval. Court bookings only: a Play Together
+// contribution is paid host-to-player and never gets a payments row.
+export async function emailMyReceipt(courtBookingId: string): Promise<{ ok: true } | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("Sign in to email a receipt.");
+  if (!user.email) return actionError("Your account has no email on file.");
+
+  const { data: booking, error: bookingErr } = await sb
+    .from("court_bookings")
+    .select("id, user_id, starts_at, ends_at, price, payment_status, courts(name, sport), venues(name)")
+    .eq("id", courtBookingId)
+    .maybeSingle();
+  if (bookingErr) return safeActionError(bookingErr);
+  const b = booking as unknown as {
+    id: string; user_id: string | null; starts_at: string; ends_at: string; price: number; payment_status: string;
+    courts: { name: string; sport: string } | null; venues: { name: string } | null;
+  } | null;
+  if (!b || b.user_id !== user.id) return actionError("Booking not found.");
+
+  const [{ data: payment }, { data: profile }] = await Promise.all([
+    sb.from("payments")
+      .select("payment_method, transaction_id")
+      .eq("court_booking_id", courtBookingId)
+      .order("submitted_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    sb.from("profiles").select("full_name, name").eq("id", user.id).maybeSingle(),
+  ]);
+
+  try {
+    await sendMail(bookingReceipt({
+      to: user.email,
+      playerName: profile?.full_name ?? profile?.name ?? "Player",
+      bookingLabel: bookingLabel("court_booking", b.id),
+      venue: b.venues?.name ?? "Venue",
+      court: b.courts?.name ?? "Court",
+      sport: b.courts?.sport ?? "",
+      startsAt: b.starts_at,
+      endsAt: b.ends_at,
+      amount: Number(b.price) || 0,
+      paymentMethod: payment ? (PAYMENT_METHOD_LABEL[payment.payment_method] ?? payment.payment_method) : null,
+      transactionId: payment?.transaction_id ?? null,
+      status: STATUS_LABEL[b.payment_status] ?? b.payment_status,
+    }));
+  } catch (e) {
+    return safeActionError(e, "Couldn't send the receipt. Try again in a moment.");
+  }
+
+  return { ok: true };
 }
