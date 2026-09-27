@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUpRight, ImageIcon, Check, MapPin, CalendarPlus, Tag, Loader2 } from "lucide-react";
+import { ArrowUpRight, ImageIcon, Check, MapPin, Navigation, CalendarPlus, Tag, Loader2 } from "lucide-react";
 
 // Eight accent pairs, cycled so a wall of grounds never looks flat.
 const HUES = [
@@ -17,7 +17,7 @@ const HUES = [
 ];
 import BookFilters, { NO_BOOK_FILTERS, bookActiveCount, timeLabel, type BookQuery } from "./BookFilters";
 import DateStrip from "@/components/shared/DateStrip";
-import { useCity, inCity } from "@/lib/city";
+import { useCity, inCity, kmFrom } from "@/lib/city";
 import { normalizeSport, SPORT_NAMES } from "@/lib/sports";
 import { useTheme } from "@/lib/hooks/useTheme";
 import { getDaySlots } from "@/lib/play/availability";
@@ -32,6 +32,19 @@ export default function MosaicGrid({ venues, offers = {}, initialSport = null }:
   const [q, setQ] = useState<BookQuery>(() => ({ ...NO_BOOK_FILTERS, sport: initialSport }));
   const [pickDate, setPickDate] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" }));
   const [myCoords, setMyCoords] = useState<[number, number] | null>(null);
+  // Cards show how far each ground is. Only read GPS when the user has
+  // already allowed it — never pop a permission prompt just for browsing.
+  useEffect(() => {
+    if (!navigator.geolocation || !navigator.permissions) return;
+    navigator.permissions.query({ name: "geolocation" }).then((st) => {
+      if (st.state !== "granted") return;
+      navigator.geolocation.getCurrentPosition(
+        (p) => setMyCoords([p.coords.latitude, p.coords.longitude]),
+        () => {},
+        { timeout: 8000 }
+      );
+    }).catch(() => {});
+  }, []);
   const venueTypes = [...new Set(venues.map((v) => v.venue_type).filter(Boolean))];
 
   // Sport is the one filter that lives in the URL too — a shared/refreshed
@@ -44,7 +57,6 @@ export default function MosaicGrid({ venues, offers = {}, initialSport = null }:
 
   function clearFilters() {
     setQ(NO_BOOK_FILTERS);
-    setMyCoords(null);
     router.replace("/create", { scroll: false });
   }
 
@@ -252,13 +264,14 @@ export default function MosaicGrid({ venues, offers = {}, initialSport = null }:
               const sports = v.sports.length ? v.sports : [v.venue_type];
               const shown = sports.slice(0, 3);
               const extra = sports.length - shown.length;
-              const km = myCoords && v.lat != null && v.lng != null ? kmTo(v.lat, v.lng) : null;
+              // Real position if we have it, else the area picked in the header.
+              const km = v.lat == null || v.lng == null ? null
+                : myCoords ? kmTo(v.lat, v.lng)
+                : area ? kmFrom(area.lat, area.lng, v.lat, v.lng)
+                : null;
               const href = `/create/${v.id}?date=${pickDate}${q.time ? `&time=${q.time}` : ""}${q.sport ? `&sport=${encodeURIComponent(q.sport)}` : ""}`;
               // Cards cycle through three skins so a row never looks flat.
               const skin = ["indigo", "chalk", "ink"][i % 3];
-              const maps = v.lat != null && v.lng != null
-                ? `https://www.google.com/maps/search/?api=1&query=${v.lat},${v.lng}`
-                : null;
 
               return (
                 <a
@@ -304,11 +317,10 @@ export default function MosaicGrid({ venues, offers = {}, initialSport = null }:
                   <div className="fcard-panel">
                     <div className="fcard-top">
                       <h3 className="fcard-name">{v.name}</h3>
-                      {(v.address || km != null) && (
+                      {v.address && (
                         <p className="fcard-where">
                           <MapPin size={11} />
-                          {v.address ? v.address.split(",")[0] : "Kathmandu"}
-                          {km != null && <> · <b>{km.toFixed(1)} km</b></>}
+                          {v.address.split(",")[0]}
                         </p>
                       )}
                       <div className="fcard-meta">
@@ -323,13 +335,9 @@ export default function MosaicGrid({ venues, offers = {}, initialSport = null }:
 
                     <div className="fcard-actions">
                       <span className="fcard-book"><CalendarPlus size={14} /> Book</span>
-                      {maps && (
-                        <span
-                          role="link"
-                          className="fcard-map"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(maps, "_blank"); }}
-                        >
-                          <MapPin size={14} /> {km != null ? `${km.toFixed(1)} km` : "Map"}
+                      {km != null && (
+                        <span className="fcard-km">
+                          <Navigation size={13} /> {km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`} away
                         </span>
                       )}
                     </div>
