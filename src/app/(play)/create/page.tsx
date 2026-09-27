@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { browseVenues } from "@/lib/play/queries";
 import { getLiveOffers } from "@/lib/play/pricing";
+import { getMyFavoriteVenueIds } from "@/lib/play/favorites";
 import { resolveSportParam } from "@/lib/sports";
 import MosaicGrid from "./MosaicGrid";
 import "./mosaic.css";
@@ -17,10 +18,18 @@ export default async function CreatePage({
 }: {
   searchParams: Promise<{ sport?: string }>;
 }) {
-  const [{ sport }, venues, offers] = await Promise.all([
+  const [{ sport }, venues, offers, favoriteIds] = await Promise.all([
     searchParams,
     browseVenues(),
     getLiveOffers(),
+    getMyFavoriteVenueIds(),
   ]);
-  return <MosaicGrid venues={venues} offers={offers} initialSport={resolveSportParam(sport)} />;
+  return (
+    <MosaicGrid
+      venues={venues}
+      offers={offers}
+      initialSport={resolveSportParam(sport)}
+      favoriteIds={favoriteIds}
+    />
+  );
 }
