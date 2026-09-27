@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { MapPin, ArrowRight, ChevronDown } from "lucide-react";
 import { EventsRail, VenuesRail, GamesRail, MatchesRail } from "@/components/home/Rails";
 import "@/components/home/rails.css";
+import HomeSearch from "@/components/home/HomeSearch";
 import type { getHomeRails } from "@/lib/play/homeRails";
 import { useCity, inCity } from "@/lib/city";
 
@@ -339,6 +340,11 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
                 </button>
               </div>
             </div>
+
+            {/* One search across sports, venues and places — the only
+                search in the app before this was the area-only one buried
+                in the header's location picker. */}
+            <HomeSearch />
 
             {/* Browse by sport — moved up from further down the page so it's
                 the first thing people act on, right under the hero copy. */}
