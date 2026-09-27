@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChevronDown, MapPin, Check, Navigation, Loader2, ClipboardList, Trophy, LogIn } from "lucide-react";
 import { useProfile } from "@/lib/hooks/useProfile";
-import { CITIES, useCity, greeting, nearestCity, nearestArea, type City, type Area } from "@/lib/city";
+import { CITIES, useCity, greeting, nearestPlace, type City, type Area } from "@/lib/city";
 import { getMyRole } from "@/lib/organizer/actions";
 import { claimGuestTournamentEntries } from "@/lib/tournaments/actions";
 import { safeRedirect } from "@/lib/validation/redirect";
@@ -109,12 +109,12 @@ export default function AppHeader() {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (p) => {
-        const c = nearestCity(p.coords.latitude, p.coords.longitude);
-        setCity(c, nearestArea(c, p.coords.latitude, p.coords.longitude));
+        const { city: c, area: a } = nearestPlace(p.coords.latitude, p.coords.longitude, p.coords.accuracy);
+        setCity(c, a);
         setLocating(false); setAsk(false); setOpen(false);
       },
       () => setLocating(false),
-      { timeout: 8000 }
+      { timeout: 8000, enableHighAccuracy: true }
     );
   }
   function pickCity(c: City) {
