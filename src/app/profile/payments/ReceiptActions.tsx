@@ -5,18 +5,14 @@ import { Printer, Mail, Check } from "lucide-react";
 import { isActionError } from "@/lib/actionError";
 import { emailMyReceipt } from "@/lib/payments/actions";
 
-// Sits inside a plain, non-Link row in the payments list (see page.tsx),
-// so it doesn't need to guard against navigating the row itself — only
-// its own two controls need to not bubble past this wrapper.
+// Only ever rendered for a court-booking row, which page.tsx always
+// renders as a plain div, never a Link — so there's no parent navigation
+// to guard against here (a wrapping stopPropagation would just cancel
+// the print link's own click before the browser could follow it).
 export default function ReceiptActions({ bookingId }: { bookingId: string }) {
   const [pending, startTransition] = useTransition();
   const [sent, setSent] = useState(false);
   const [failed, setFailed] = useState(false);
-
-  function stop(e: React.SyntheticEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-  }
 
   function email() {
     if (pending || sent) return;
@@ -29,7 +25,7 @@ export default function ReceiptActions({ bookingId }: { bookingId: string }) {
   }
 
   return (
-    <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: 4 }} onClick={stop}>
+    <div style={{ display: "flex", gap: 6, alignItems: "center", marginLeft: 4 }}>
       <a
         href={`/profile/payments/${bookingId}/receipt`}
         target="_blank"
@@ -48,7 +44,7 @@ export default function ReceiptActions({ bookingId }: { bookingId: string }) {
         type="button"
         onClick={email}
         disabled={pending}
-        title={failed ? "Couldn't send — tap to retry" : sent ? "Sent" : "Email me a copy"}
+        title={failed ? "Couldn't send. Tap to retry." : sent ? "Sent" : "Email me a copy"}
         aria-label={sent ? "Receipt emailed" : "Email me a copy of this receipt"}
         style={{
           display: "inline-flex", alignItems: "center", justifyContent: "center",

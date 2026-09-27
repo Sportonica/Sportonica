@@ -6,10 +6,17 @@ const KTM = "Asia/Kathmandu";
 const when = (iso: string) =>
   new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: KTM });
 
-// Quote a cell and escape any embedded quote — the one thing a raw CSV
-// writer needs, since a venue or game label can contain a comma.
+// Quote a cell and escape any embedded quote, since a venue or game label
+// (both venue-owner-set, not something Sportonica controls) can contain a
+// comma. Also guard against CSV/formula injection: Excel, Sheets and
+// LibreOffice all treat a cell starting with =, +, - or @ as a formula to
+// evaluate on open — a venue or Play Together host naming their venue
+// something like `=HYPERLINK(...)` would otherwise run for every player
+// who downloads a statement mentioning it. A leading apostrophe forces
+// spreadsheet apps to treat the cell as plain text instead.
 function cell(v: string | number): string {
-  const s = String(v);
+  let s = String(v);
+  if (/^[=+\-@]/.test(s)) s = `'${s}`;
   return /["\n,]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 

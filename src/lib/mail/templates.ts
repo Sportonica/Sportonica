@@ -217,12 +217,18 @@ Sportonica`,
 export function bookingReceipt(p: {
   to: string; playerName: string; bookingLabel: string; venue: string;
   court: string; sport: string; startsAt: string; endsAt: string;
-  amount: number; paymentMethod: string | null; transactionId: string | null; status: string;
+  amount: number; advanceAmount: number | null;
+  paymentMethod: string | null; transactionId: string | null; status: string;
 }): Mail {
   const when = `${fmtWhen(p.startsAt)} – ${fmtWhen(p.endsAt).split(", ").pop()}`;
+  // Matches the printable receipt's "Advance paid" line (see
+  // src/app/profile/payments/[id]/receipt/route.tsx) — without this, a
+  // partial/advance-paid booking would show its full price here with no
+  // sign that only part of it was actually collected.
   const paymentLines = [
     p.paymentMethod ? `  Method      ${p.paymentMethod}` : null,
     p.transactionId ? `  Transaction ${p.transactionId}` : null,
+    p.advanceAmount != null ? `  Advance     ${rs(p.advanceAmount)} paid` : null,
   ].filter(Boolean).join("\n");
   return {
     to: p.to,

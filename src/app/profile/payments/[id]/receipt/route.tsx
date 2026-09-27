@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
-import { bookingLabel } from "@/lib/payments/types";
-import { STATUS_LABEL } from "@/lib/payments/statement";
+import { bookingLabel, PAYMENT_METHOD_LABEL, type PaymentMethod } from "@/lib/payments/types";
+import { STATUS_LABEL, getReceiptData } from "@/lib/payments/statement";
+import { isActionError } from "@/lib/actionError";
 
 export const dynamic = "force-dynamic";
 
@@ -24,41 +25,19 @@ const esc = (s: unknown) =>
 
 const rs = (n: number) => `Rs ${Math.round(n).toLocaleString("en-IN")}`;
 
-const PAYMENT_METHOD_LABEL: Record<string, string> = {
-  esewa: "eSewa", khalti: "Khalti", fonepay: "FonePay", bank_transfer: "Bank transfer",
-};
-
-type BookingRow = {
-  id: string; user_id: string | null; starts_at: string; ends_at: string; price: number;
-  payment_status: string; advance_amount: number | null; created_at: string;
-  courts: { name: string; sport: string } | null; venues: { name: string; address: string | null } | null;
-};
-
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return new Response("Sign in to view this receipt.", { status: 401 });
 
-  const { data: booking } = await sb
-    .from("court_bookings")
-    .select("id, user_id, starts_at, ends_at, price, payment_status, advance_amount, created_at, courts(name, sport), venues(name, address)")
-    .eq("id", id)
-    .maybeSingle();
-  const b = booking as unknown as BookingRow | null;
-  if (!b || b.user_id !== user.id) return new Response("Receipt not found.", { status: 404 });
+  const receipt = await getReceiptData(id, user.id);
+  // A real DB error is already logged server-side inside getReceiptData
+  // (via safeActionError) — this still reads as a plain 404 to the
+  // client either way, same as a booking that isn't theirs or doesn't exist.
+  if (isActionError(receipt)) return new Response("Receipt not found.", { status: 404 });
+  const { booking: b, payment, playerName } = receipt;
 
-  const [{ data: payment }, { data: profile }] = await Promise.all([
-    sb.from("payments")
-      .select("payment_method, transaction_id")
-      .eq("court_booking_id", id)
-      .order("submitted_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    sb.from("profiles").select("full_name, name").eq("id", user.id).maybeSingle(),
-  ]);
-
-  const playerName = profile?.full_name ?? profile?.name ?? "Player";
   const ref = bookingLabel("court_booking", b.id);
   const generated = dateTimeLabel(new Date().toISOString());
   const statusClass = b.payment_status === "paid" ? "" : b.payment_status === "rejected" ? "bad" : "warn";
@@ -145,9 +124,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
 
         <div class="section-h">Payment</div>
         ${payment
-          ? `<div class="row"><span class="k">Method</span><span class="v">${esc(PAYMENT_METHOD_LABEL[payment.payment_method] ?? payment.payment_method)}</span></div>
+          ? `<div class="row"><span class="k">Method</span><span class="v">${esc(PAYMENT_METHOD_LABEL[payment.payment_method as PaymentMethod] ?? payment.payment_method)}</span></div>
              <div class="row"><span class="k">Transaction ID</span><span class="v">${esc(payment.transaction_id)}</span></div>`
-          : `<div class="row"><span class="k">Method</span><span class="v">—</span></div>`}
+          : `<div class="row"><span class="k">Method</span><span class="v">Not recorded</span></div>`}
         ${b.advance_amount != null ? `<div class="row"><span class="k">Advance paid</span><span class="v">${esc(rs(b.advance_amount))}</span></div>` : ""}
 
         <div class="total"><span class="k">Total</span><span class="v">${esc(rs(b.price))}</span></div>
