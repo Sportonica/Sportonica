@@ -7,6 +7,7 @@ import {
   ShieldQuestion, LifeBuoy, ScrollText, LogOut, Users, LayoutDashboard, Trash2, Mail,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { forgetPushToken } from "@/lib/push/client";
 import ShareButton from "@/app/p/[username]/ShareButton";
 import { sportColor, normalizeSport } from "@/lib/sports";
 import type { PlayerProfile, PlayerStats, SportCount, Badge, ActivitySummary } from "@/lib/profile/queries";
@@ -32,6 +33,7 @@ export default function ProfileHub({
 
   async function logout() {
     setLoggingOut(true);
+    await forgetPushToken();
     await createClient().auth.signOut();
     window.location.href = "/";
   }
