@@ -71,11 +71,26 @@ export interface GamePlayerWithProfile extends GamePlayer {
   profiles: { full_name: string | null; name: string | null; avatar_url: string | null; phone: string | null } | null;
 }
 
+// profiles.phone isn't readable through the API (it used to leak every
+// player's number to anyone). The host still needs it on the review
+// screens, so the host-only queues merge it in from game_player_phones(),
+// which returns nothing unless the caller hosts this game.
+async function withHostPhones(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  gameId: string,
+  rows: GamePlayerWithProfile[],
+): Promise<GamePlayerWithProfile[]> {
+  if (!rows.length) return rows;
+  const { data } = await sb.rpc("game_player_phones", { p_game_id: gameId });
+  const phones = new Map(((data ?? []) as { user_id: string; phone: string | null }[]).map((r) => [r.user_id, r.phone]));
+  return rows.map((r) => (r.profiles ? { ...r, profiles: { ...r.profiles, phone: phones.get(r.user_id) ?? null } } : r));
+}
+
 export async function getGamePlayers(gameId: string): Promise<GamePlayerWithProfile[]> {
   const sb = await createClient();
   const { data } = await sb
     .from("game_players")
-    .select("*, profiles(full_name, name, avatar_url, phone)")
+    .select("*, profiles(full_name, name, avatar_url)")
     .eq("game_id", gameId)
     .eq("status", "joined")
     .order("joined_at", { ascending: true });
@@ -90,11 +105,11 @@ export async function getPendingRequests(gameId: string): Promise<GamePlayerWith
   const sb = await createClient();
   const { data } = await sb
     .from("game_players")
-    .select("*, profiles(full_name, name, avatar_url, phone)")
+    .select("*, profiles(full_name, name, avatar_url)")
     .eq("game_id", gameId)
     .eq("status", "requested")
     .order("joined_at", { ascending: true });
-  return (data as GamePlayerWithProfile[]) ?? [];
+  return withHostPhones(sb, gameId, (data as GamePlayerWithProfile[]) ?? []);
 }
 
 // Host-only — the "Manage Payments" queue: players who've submitted proof
@@ -105,11 +120,11 @@ export async function getAwaitingPaymentReview(gameId: string): Promise<GamePlay
   const sb = await createClient();
   const { data } = await sb
     .from("game_players")
-    .select("*, profiles(full_name, name, avatar_url, phone)")
+    .select("*, profiles(full_name, name, avatar_url)")
     .eq("game_id", gameId)
     .eq("status", "payment_verification_pending")
     .order("payment_submitted_at", { ascending: true });
-  return (data as GamePlayerWithProfile[]) ?? [];
+  return withHostPhones(sb, gameId, (data as GamePlayerWithProfile[]) ?? []);
 }
 
 // Host-only — approved players still inside their 2-hour payment window
@@ -119,11 +134,11 @@ export async function getPaymentPendingPlayers(gameId: string): Promise<GamePlay
   const sb = await createClient();
   const { data } = await sb
     .from("game_players")
-    .select("*, profiles(full_name, name, avatar_url, phone)")
+    .select("*, profiles(full_name, name, avatar_url)")
     .eq("game_id", gameId)
     .in("status", ["payment_pending", "payment_rejected"])
     .order("payment_deadline", { ascending: true });
-  return (data as GamePlayerWithProfile[]) ?? [];
+  return withHostPhones(sb, gameId, (data as GamePlayerWithProfile[]) ?? []);
 }
 
 // Host-only — historical requests that never became members: the host
@@ -134,11 +149,11 @@ export async function getHistoricalRequests(gameId: string): Promise<GamePlayerW
   const sb = await createClient();
   const { data } = await sb
     .from("game_players")
-    .select("*, profiles(full_name, name, avatar_url, phone)")
+    .select("*, profiles(full_name, name, avatar_url)")
     .eq("game_id", gameId)
     .in("status", ["rejected", "expired"])
     .order("joined_at", { ascending: false });
-  return (data as GamePlayerWithProfile[]) ?? [];
+  return withHostPhones(sb, gameId, (data as GamePlayerWithProfile[]) ?? []);
 }
 
 // A player's own count of Play Together join requests still somewhere in

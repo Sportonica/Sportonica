@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { PUBLIC_PROFILE_COLUMNS } from "./columns";
 
 export interface PlayerProfile {
   id: string;
@@ -41,17 +42,18 @@ export async function getProfileByUsername(username: string) {
   const sb = await createClient();
   const { data } = await sb
     .from("profiles")
-    .select("*")
+    .select(PUBLIC_PROFILE_COLUMNS)
     .ilike("username", username)
     .maybeSingle();
-  return (data as PlayerProfile) ?? null;
+  // phone isn't readable through the API — never someone else's anyway.
+  return data ? ({ ...data, phone: null } as PlayerProfile) : null;
 }
 
 export async function getMyProfile() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
-  const { data } = await sb.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  const { data } = await sb.rpc("get_my_profile").maybeSingle();
   return (data as PlayerProfile) ?? null;
 }
 
@@ -166,7 +168,7 @@ export async function getProfileByUsernameAnon(username: string) {
   const { anonSelect } = await import("@/lib/supabase/anon");
   const rows = await anonSelect<PlayerProfile>(
     "profiles",
-    `username=ilike.${encodeURIComponent(username)}&select=*&limit=1`
+    `username=ilike.${encodeURIComponent(username)}&select=${PUBLIC_PROFILE_COLUMNS}&limit=1`
   );
   return rows[0] ?? null;
 }

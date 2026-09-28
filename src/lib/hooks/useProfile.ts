@@ -3,6 +3,7 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getCachedUser } from "@/lib/supabase/authCache";
+import { PUBLIC_PROFILE_COLUMNS } from "@/lib/profile/columns";
 
 const sb = () => createClient();
 
@@ -44,11 +45,8 @@ async function loadProfile(): Promise<void> {
   if (!u) { setSnapshot({ loading: false, user: null, profile: null }); return; }
   setSnapshot({ user: { id: u.id, email: u.email } });
 
-  const { data, error } = await sb()
-    .from("profiles")
-    .select("*")
-    .eq("id", u.id)
-    .maybeSingle();
+  // Own row via RPC — it's the only way to read your phone (see columns.ts).
+  const { data, error } = await sb().rpc("get_my_profile").maybeSingle();
 
   if (error) {
     // A failed read is not a missing row — writing here used to overwrite
@@ -64,8 +62,7 @@ async function loadProfile(): Promise<void> {
         id:        u.id,
         full_name: u.user_metadata?.full_name ?? u.email ?? null,
       }, { onConflict: "id", ignoreDuplicates: true });
-    const { data: created } = await sb()
-      .from("profiles").select("*").eq("id", u.id).maybeSingle();
+    const { data: created } = await sb().rpc("get_my_profile").maybeSingle();
     setSnapshot({ profile: created as Profile | null, loading: false });
   } else {
     setSnapshot({ profile: data as Profile, loading: false });
@@ -141,8 +138,8 @@ export function useProfile() {
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data } = await sb()
     .from("profiles")
-    .select("*")
+    .select(PUBLIC_PROFILE_COLUMNS)
     .eq("id", userId)
     .maybeSingle();
-  return data as Profile | null;
+  return data ? ({ ...(data as object), phone: null } as Profile) : null;
 }
