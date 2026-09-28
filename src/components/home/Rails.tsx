@@ -185,7 +185,7 @@ const MATCH_ACCENT: Record<string, string> = {
   Futsal: "#539C49",
 };
 
-function MatchCard({ m }: { m: RailMatch }) {
+export function MatchCard({ m }: { m: RailMatch }) {
   const accent = MATCH_ACCENT[m.sport] ?? sportColor(m.sport);
   const live = m.status === "live";
   const completed = m.status === "completed";
@@ -218,6 +218,9 @@ function MatchCard({ m }: { m: RailMatch }) {
               </div>
             ) : (
               <div className="rc-match-bigscore vs">VS</div>
+            )}
+            {started && m.pensA != null && m.pensB != null && (
+              <div className="rc-match-extra">Pens {m.pensA} : {m.pensB}</div>
             )}
             <div className={`rc-match-pill${live ? " live" : ""}`}>
               {live ? <><i className="rc-live-dot" />Live</> : completed ? "Full-time" : m.startsAt ? when(m.startsAt) : "TBD"}
