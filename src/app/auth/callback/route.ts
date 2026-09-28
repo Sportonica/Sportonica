@@ -12,15 +12,23 @@ export async function GET(request: Request) {
   const next = safeRedirect(url.searchParams.get("next"));
   const origin = url.origin;
 
+  // A broken or expired reset link lands on "Forgot password" with an
+  // explanation rather than on the login page.
+  const failed = (reason: string) =>
+    NextResponse.redirect(next === "/reset-password"
+      ? `${origin}/forgot-password?error=reset_link`
+      : `${origin}/login?error=${reason}`);
+
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=missing_code`);
+    // The provider sends ?error=access_denied when the user backs out.
+    return failed(url.searchParams.get("error") === "access_denied" ? "cancelled" : "missing_code");
   }
 
   const sb = await createClient();
   const { error } = await sb.auth.exchangeCodeForSession(code);
   if (error) {
     console.error("[auth/callback] exchange failed:", error.message);
-    return NextResponse.redirect(`${origin}/login?error=signin_failed`);
+    return failed("signin_failed");
   }
 
   const { data: { user } } = await sb.auth.getUser();

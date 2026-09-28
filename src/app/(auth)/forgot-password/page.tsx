@@ -21,7 +21,11 @@ function ForgotPasswordInner() {
   const sb = createClient();
   const params = useSearchParams();
   const [email, setEmail] = useState(params.get("email")?.trim() ?? "");
-  const [err, setErr] = useState<string | null>(null);
+  // /auth/callback sends a reset link that failed to sign in back here.
+  const [err, setErr] = useState<string | null>(() =>
+    params.get("error") === "reset_link"
+      ? "That reset link has expired or was opened in a different browser or app. Request a new one below and open it on this device."
+      : null);
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -92,7 +96,7 @@ function ForgotPasswordInner() {
                 onEnter={submit}
               />
 
-              {err && <div className="auth-error">{err}</div>}
+              {err && <div className="auth-error" role="alert">{err}</div>}
 
               <SubmitButton loading={loading} onClick={submit}>Send reset link</SubmitButton>
 

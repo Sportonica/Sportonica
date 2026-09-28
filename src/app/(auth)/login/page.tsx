@@ -11,6 +11,7 @@ import AuthInput from "@/components/auth/AuthInput";
 import IdentityBadge from "@/components/auth/IdentityBadge";
 import SubmitButton from "@/components/auth/SubmitButton";
 import { useRouter, useSearchParams } from "next/navigation";
+import { isAuthRetryableFetchError, type AuthError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import {
   normalizeEmail, normalizePhone, isValidEmail, isValidLocalPhone, looksLikeEmail,
@@ -19,10 +20,37 @@ import { safeRedirect } from "@/lib/validation/redirect";
 import { signInWithPhone } from "@/lib/auth/actions";
 import { isActionError } from "@/lib/actionError";
 
-// Shown for any failed sign-in regardless of cause, so an attacker can't
+// Shown for a wrong account OR wrong password alike, so an attacker can't
 // tell "no such account" from "wrong password" (spec §21).
 const BAD_CREDENTIALS = "The email/phone number or password is incorrect.";
 const BAD_IDENTIFIER = "Enter a valid email address or a 10-digit mobile number.";
+const NOT_CONFIRMED = "Confirm your email before signing in. Check your inbox (and spam) for the link we sent.";
+const RATE_LIMITED = "Too many attempts. Wait a few minutes, then try again.";
+const NETWORK = "Couldn't reach Sportonica. Check your connection and try again.";
+const UNAVAILABLE = "Sign-in isn't working right now. Please try again in a moment.";
+
+// /auth/callback sends failed Google/Apple sign-ins back with ?error=.
+const CALLBACK_ERRORS: Record<string, string> = {
+  cancelled: "Sign-in was cancelled. Pick a way to sign in to continue.",
+  missing_code: "That sign-in didn't complete. Please try again.",
+  signin_failed: "That sign-in link didn't work. It may have expired or been opened in a different browser. Please try again.",
+};
+
+// Only email_not_confirmed (which Supabase returns after the password
+// checks out) gets its own message; everything else stays BAD_CREDENTIALS.
+function messageFor(error: AuthError): string {
+  if (isAuthRetryableFetchError(error)) return NETWORK;
+  if (error.code === "email_not_confirmed") return NOT_CONFIRMED;
+  if (error.status === 429) return RATE_LIMITED;
+  if (error.status && error.status >= 500) return UNAVAILABLE;
+  return BAD_CREDENTIALS;
+}
+
+const ACTION_MESSAGES: Record<string, string> = {
+  EMAIL_NOT_CONFIRMED: NOT_CONFIRMED,
+  RATE_LIMITED,
+  UNAVAILABLE,
+};
 
 function LoginInner() {
   const sb = createClient();
@@ -31,8 +59,11 @@ function LoginInner() {
   const redirect = params.get("redirect");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(() => CALLBACK_ERRORS[params.get("error") ?? ""] ?? null);
   const [loading, setLoading] = useState(false);
+  // Email awaiting confirmation: offers the resend button under the error.
+  const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
+  const [resend, setResend] = useState<"idle" | "sending" | "sent">("idle");
 
   const identifierValid = useMemo(() => {
     const id = identifier.trim();
@@ -41,7 +72,9 @@ function LoginInner() {
   }, [identifier]);
 
   async function login() {
+    if (loading) return;   // Enter while a sign-in is already in flight
     const id = identifier.trim();
+    setUnconfirmed(null); setResend("idle");
     if (!id || !password) { setErr("Enter your mobile number or email, and your password."); return; }
 
     const target = (role: unknown) =>
@@ -58,26 +91,58 @@ function LoginInner() {
     }
 
     setLoading(true); setErr(null);
-    const { data, error } = await sb.auth.signInWithPassword({ email: signInEmail, password });
-    if (!error) {
-      router.push(target(data.user?.user_metadata?.role));
-      router.refresh();
-      return;
-    }
+    let navigating = false;
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({ email: signInEmail, password });
+      if (!error) {
+        navigating = true;
+        router.push(target(data.user?.user_metadata?.role));
+        router.refresh();
+        return;
+      }
 
-    // A phone that belongs to an account with a real email: resolved and
-    // signed in server-side so that email is never sent to the browser.
-    if (!looksLikeEmail(id)) {
-      const res = await signInWithPhone(id, password).catch(() => null);
-      if (res && !isActionError(res)) {
+      const message = messageFor(error);
+      // Only wrong credentials on the synthetic phone address fall through
+      // to the server lookup; a network/rate-limit failure would just repeat.
+      if (looksLikeEmail(id) || message !== BAD_CREDENTIALS) {
+        setErr(message);
+        if (message === NOT_CONFIRMED) setUnconfirmed(signInEmail);
+        return;
+      }
+
+      // A phone that belongs to an account with a real email: resolved and
+      // signed in server-side so that email is never sent to the browser.
+      const res = await signInWithPhone(id, password);
+      if (!isActionError(res)) {
+        navigating = true;
         // Session was set as cookies by the server — a full load makes the
         // in-memory auth client pick it up.
         window.location.assign(target(res.role));
         return;
       }
+      setErr(ACTION_MESSAGES[res.message] ?? BAD_CREDENTIALS);
+    } catch {
+      setErr(NETWORK);
+    } finally {
+      if (!navigating) setLoading(false);
     }
-    setErr(BAD_CREDENTIALS);
-    setLoading(false);
+  }
+
+  async function resendConfirmation() {
+    if (!unconfirmed || resend !== "idle") return;
+    setResend("sending");
+    const { error } = await sb.auth.resend({ type: "signup", email: unconfirmed }).catch(
+      () => ({ error: { status: 0 } as AuthError }),
+    );
+    if (error) {
+      setResend("idle");
+      setErr(error.status === 429
+        ? "We just sent one. Wait a minute before asking for another."
+        : "Couldn't send the email. Please try again.");
+      return;
+    }
+    setResend("sent");
+    setErr(null);
   }
 
   // The brand lockup doubles as a link home. Rendered in the left
@@ -142,7 +207,22 @@ function LoginInner() {
             </Link>
           </div>
 
-          {err && <div className="auth-error">{err}</div>}
+          {err && <div className="auth-error" role="alert">{err}</div>}
+          {unconfirmed && resend !== "sent" && (
+            <button
+              type="button"
+              className="auth-resend"
+              onClick={resendConfirmation}
+              disabled={resend === "sending"}
+            >
+              {resend === "sending" ? "Sending…" : "Resend confirmation email"}
+            </button>
+          )}
+          {resend === "sent" && (
+            <div className="auth-note" role="status">
+              Sent. Check your inbox for the new confirmation link, then sign in.
+            </div>
+          )}
 
           <SubmitButton loading={loading} onClick={login}>Sign in</SubmitButton>
 
