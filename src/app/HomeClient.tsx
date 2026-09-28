@@ -6,11 +6,9 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { MapPin, ArrowRight, ChevronDown } from "lucide-react";
-import { EventsRail, VenuesRail, GamesRail, MatchesRail, RecommendedRail } from "@/components/home/Rails";
+import { EventsRail, VenuesRail, GamesRail, MatchesRail } from "@/components/home/Rails";
 import "@/components/home/rails.css";
-import HomeSearch from "@/components/home/HomeSearch";
 import type { getHomeRails } from "@/lib/play/homeRails";
-import { getRecommendedVenues, type RecommendedVenue } from "@/lib/play/recommendations";
 import { useCity, inCity } from "@/lib/city";
 
 type HomeRails = Awaited<ReturnType<typeof getHomeRails>>;
@@ -292,15 +290,6 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
   // the section doesn't read as an empty wall of collapsed bars.
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
-  // Personalised, so it can't ride the cached `rails` prop from page.tsx
-  // (that query runs cookie-free so the rest of the homepage can be edge
-  // cached — see getRecommendedVenues' own comment). Fetched client-side
-  // instead, after the cached rails have already painted.
-  const [recommended, setRecommended] = useState<RecommendedVenue[]>([]);
-  useEffect(() => {
-    getRecommendedVenues().then(setRecommended).catch(() => {});
-  }, []);
-
   useEffect(() => {
     (async () => {
       const raw = sessionStorage.getItem("sportonica_pending_intent");
@@ -351,11 +340,6 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
               </div>
             </div>
 
-            {/* One search across sports, venues and places — the only
-                search in the app before this was the area-only one buried
-                in the header's location picker. */}
-            <HomeSearch />
-
             {/* Browse by sport — moved up from further down the page so it's
                 the first thing people act on, right under the hero copy. */}
             <div id="sports">
@@ -402,7 +386,6 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
         ══════════════════════════════════ */}
         {rails && (
           <div className="p-rails">
-            <RecommendedRail venues={recommended.filter((v) => inCity(v.lat, v.lng, city, area))} />
             <EventsRail events={rails.official} />
             <VenuesRail venues={rails.venues.filter((v) => inCity(v.lat, v.lng, city, area))} />
             <GamesRail games={rails.games} />
