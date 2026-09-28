@@ -34,14 +34,20 @@ export async function signInWithPhone(
   } catch {
     return actionError("UNAVAILABLE");
   }
-  const { data: email } = await admin.rpc("email_for_phone", { p_phone: digits });
+  const { data: email, error: lookupError } = await admin.rpc("email_for_phone", { p_phone: digits });
+  if (lookupError) return actionError("UNAVAILABLE");
   // The page already tried the synthetic address with this password —
   // don't burn a second attempt on the same account.
   if (!email || email === syntheticEmailForPhone(digits)) return actionError("BAD_CREDENTIALS");
 
   const sb = await createClient();
   const { data, error } = await sb.auth.signInWithPassword({ email: String(email), password });
-  if (error) return actionError("BAD_CREDENTIALS");
+  if (error) {
+    // Codes only — the account's email still never reaches the browser.
+    if (error.code === "email_not_confirmed") return actionError("EMAIL_NOT_CONFIRMED");
+    if (error.status === 429) return actionError("RATE_LIMITED");
+    return actionError("BAD_CREDENTIALS");
+  }
 
   return { role: (data.user?.user_metadata?.role as string | undefined) ?? null };
 }
