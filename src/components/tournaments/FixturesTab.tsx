@@ -37,12 +37,84 @@ const DONE = new Set(["completed", "walkover", "cancelled"]);
 // grab round 1's winner by name instead of having to remember/re-find
 // it in the confirmed-teams list.
 function winnerOptions(matches: TournamentMatch[], teamName: (id: string | null) => string) {
-  const out: { id: string; label: string }[] = [];
+  // One entry per team: a team that won several rounds lists them all
+  // ("Phase 1, Quarterfinal") rather than showing up once per win.
+  const byId = new Map<string, { id: string; name: string; won: string[] }>();
   for (const m of matches) {
     if (!m.winner_team_id) continue;
-    out.push({ id: m.winner_team_id, label: `${teamName(m.winner_team_id)} won ${m.round_label}` });
+    const entry = byId.get(m.winner_team_id) ?? { id: m.winner_team_id, name: teamName(m.winner_team_id), won: [] };
+    if (!entry.won.includes(m.round_label)) entry.won.push(m.round_label);
+    byId.set(m.winner_team_id, entry);
   }
-  return out;
+  return [...byId.values()];
+}
+
+// For a knockout round after the first, who can play in it: the
+// previous knockout round's winners (a bye's lone team counts), plus
+// teams entering the knockout for the first time (seeded straight in,
+// e.g. 12 Phase 1 winners + 20 direct entries = Round of 32). Anyone
+// knocked out, or still waiting on an earlier result, isn't listed. null means no restriction: group/league rounds and the
+// first knockout round draw from every confirmed team.
+function previousRoundWinners(
+  matches: TournamentMatch[], teams: TournamentTeam[], teamName: (id: string | null) => string,
+  stage: TournamentMatch["stage"], round: number,
+) {
+  if (stage !== "knockout") return null;
+  const earlier = matches.filter((m) => m.stage === "knockout" && m.round < round);
+  if (earlier.length === 0) return null;
+  const prevRound = Math.max(...earlier.map((m) => m.round));
+  const prev = earlier.filter((m) => m.round === prevRound);
+
+  const playedEarlier = new Set<string>();
+  for (const m of earlier) {
+    if (m.team_a_id) playedEarlier.add(m.team_a_id);
+    if (m.team_b_id) playedEarlier.add(m.team_b_id);
+  }
+
+  const winners = new Map<string, { id: string; name: string; won: string[] }>();
+  for (const m of prev) {
+    const bye = !m.team_b_id ? m.team_a_id : !m.team_a_id ? m.team_b_id : null;
+    const id = m.winner_team_id ?? bye;
+    if (id && !winners.has(id)) winners.set(id, { id, name: teamName(id), won: [m.round_label] });
+  }
+  const direct = new Set(teams.filter((t) => !playedEarlier.has(t.id)).map((t) => t.id));
+  return { winners: [...winners.values()], direct, prevLabel: prev[0].round_label };
+}
+
+// How well a team name matches the search: 0 exact, 1 prefix, 2 start of
+// a later word, 3 anywhere else, null no match. Lower sorts first.
+function matchRank(name: string, q: string): number | null {
+  const n = name.toLowerCase();
+  const i = n.indexOf(q);
+  if (i < 0) return null;
+  if (n === q) return 0;
+  if (i === 0) return 1;
+  if (new RegExp(`(^|[^a-z0-9])${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(n)) return 2;
+  return 3;
+}
+
+// Wraps the first occurrence of q in <mark> so the matched part stands out.
+function Highlight({ text, q }: { text: string; q: string }) {
+  const i = q ? text.toLowerCase().indexOf(q) : -1;
+  if (i < 0) return <>{text}</>;
+  return <>{text.slice(0, i)}<mark className="tc-teamselect-mark">{text.slice(i, i + q.length)}</mark>{text.slice(i + q.length)}</>;
+}
+
+function TeamOption({ opt, q, selected, active, onPick, onHover }: {
+  opt: { name: string; won?: string[] };
+  q: string;
+  selected: boolean;
+  active?: boolean;
+  onPick: () => void;
+  onHover?: () => void;
+}) {
+  return (
+    <div className={`tc-teamselect-opt ${selected ? "on" : ""} ${active ? "active" : ""}`} onClick={onPick} onMouseEnter={onHover}>
+      {selected && <Check size={13} className="tc-teamselect-check" />}
+      <span className="tc-teamselect-name"><Highlight text={opt.name} q={q} /></span>
+      {opt.won && <span className="tc-teamselect-tag">Won {opt.won.join(", ")}</span>}
+    </div>
+  );
 }
 
 // A native <select> with 20+ teams (plus a "Winners" optgroup) is an
@@ -50,11 +122,15 @@ function winnerOptions(matches: TournamentMatch[], teamName: (id: string | null)
 // custom combobox instead: same value/onChange contract as a <select>
 // (so every call site is untouched), but with a search box and a
 // styled list that actually fits the tc-* design language.
-function TeamSelect({ value, onChange, teams, winners, excludeId, placeholder, style }: {
+function TeamSelect({ value, onChange, teams, winners, restrictTo, excludeId, placeholder, style }: {
   value: string;
   onChange: (id: string) => void;
   teams: TournamentTeam[];
-  winners: { id: string; label: string }[];
+  winners: { id: string; name: string; won: string[] }[];
+  // Knockout rounds after the first: list only `winners` (the previous
+  // round's winners) plus the `direct` entrants who skipped that round,
+  // with a "Show all teams" escape hatch for corrections.
+  restrictTo?: { direct: Set<string>; prevLabel: string } | null;
   excludeId?: string;
   placeholder: string;
   style?: React.CSSProperties;
@@ -63,6 +139,8 @@ function TeamSelect({ value, onChange, teams, winners, excludeId, placeholder, s
   const teamOpts = teams.filter((t) => t.id !== excludeId);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [showAll, setShowAll] = useState(false);
+  const restricted = !!restrictTo && !showAll;
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -81,12 +159,46 @@ function TeamSelect({ value, onChange, teams, winners, excludeId, placeholder, s
     return () => cancelAnimationFrame(raf);
   }, [open]);
 
-  const q = query.trim().toLowerCase();
-  const filteredWinners = q ? winnerOpts.filter((w) => w.label.toLowerCase().includes(q)) : winnerOpts;
-  const filteredTeams = q ? teamOpts.filter((t) => t.name.toLowerCase().includes(q)) : teamOpts;
-  const noResults = !!q && filteredWinners.length === 0 && filteredTeams.length === 0;
+  // Each team exactly once: round winners first (the likely pick when
+  // building the next round), tagged with what they won, then the rest.
+  // Picking "DERBY FC won Phase 1" and "DERBY FC" set the same id, so
+  // listing both was just a duplicate row.
+  const winnerIds = new Set(winnerOpts.map((w) => w.id));
+  // When restricted, the team already in this slot stays listed (so the
+  // trigger still shows its name) even if it didn't come through the
+  // previous round.
+  const options: { id: string; name: string; won?: string[] }[] = [
+    ...winnerOpts.map((w) => ({ id: w.id, name: teamOpts.find((t) => t.id === w.id)?.name ?? w.name, won: w.won })),
+    ...teamOpts
+      .filter((t) => !winnerIds.has(t.id) && (!restricted || restrictTo.direct.has(t.id) || t.id === value))
+      .map((t) => ({ id: t.id, name: t.name })),
+  ];
 
-  const selectedLabel = value === "" ? null : winnerOpts.find((w) => w.id === value)?.label ?? teamOpts.find((t) => t.id === value)?.name ?? null;
+  const q = query.trim().toLowerCase();
+  // While searching, one flat list ranked by how well the name matches
+  // so the team typed lands at the top.
+  const results = !q ? [] : options
+    .map((o, i) => ({ ...o, i, rank: matchRank(o.name, q) }))
+    .filter((o) => o.rank !== null)
+    .sort((a, b) => a.rank! - b.rank! || a.i - b.i);
+  const noResults = !!q && results.length === 0;
+
+  // Keyboard-highlighted result; resets to the best match on every keystroke.
+  const [active, setActive] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    listRef.current?.querySelector(".tc-teamselect-opt.active")?.scrollIntoView({ block: "nearest" });
+  }, [active, query]);
+
+  function onSearchKey(e: React.KeyboardEvent) {
+    if (e.key === "Escape") setOpen(false);
+    else if (e.key === "ArrowDown" && results.length) { e.preventDefault(); setActive((a) => Math.min(a + 1, results.length - 1)); }
+    else if (e.key === "ArrowUp" && results.length) { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+    else if (e.key === "Enter" && results[active]) { e.preventDefault(); pick(results[active].id); }
+  }
+
+  const selectedLabel = value === "" ? null
+    : options.find((o) => o.id === value)?.name ?? teams.find((t) => t.id === value)?.name ?? null;
 
   function pick(id: string) {
     onChange(id);
@@ -99,7 +211,7 @@ function TeamSelect({ value, onChange, teams, winners, excludeId, placeholder, s
         type="button"
         className="tc-teamselect-trigger"
         style={style}
-        onClick={() => { setOpen((v) => !v); setQuery(""); }}
+        onClick={() => { setOpen((v) => !v); setQuery(""); setActive(0); setShowAll(false); }}
         onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
       >
         <span className={selectedLabel ? undefined : "tc-teamselect-placeholder"}>{selectedLabel ?? placeholder}</span>
@@ -113,39 +225,52 @@ function TeamSelect({ value, onChange, teams, winners, excludeId, placeholder, s
             <input
               ref={searchRef}
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+              onChange={(e) => { setQuery(e.target.value); setActive(0); }}
+              onKeyDown={onSearchKey}
               placeholder="Search teams…"
               aria-label="Search teams"
             />
           </div>
-          <div className="tc-teamselect-list">
-            <div className={`tc-teamselect-opt ${value === "" ? "on" : ""}`} onClick={() => pick("")}>
-              <span className="tc-teamselect-placeholder">{placeholder}</span>
-            </div>
-            {filteredWinners.length > 0 && (
+          <div ref={listRef} className="tc-teamselect-list">
+            {q ? (
               <>
-                <div className="tc-teamselect-group">Winners</div>
-                {filteredWinners.map((w) => (
-                  <div key={`w-${w.id}`} className={`tc-teamselect-opt ${value === w.id ? "on" : ""}`} onClick={() => pick(w.id)}>
-                    {value === w.id && <Check size={13} className="tc-teamselect-check" />}
-                    {w.label}
+                {results.map((o, i) => (
+                  <TeamOption key={o.id} opt={o} q={q} selected={value === o.id} active={i === active}
+                    onPick={() => pick(o.id)} onHover={() => setActive(i)} />
+                ))}
+                {noResults && (
+                  <div className="tc-teamselect-empty">
+                    {restricted ? <>No team still in the running matches &quot;{query}&quot;</> : <>No teams match &quot;{query}&quot;</>}
                   </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className={`tc-teamselect-opt ${value === "" ? "on" : ""}`} onClick={() => pick("")}>
+                  <span className="tc-teamselect-placeholder">{placeholder}</span>
+                </div>
+                {winnerIds.size > 0 && <div className="tc-teamselect-group">{restrictTo ? `Winners of ${restrictTo.prevLabel}` : "Winners"}</div>}
+                {restricted && winnerIds.size === 0 && (
+                  <div className="tc-teamselect-empty">No {restrictTo.prevLabel} winners yet. Record those results first.</div>
+                )}
+                {options.filter((o) => o.won).map((o) => (
+                  <TeamOption key={o.id} opt={o} q="" selected={value === o.id} onPick={() => pick(o.id)} />
+                ))}
+                {options.some((o) => !o.won) && (
+                  <div className="tc-teamselect-group">
+                    {restricted ? "Entering this round" : winnerIds.size > 0 ? "Other teams" : "All confirmed teams"}
+                  </div>
+                )}
+                {options.filter((o) => !o.won).map((o) => (
+                  <TeamOption key={o.id} opt={o} q="" selected={value === o.id} onPick={() => pick(o.id)} />
                 ))}
               </>
             )}
-            {filteredTeams.length > 0 && (
-              <>
-                <div className="tc-teamselect-group">All confirmed teams</div>
-                {filteredTeams.map((t) => (
-                  <div key={t.id} className={`tc-teamselect-opt ${value === t.id ? "on" : ""}`} onClick={() => pick(t.id)}>
-                    {value === t.id && <Check size={13} className="tc-teamselect-check" />}
-                    {t.name}
-                  </div>
-                ))}
-              </>
+            {restrictTo && (
+              <button type="button" className="tc-teamselect-toggle" onClick={() => { setShowAll((v) => !v); setActive(0); }}>
+                {showAll ? "Show only teams still in the running" : "Show all teams"}
+              </button>
             )}
-            {noResults && <div className="tc-teamselect-empty">No teams match &quot;{query}&quot;</div>}
           </div>
         </div>
       )}
@@ -612,10 +737,11 @@ function AddMatchForm({ tournament, teams, matches, teamName, pending, onAdd }: 
   const [roundLabel, setRoundLabel] = useState("");
   const [localErr, setLocalErr] = useState<string | null>(null);
 
-  // Every confirmed team is always selectable — an admin fixing up a
-  // generated bracket (swapping a bye, correcting a seed placement)
-  // needs to freely re-pick any team, not just ones unused elsewhere.
-  const winners = winnerOptions(matches, teamName);
+  // A later knockout round lists only the previous round's winners
+  // ("Show all teams" in the picker still reaches every confirmed team,
+  // for fixing up a bye or a seed placement). Otherwise every team.
+  const prevWinners = previousRoundWinners(matches, teams, teamName, stage, round);
+  const winners = prevWinners?.winners ?? winnerOptions(matches, teamName);
 
   function submit() {
     if (!teamAId) { setLocalErr("Pick team A."); return; }
@@ -645,14 +771,14 @@ function AddMatchForm({ tournament, teams, matches, teamName, pending, onAdd }: 
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span className="tc-dim" style={{ fontSize: 11 }}>Team A</span>
           <TeamSelect
-            value={teamAId} onChange={setTeamAId} teams={teams} winners={winners}
+            value={teamAId} onChange={setTeamAId} teams={teams} winners={winners} restrictTo={prevWinners}
             excludeId={teamBId || undefined} placeholder="Select…" style={{ ...inputStyle, width: 190 }}
           />
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span className="tc-dim" style={{ fontSize: 11 }}>Team B</span>
           <TeamSelect
-            value={teamBId} onChange={setTeamBId} teams={teams} winners={winners}
+            value={teamBId} onChange={setTeamBId} teams={teams} winners={winners} restrictTo={prevWinners}
             excludeId={teamAId || undefined} placeholder="TBD / bye" style={{ ...inputStyle, width: 190 }}
           />
         </label>
@@ -703,7 +829,8 @@ function RoundAddMatch({ tournament, teams, matches, teamName, pending, stage, r
   const [teamAId, setTeamAId] = useState("");
   const [teamBId, setTeamBId] = useState("");
   const [localErr, setLocalErr] = useState<string | null>(null);
-  const winners = winnerOptions(matches, teamName);
+  const prevWinners = previousRoundWinners(matches, teams, teamName, stage, round);
+  const winners = prevWinners?.winners ?? winnerOptions(matches, teamName);
 
   if (!open) {
     return (
@@ -723,9 +850,9 @@ function RoundAddMatch({ tournament, teams, matches, teamName, pending, stage, r
 
   return (
     <div style={{ background: "rgba(0,98,65,0.06)", borderRadius: 12, padding: 12, marginBottom: 10, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      <TeamSelect value={teamAId} onChange={setTeamAId} teams={teams} winners={winners} excludeId={teamBId || undefined} placeholder="Team A" style={{ ...inputStyle, width: 170 }} />
+      <TeamSelect value={teamAId} onChange={setTeamAId} teams={teams} winners={winners} restrictTo={prevWinners} excludeId={teamBId || undefined} placeholder="Team A" style={{ ...inputStyle, width: 170 }} />
       <span className="tc-dim">vs</span>
-      <TeamSelect value={teamBId} onChange={setTeamBId} teams={teams} winners={winners} excludeId={teamAId || undefined} placeholder="TBD / bye" style={{ ...inputStyle, width: 170 }} />
+      <TeamSelect value={teamBId} onChange={setTeamBId} teams={teams} winners={winners} restrictTo={prevWinners} excludeId={teamAId || undefined} placeholder="TBD / bye" style={{ ...inputStyle, width: 170 }} />
       <button className="tc-btn primary" disabled={pending || !teamAId} style={{ padding: "6px 10px", fontSize: 12 }} onClick={submit}>Add</button>
       <button className="tc-btn" disabled={pending} style={{ padding: "6px 10px", fontSize: 12 }} onClick={() => { setOpen(false); setLocalErr(null); }}>Cancel</button>
       {localErr && <div className="tc-err" style={{ width: "100%", marginTop: 4, marginBottom: 0 }}>{localErr}</div>}
@@ -819,8 +946,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
   const bothSet = !!match.team_a_id && !!match.team_b_id;
   const done = DONE.has(match.status);
 
-  // Every confirmed team stays selectable here too — see AddMatchForm.
-  const winners = winnerOptions(matches, teamName).filter((w) => w.id !== match.winner_team_id);
+  // Same previous-round rule as AddMatchForm.
+  const prevWinners = previousRoundWinners(matches, teams, teamName, match.stage, match.round);
+  const winners = prevWinners?.winners ?? winnerOptions(matches, teamName).filter((w) => w.id !== match.winner_team_id);
 
   // A knockout match can't end level — group/league draws are a valid
   // result on their own. When regulation is tied, reveal extra time;
@@ -889,12 +1017,12 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
         {editingTeams ? (
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <TeamSelect
-              value={teamAId} onChange={setTeamAId} teams={teams} winners={winners}
+              value={teamAId} onChange={setTeamAId} teams={teams} winners={winners} restrictTo={prevWinners}
               excludeId={teamBId || undefined} placeholder="Team A" style={{ ...inputStyle, width: 160 }}
             />
             <span className="tc-dim">vs</span>
             <TeamSelect
-              value={teamBId} onChange={setTeamBId} teams={teams} winners={winners}
+              value={teamBId} onChange={setTeamBId} teams={teams} winners={winners} restrictTo={prevWinners}
               excludeId={teamAId || undefined} placeholder="TBD / bye" style={{ ...inputStyle, width: 160 }}
             />
             <button
