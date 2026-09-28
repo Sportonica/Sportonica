@@ -219,9 +219,11 @@ export function MatchCard({ m }: { m: RailMatch }) {
             ) : (
               <div className="rc-match-bigscore vs">VS</div>
             )}
-            {started && m.pensA != null && m.pensB != null && (
-              <div className="rc-match-extra">Pens {m.pensA} : {m.pensB}</div>
-            )}
+            {/* Always rendered (empty when there's no shootout) so the
+                status pill sits at the same height on every card. */}
+            <div className="rc-match-extra" aria-label={started && m.pensA != null && m.pensB != null ? `Penalties ${m.pensA} to ${m.pensB}` : undefined}>
+              {started && m.pensA != null && m.pensB != null ? `(${m.pensA} : ${m.pensB})` : ""}
+            </div>
             <div className={`rc-match-pill${live ? " live" : ""}`}>
               {live ? <><i className="rc-live-dot" />Live</> : completed ? "Full-time" : m.startsAt ? when(m.startsAt) : "TBD"}
             </div>
