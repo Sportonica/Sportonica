@@ -48,6 +48,9 @@ export interface RailMatch {
   teamB: { id: string; name: string; logoUrl: string | null };
   scoreA: number | null;
   scoreB: number | null;
+  // Penalty shootout score, null unless the match went to penalties.
+  pensA: number | null;
+  pensB: number | null;
   winnerTeamId: string | null;
 }
 
@@ -80,7 +83,7 @@ export async function getHomeRails() {
   // Match columns shared by the live/upcoming/completed queries below —
   // a single string keeps the three selects (and any future one) from
   // drifting out of sync with each other.
-  const MATCH_COLS = "id,tournament_id,round_label,status,starts_at,team_a_id,team_b_id,score_a,score_b,winner_team_id";
+  const MATCH_COLS = "id,tournament_id,round_label,status,starts_at,team_a_id,team_b_id,score_a,score_b,score_a_pens,score_b_pens,winner_team_id";
 
   const [officialRes, gamesRes, venuesRes, playTogetherRes, singleEventRes, liveMatchRes, upcomingMatchRes, completedMatchRes] = await Promise.all([
     sb.from("events_full")
@@ -243,6 +246,7 @@ export async function getHomeRails() {
   type RawMatch = {
     id: string; tournament_id: string; round_label: string; status: string; starts_at: string | null;
     team_a_id: string; team_b_id: string; score_a: number | null; score_b: number | null; winner_team_id: string | null;
+    score_a_pens: number | null; score_b_pens: number | null;
   };
   const rawMatches = [
     ...(liveMatchRes.data ?? []) as RawMatch[],
@@ -286,6 +290,8 @@ export async function getHomeRails() {
       teamB: { id: b.id, name: b.name, logoUrl: b.logo_url },
       scoreA: m.score_a,
       scoreB: m.score_b,
+      pensA: m.score_a_pens,
+      pensB: m.score_b_pens,
       winnerTeamId: m.winner_team_id,
     }];
   });

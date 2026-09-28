@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { MapPin, ArrowRight, ChevronDown } from "lucide-react";
-import { EventsRail, VenuesRail, GamesRail, MatchesRail } from "@/components/home/Rails";
+import { EventsRail, VenuesRail, GamesRail, MatchesRail, MatchCard } from "@/components/home/Rails";
 import "@/components/home/rails.css";
 import type { getHomeRails } from "@/lib/play/homeRails";
 import { useCity, inCity } from "@/lib/city";
@@ -82,7 +82,8 @@ const CSS = `
     padding-bottom:22px; border-bottom:1px solid rgba(255,255,255,0.1);
   }
   .p-hero-lead { flex:0 1 auto; }
-  .p-hero-aside { flex:0 0 auto; display:flex; align-items:center; padding-bottom:6px; }
+  .p-hero-aside { flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:18px; padding-bottom:6px; }
+  @media (max-width:900px) { .p-hero-aside { align-items:flex-start; } }
 
   /* A single, deliberate call to action. */
   .p-book {
@@ -285,6 +286,9 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
   const supabase = createClient();
   const { city, area } = useCity();
   const heroRef = useRef<HTMLDivElement>(null);
+  const liveMatch = (rails?.matches ?? [])
+    .filter((m) => m.status === "live")
+    .sort((a, b) => (b.startsAt ?? "").localeCompare(a.startsAt ?? ""))[0];
 
   // Which FAQ item is expanded. 0 = first question open by default, so
   // the section doesn't read as an empty wall of collapsed bars.
@@ -326,6 +330,9 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
               </div>
 
               <div className="p-hero-aside">
+                {/* The ongoing match, only while one is live (the most
+                    recently started if several are). Nothing otherwise. */}
+                {liveMatch && <MatchCard m={liveMatch} />}
                 <button className="p-book"
                   onClick={() => window.dispatchEvent(new Event("open-nearby"))}>
                   <span className="p-book-in">
