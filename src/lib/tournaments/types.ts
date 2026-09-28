@@ -480,6 +480,7 @@ export const TOURNAMENT_ERROR_MESSAGES: Record<string, string> = {
   SLOT_TAKEN: "That court is already booked for that time.",
   SLOT_BLOCKED: "That court is blocked for that time.",
   SCORES_REQUIRED: "Enter a score for both teams.",
+  INVALID_SCORE: "Scores can't be negative.",
   INVALID_WINNER: "Pick one of the two teams as the winner.",
   KNOCKOUT_CANNOT_DRAW: "Knockout matches can't end in a draw. Enter a winner instead.",
   INCOMPLETE_MATCHES: "Every match needs a result before the tournament can be completed.",

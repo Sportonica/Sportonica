@@ -7,7 +7,7 @@ import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
   getTeamRoster, getMatchPlayerStats, recordMatchPlayerStats,
   generateKnockoutBracket, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
-  recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound,
+  recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound, updateLiveScore,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { friendlyTournamentError } from "@/lib/tournaments/types";
@@ -628,11 +628,14 @@ export default function FixturesTab({
               <tbody>
                 {ms.map((m) => (
                   <MatchRow
-                    key={m.id} match={m} teams={teams} matches={matches} teamName={teamName} pending={pending}
+                    // Score in the key so the row's inputs pick up a live score
+                    // saved elsewhere (another admin, or the +1 buttons) after refresh.
+                    key={`${m.id}:${m.status}:${m.score_a}:${m.score_b}`} match={m} teams={teams} matches={matches} teamName={teamName} pending={pending}
                     sportKind={sportKind}
                     selected={selected.has(m.id)}
                     onToggleSelect={() => toggleSelected(m.id)}
                     onResult={(a, b, winnerId, et, pens, confirmCascade) => run(() => recordMatchResult(m.id, a, b, winnerId, et, pens, confirmCascade))}
+                    onLiveScore={(a, b) => run(() => updateLiveScore(m.id, a, b))}
                     onCricketResult={(runsA, wicketsA, oversA, runsB, wicketsB, oversB, winnerId, toss, targetRuns, confirmCascade) =>
                       run(() => recordCricketResult(m.id, runsA, wicketsA, oversA, runsB, wicketsB, oversB, winnerId, toss, targetRuns, confirmCascade))
                     }
@@ -903,7 +906,7 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -916,6 +919,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
     extraTime?: { scoreA: number; scoreB: number }, penalties?: { scoreA: number; scoreB: number },
     confirmCascade?: boolean
   ) => void;
+  onLiveScore: (a: number, b: number) => void;
   onCricketResult: (
     runsA: number, wicketsA: number | null, oversA: number | null,
     runsB: number, wicketsB: number | null, oversB: number | null,
@@ -946,6 +950,8 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
   const [scoreBPens, setScoreBPens] = useState(match.score_b_pens?.toString() ?? "");
   const bothSet = !!match.team_a_id && !!match.team_b_id;
   const done = DONE.has(match.status);
+  const live = match.status === "live";
+  const saveLabel = done ? "Update score" : live ? "Full-time" : "Save score";
 
   // Same previous-round rule as AddMatchForm.
   const prevWinners = previousRoundWinners(matches, teams, teamName, match.stage, match.round);
@@ -1099,8 +1105,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
         )}
       </td>
       <td className="tc-num">
-        {match.status === "completed" && match.score_a !== null && match.score_b !== null ? (
+        {(match.status === "completed" || match.status === "live") && match.score_a !== null && match.score_b !== null ? (
           <>
+            {match.status === "live" && <span className="tc-badge live" style={{ marginRight: 6 }}>Live</span>}
             {match.score_a} – {match.score_b}
             {match.score_a_pens !== null && match.score_b_pens !== null && (
               <div className="tc-dim" style={{ fontSize: 11, fontWeight: 400 }}>pens {match.score_a_pens}–{match.score_b_pens}</div>
@@ -1189,6 +1196,28 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+            {/* Live scoring: "Start match" puts it live at 0 : 0, then each
+                +1 pushes the new score straight to the public pages. The
+                inputs below correct it ("Update live score") or finish it
+                ("Full-time", which records the result and advances the winner). */}
+            {!done && (live ? (
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <span className="tc-badge live">Live</span>
+                <button className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
+                  onClick={() => onLiveScore((match.score_a ?? 0) + 1, match.score_b ?? 0)}>
+                  +1 {teamName(match.team_a_id)}
+                </button>
+                <button className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
+                  onClick={() => onLiveScore(match.score_a ?? 0, (match.score_b ?? 0) + 1)}>
+                  +1 {teamName(match.team_b_id)}
+                </button>
+              </div>
+            ) : (
+              <button className="tc-btn" disabled={pending} style={{ padding: "6px 10px", fontSize: 11.5 }}
+                onClick={() => onLiveScore(0, 0)}>
+                Start match (live 0 : 0)
+              </button>
+            ))}
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_a_id)}</span>
@@ -1205,12 +1234,20 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
                   style={{ ...inputStyle, width: 50 }} aria-label={`${teamName(match.team_b_id)} score`}
                 />
               </label>
+              {live && (
+                <button
+                  className="tc-btn" disabled={pending || scoreA === "" || scoreB === ""} style={{ padding: "6px 10px", alignSelf: "flex-end" }}
+                  onClick={() => onLiveScore(Number(scoreA), Number(scoreB))}
+                >
+                  Update live score
+                </button>
+              )}
               {!showEt && (
                 <button
                   className="tc-btn primary" disabled={pending || !canSave} style={{ padding: "6px 10px", alignSelf: "flex-end" }}
                   onClick={save}
                 >
-                  {done ? "Update score" : "Save score"}
+                  {saveLabel}
                 </button>
               )}
             </div>
@@ -1235,7 +1272,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
                 </label>
                 {!showPens && (
                   <button className="tc-btn primary" disabled={pending || !canSave} style={{ padding: "6px 10px", alignSelf: "flex-end" }} onClick={save}>
-                    {done ? "Update score" : "Save score"}
+                    {saveLabel}
                   </button>
                 )}
               </div>
@@ -1260,7 +1297,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onCric
                   />
                 </label>
                 <button className="tc-btn primary" disabled={pending || !canSave} style={{ padding: "6px 10px", alignSelf: "flex-end" }} onClick={save}>
-                  {done ? "Update score" : "Save score"}
+                  {saveLabel}
                 </button>
               </div>
             )}
@@ -1755,6 +1792,7 @@ function summarizeAudit(e: MatchAuditEntry): string {
   }
   if (e.change_type === "result") {
     if (nv?.status === "walkover") return "Walkover recorded";
+    if (nv?.status === "live") return `Live score ${nv?.score_a}–${nv?.score_b}`;
     return `Score set to ${nv?.score_a}–${nv?.score_b}`;
   }
   if (e.change_type === "teams") return "Teams changed";

@@ -19,6 +19,7 @@ import TournamentRegisterTab from "./TournamentRegisterTab";
 import DayFixturesShareButton from "./DayFixturesShareButton";
 import BracketBoard from "../BracketBoard";
 import FormattedText from "./FormattedText";
+import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 import "./event-tabs.css";
 
 const KTM = "Asia/Kathmandu";
@@ -62,6 +63,7 @@ export default function EventTabs({
   // resolved server-side and passed down so the first paint is right.
   initialTab?: string;
 }) {
+  useLiveRefresh(matches.some((m) => m.status === "live"));
   const confirmedTeams = teams.filter((t) => t.status === "confirmed");
   const hasKnockout = matches.some((m) => m.stage === "knockout");
   const hasStandings = tournament.format === "league" || tournament.format === "group_knockout";
@@ -528,7 +530,10 @@ function FixturesPublicTab({ tournamentId, matches, teams }: {
                   ) : m.status === "completed" && m.score_a !== null && m.score_b !== null ? (
                     <span className="score">{m.score_a} – {m.score_b}</span>
                   ) : live ? (
-                    <span className="live"><i className="ev2-live-dot" />Live</span>
+                    <span className="live">
+                      <i className="ev2-live-dot" />
+                      {m.score_a !== null && m.score_b !== null ? `${m.score_a} – ${m.score_b}` : "Live"}
+                    </span>
                   ) : <span className="vs">vs</span>}
                 </span>
                 <span className="ev2-fixture-team ev2-fixture-team-right">
