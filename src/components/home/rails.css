@@ -165,7 +165,7 @@
   border-color: color-mix(in srgb, var(--rc-accent) 55%, transparent);
 }
 
-.rc-match-hit { display: flex; flex-direction: column; text-decoration: none; color: #fff; position: relative; z-index: 1; }
+.rc-match-hit { flex: 1; display: flex; flex-direction: column; text-decoration: none; color: #fff; position: relative; z-index: 1; }
 [data-theme="paper"] .rc-match-hit { color: #14171E; }
 
 .rc-match-comp {
@@ -217,6 +217,10 @@
 [data-theme="paper"] .rc-match-bigscore { color: #14171E; }
 .rc-match-bigscore i { font-style: normal; opacity: 0.4; font-weight: 600; font-size: 21px; }
 .rc-match-bigscore span.lose { opacity: 0.5; }
+.rc-match-extra {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: -4px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.7; white-space: nowrap;
+}
 .rc-match-bigscore.vs { font-size: 15px; opacity: 0.75; letter-spacing: 0.08em; }
 
 .rc-match-pill {
