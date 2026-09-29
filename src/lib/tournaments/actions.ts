@@ -15,6 +15,7 @@ import type {
   TournamentCricketPlayerStat, TournamentCricketStatRow,
   TournamentRaceCategory, TournamentRaceResult, RaceResultRow, RaceResultStatus,
 } from "./types";
+import { TEAM_PUBLIC_COLUMNS, TEAM_PRIVATE_FIELDS } from "./columns";
 
 async function requireUser() {
   const sb = await createClient();
@@ -94,12 +95,32 @@ export async function listPublicTournaments(): Promise<(Tournament & { venue_nam
   });
 }
 
+// Team contact details (address, contact person/phone/email, manager
+// email) aren't readable from tournament_teams. team_private_contacts()
+// returns them only for rows the caller runs or belongs to; everyone else
+// gets null for those fields.
+async function withPrivateContacts(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  teams: TournamentTeam[],
+): Promise<TournamentTeam[]> {
+  const empty = Object.fromEntries(TEAM_PRIVATE_FIELDS.map((f) => [f, null]));
+  if (teams.length === 0) return teams;
+  const { data } = await sb.rpc("team_private_contacts", { p_team_ids: teams.map((t) => t.id) });
+  const byId = new Map(((data ?? []) as ({ id: string } & Record<string, string | null>)[]).map((r) => [r.id, r]));
+  return teams.map((t) => {
+    const priv = byId.get(t.id);
+    const { id: _id, ...fields } = priv ?? { id: t.id };
+    void _id;
+    return { ...t, ...empty, ...fields } as TournamentTeam;
+  });
+}
+
 export async function listTournamentTeams(tournamentId: string): Promise<TournamentTeam[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb
-    .from("tournament_teams").select("*").eq("tournament_id", tournamentId).order("created_at", { ascending: true });
+    .from("tournament_teams").select(TEAM_PUBLIC_COLUMNS).eq("tournament_id", tournamentId).order("created_at", { ascending: true });
   if (error) return actionError(error.message);
-  return (data ?? []) as TournamentTeam[];
+  return withPrivateContacts(sb, (data ?? []) as unknown as TournamentTeam[]);
 }
 
 // True only for someone who can run this tournament's Control Center —
@@ -145,9 +166,10 @@ export async function getMyTeamForTournament(tournamentId: string): Promise<Tour
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb
-    .from("tournament_teams").select("*").eq("tournament_id", tournamentId).eq("captain_id", user.id).maybeSingle();
+    .from("tournament_teams").select(TEAM_PUBLIC_COLUMNS).eq("tournament_id", tournamentId).eq("captain_id", user.id).maybeSingle();
   if (error) return actionError(error.message);
-  return data as TournamentTeam | null;
+  if (!data) return null;
+  return (await withPrivateContacts(sb, [data as unknown as TournamentTeam]))[0];
 }
 
 export async function getTeamRoster(teamId: string): Promise<

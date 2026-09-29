@@ -6,7 +6,9 @@
 // template, and hand it to sendMail. Nothing here knows about SMTP.
 // ================================================================
 
+import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { sendMail } from "./mailer";
 import {
   playerBooked, venueNewBooking, venueAdvancePaymentApproved, hostGameLive, playerJoined, hostSomeoneJoined,
@@ -47,14 +49,18 @@ async function nameFor(userId: string | null | undefined): Promise<string> {
   return data?.full_name ?? data?.name ?? "Player";
 }
 
-// Writes go through emit_notification() (SECURITY DEFINER) instead of a
-// direct table insert — it checks that both the caller and the recipient
-// have real standing on the referenced game/event/tournament before the
-// row is written (see db/emit_notification.sql). This replaced a blanket
-// `with check (true)` insert policy that let any signed-in user write a
-// notification for any other user, claiming anything.
+// Writes use the service role. Every notify*() here is called from a
+// server action AFTER that action has checked the caller may do the thing
+// being announced, and the recipients are looked up server-side — so the
+// database doesn't have to trust the caller's session for the insert.
+// This replaced a blanket `with check (true)` insert policy on
+// notifications, which let any signed-in user (even an anonymous
+// Register-tab session) put any title/body into anyone's bell and push
+// it to their phone (security audit, DATABASE_ACCESS). The earlier plan
+// to route through an emit_notification() RPC was never deployed — the
+// function didn't exist, so these writes were silently failing.
 //
-// A rejected or failed write never breaks the action that triggered it —
+// A failed write never breaks the action that triggered it —
 // the booking/payment/join it describes already succeeded, and a
 // notification is best-effort. It's logged instead of thrown, matching
 // every existing call site here (none of them wrap notify*() in
@@ -70,22 +76,24 @@ type NotificationInput = {
   tournamentId?: string | null;
 };
 
-async function writeNotification(
-  sb: Awaited<ReturnType<typeof createClient>>,
-  input: NotificationInput
-) {
-  const { error } = await sb.rpc("emit_notification", {
-    p_user_id: input.userId,
-    p_kind: input.kind,
-    p_title: input.title,
-    p_body: input.body ?? null,
-    p_event_id: input.eventId ?? null,
-    p_actor_id: input.actorId ?? null,
-    p_game_id: input.gameId ?? null,
-    p_tournament_id: input.tournamentId ?? null,
-  });
+async function writeNotification(input: NotificationInput) {
+  let error: { message: string } | null = null;
+  try {
+    ({ error } = await createServiceClient().from("notifications").insert({
+      user_id: input.userId,
+      kind: input.kind,
+      title: input.title,
+      body: input.body ?? null,
+      event_id: input.eventId ?? null,
+      actor_id: input.actorId ?? null,
+      game_id: input.gameId ?? null,
+      tournament_id: input.tournamentId ?? null,
+    }));
+  } catch (e) {
+    error = { message: e instanceof Error ? e.message : String(e) };
+  }
   if (error) {
-    console.error("[notify] emit_notification failed", { kind: input.kind, error: error.message });
+    console.error("[notify] notification write failed", { kind: input.kind, error: error.message });
   }
 }
 
@@ -257,7 +265,7 @@ export async function notifyPlayTogetherGamePublishedIfAny(courtBookingId: strin
     }));
   }
 
-  await writeNotification(sb, {
+  await writeNotification({
     userId: game.host_id,
     kind: "game_published",
     title: "Your venue is confirmed",
@@ -284,8 +292,7 @@ export async function notifyPlayTogetherJoinRequested(input: { requesterId: stri
     }));
   }
 
-  const sb = await createClient();
-  await writeNotification(sb, {
+  await writeNotification({
     userId: game.host_id,
     kind: "game_join_requested",
     title: "New join request",
@@ -321,7 +328,7 @@ export async function notifyPlayTogetherPaymentRequired(input: { playerId: strin
     }));
   }
 
-  await writeNotification(sb, {
+  await writeNotification({
     userId: input.playerId,
     kind: "game_payment_required",
     title: "Payment required",
@@ -357,12 +364,12 @@ export async function notifyPlayTogetherPaymentSubmitted(input: { gamePlayerId: 
   }
 
   await Promise.all([
-    writeNotification(sb, {
+    writeNotification({
       userId: game.host_id, kind: "game_host_payment_submitted", title: "Payment verification required",
       body: `${playerName} submitted payment proof for your ${game.sport} game. Review it.`,
       gameId: game.id, actorId: row.user_id,
     }),
-    writeNotification(sb, {
+    writeNotification({
       userId: row.user_id, kind: "game_payment_submitted", title: "Payment submitted",
       body: `Your payment proof for the ${game.sport} game was submitted. Waiting on the host to verify it.`,
       gameId: game.id,
@@ -400,12 +407,12 @@ export async function notifyPlayTogetherCashSelected(input: { gamePlayerId: stri
   }
 
   await Promise.all([
-    writeNotification(sb, {
+    writeNotification({
       userId: game.host_id, kind: "game_payment_cash_selected", title: "Player will pay in cash",
       body: `${playerName} chose to pay Rs ${Math.round(amount)} in cash at the venue for your ${game.sport} game. They're confirmed. Mark it collected once they've paid.`,
       gameId: game.id, actorId: row.user_id,
     }),
-    writeNotification(sb, {
+    writeNotification({
       userId: row.user_id, kind: "game_joined", title: "You're in!",
       body: `You're confirmed for the ${game.sport} game. Bring Rs ${Math.round(amount)} in cash to pay the host at the venue.`,
       gameId: game.id,
@@ -437,7 +444,7 @@ export async function notifyPlayTogetherPaymentRejected(input: { playerId: strin
     }));
   }
 
-  await writeNotification(sb, {
+  await writeNotification({
     userId: input.playerId,
     kind: "game_payment_rejected",
     title: "Payment couldn't be verified",
@@ -470,8 +477,7 @@ export async function notifyPlayTogetherJoined(input: { playerId: string; gameId
     }));
   }
 
-  const sb = await createClient();
-  await writeNotification(sb, {
+  await writeNotification({
     userId: input.playerId,
     kind: "game_joined",
     title: "You're in!",
@@ -493,8 +499,7 @@ export async function notifyPlayTogetherJoinRejected(input: { playerId: string; 
     }));
   }
 
-  const sb = await createClient();
-  await writeNotification(sb, {
+  await writeNotification({
     userId: input.playerId,
     kind: "game_join_rejected",
     title: "Request not approved",
@@ -520,8 +525,7 @@ export async function notifyPlayTogetherLeft(input: { leaverId: string; gameId: 
     }));
   }
 
-  const sb = await createClient();
-  await writeNotification(sb, {
+  await writeNotification({
     userId: game.host_id,
     kind: "game_left",
     title: "Player left",
@@ -560,7 +564,7 @@ export async function notifyPlayTogetherCancelled(input: { hostId: string; gameI
     }));
   if (mails.length) await sendMail(mails);
 
-  await Promise.all(details.map((d) => writeNotification(sb, {
+  await Promise.all(details.map((d) => writeNotification({
     userId: d.userId,
     kind: "game_cancelled",
     title: "Game cancelled",
@@ -691,14 +695,14 @@ export async function notifyPaymentSubmitted(paymentId: string) {
 
   const isTournament = ctx.payment.booking_type === "tournament_registration";
   await Promise.all([
-    ...[...adminIds].map((id) => writeNotification(sb, {
+    ...[...adminIds].map((id) => writeNotification({
       userId: id,
       kind: "payment_submitted",
       title: `New payment to verify: ${ctx.label}`,
       body: `${ctx.customerName} · ${ctx.payment.payment_method} · Rs ${Math.round(ctx.payment.expected_amount)}`,
       tournamentId: ctx.tournamentId,
     })),
-    ...[...organizerIds].map((id) => writeNotification(sb, {
+    ...[...organizerIds].map((id) => writeNotification({
       userId: id,
       kind: isTournament ? "tournament_registration_submitted" : "payment_submitted",
       title: `New team registration payment: ${ctx.label}`,
@@ -710,7 +714,6 @@ export async function notifyPaymentSubmitted(paymentId: string) {
 
 // Admin approved or rejected — tell the customer both ways, never silently.
 export async function notifyPaymentReviewed(paymentId: string) {
-  const sb = await createClient();
   const ctx = await paymentContext(paymentId);
   if (!ctx) return;
 
@@ -724,7 +727,7 @@ export async function notifyPaymentReviewed(paymentId: string) {
       }));
     }
     const isTournament = ctx.payment.booking_type === "tournament_registration";
-    await writeNotification(sb, {
+    await writeNotification({
       userId: ctx.payment.user_id,
       kind: isTournament ? "tournament_payment_verified" : "payment_approved",
       title: isTournament ? "Team registration confirmed" : "Booking confirmed",
@@ -754,7 +757,7 @@ export async function notifyPaymentReviewed(paymentId: string) {
           amountPaid: ctx.payment.expected_amount, balanceDue, plan,
         }));
       }
-      await writeNotification(sb, {
+      await writeNotification({
         userId: ctx.venueOwnerId,
         kind: "advance_payment_received",
         title: "Advance payment received",
@@ -767,7 +770,7 @@ export async function notifyPaymentReviewed(paymentId: string) {
     if (to) {
       await sendMail(paymentRejected({ to, playerName, bookingLabel: ctx.label, reason }));
     }
-    await writeNotification(sb, {
+    await writeNotification({
       userId: ctx.payment.user_id,
       kind: isTournament ? "tournament_payment_rejected" : "payment_rejected",
       title: "Payment verification failed",

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { sendMail } from "@/lib/mail/mailer";
 import { fmtWhen } from "@/lib/mail/templates";
 import { actionError, type ActionError } from "@/lib/actionError";
@@ -82,8 +83,10 @@ export async function updateHostedGame(input: {
 
     const ids = (joins ?? []).map((j: { user_id: string }) => j.user_id);
     if (ids.length) {
-      // In-app notifications for each player.
-      await sb.from("notifications").insert(
+      // In-app notifications for each player. Service role: the insert
+      // policy on notifications was removed (any signed-in user could
+      // write into anyone's bell); the host check above is the gate.
+      await createServiceClient().from("notifications").insert(
         ids.map((uid) => ({
           user_id: uid,
           kind: "event",
