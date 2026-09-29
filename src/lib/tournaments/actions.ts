@@ -748,6 +748,18 @@ export async function updateTeamPlayerGuest(
 
 // ── Walk-in teams: registered by whoever manages the tournament, on
 // behalf of people who signed up in person — no accounts involved. ──
+// Organizer picks the team captain from the roster. The previous captain
+// (if any) becomes a regular player. Checked in set_team_captain():
+// tournament owner/organizer, host-venue manager or super admin only.
+export async function setTeamCaptain(teamPlayerId: string, tournamentId: string): Promise<void | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { error } = await sb.rpc("set_team_captain", { p_team_player_id: teamPlayerId });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  revalidatePath(`/organize/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+}
+
 export async function createWalkinTeam(
   tournamentId: string,
   teamName: string,
@@ -765,6 +777,7 @@ export async function createWalkinTeam(
       name: m.name, phone: m.phone, email: m.email || null,
       jersey_number: m.jerseyNumber ? Number(m.jerseyNumber) : null,
       position: m.position || null,
+      captain: !!m.captain,
     })),
     p_manager_name: managerName || null,
     p_manager_phone: managerPhone || null,

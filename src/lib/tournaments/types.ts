@@ -286,7 +286,9 @@ export interface TournamentTeamPlayer {
   joined_at: string;
 }
 
-export type WalkinMember = { name: string; phone: string; email?: string; jerseyNumber?: string; position?: string };
+// captain: the organizer picked this member as the team captain. Nobody is
+// captain unless picked (it used to be whoever was entered first).
+export type WalkinMember = { name: string; phone: string; email?: string; jerseyNumber?: string; position?: string; captain?: boolean };
 
 export interface TournamentMatchPlayerStat {
   id: string;
@@ -458,7 +460,9 @@ export const TOURNAMENT_ERROR_MESSAGES: Record<string, string> = {
   ROSTER_LOCKED: "This team's roster is locked. Payment is already underway or verified.",
   ROSTER_FULL: "This team's roster is already full.",
   SUBSTITUTE_LIMIT_REACHED: "This team's substitute slots are full.",
-  CANNOT_REMOVE_CAPTAIN: "The captain can't be removed from the roster.",
+  CANNOT_REMOVE_CAPTAIN: "The captain can't be removed from the roster. Make someone else captain first.",
+  SUBSTITUTE_CANNOT_BE_CAPTAIN: "A substitute can't be captain. Pick a player from the starting roster.",
+  PLAYER_NOT_FOUND: "That player isn't on this team any more.",
   TEAM_HAS_RESULTS: "This team has already played a match, so it can't be deleted.",
   TEAM_NOT_CONFIRMED: "Only confirmed teams can be seeded.",
   WRONG_FORMAT: "That action doesn't apply to this tournament's format.",
