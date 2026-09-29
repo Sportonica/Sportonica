@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { actionError, type ActionError } from "@/lib/actionError";
 import { isValidLocalPhone, normalizePhone } from "@/lib/validation/identity";
+import { captchaPassed, clientIp, underRateLimit } from "@/lib/security/abuse";
 
 // Internal e-mail synthesised for a phone-only account. The user never
 // sees or types it. A dedicated subdomain keeps it from ever colliding
@@ -21,12 +22,23 @@ function syntheticEmailForPhone(digits: string): string {
 // email_for_phone() is service-role only for exactly that reason. The
 // session lands in cookies; the caller does a full navigation to pick
 // it up.
+//
+// Supabase sees this sign-in coming from Vercel, not the visitor, so its
+// per-IP limit can't tell attackers apart — hence our own limits (SEC-04).
 export async function signInWithPhone(
   phone: string,
   password: string,
+  captchaToken?: string,
 ): Promise<{ role: string | null } | ActionError> {
   if (!isValidLocalPhone(phone) || !password) return actionError("BAD_CREDENTIALS");
   const digits = normalizePhone(phone);
+
+  if (
+    !(await underRateLimit("phone-login-ip", await clientIp(), 20, 15 * 60)) ||
+    !(await underRateLimit("phone-login-phone", digits, 10, 15 * 60))
+  ) {
+    return actionError("RATE_LIMITED");
+  }
 
   let admin;
   try {
@@ -41,8 +53,13 @@ export async function signInWithPhone(
   if (!email || email === syntheticEmailForPhone(digits)) return actionError("BAD_CREDENTIALS");
 
   const sb = await createClient();
-  const { data, error } = await sb.auth.signInWithPassword({ email: String(email), password });
+  const { data, error } = await sb.auth.signInWithPassword({
+    email: String(email),
+    password,
+    options: { captchaToken },
+  });
   if (error) {
+    if (error.code === "captcha_failed") return actionError("CAPTCHA_FAILED");
     // Codes only — the account's email still never reaches the browser.
     if (error.code === "email_not_confirmed") return actionError("EMAIL_NOT_CONFIRMED");
     if (error.status === 429) return actionError("RATE_LIMITED");
@@ -59,11 +76,15 @@ export async function signInWithPhone(
 // (supabase/identity_validation.sql) copies it onto profiles.phone
 // and enforces the 10-digit format + UNIQUE constraint. The client then
 // signs in with password to get a real session.
+//
+// The admin API skips Supabase's own signup rate limit and CAPTCHA, so
+// both are enforced here instead (SEC-04).
 export async function signUpWithPhone(input: {
   name: string;
   phone: string;
   password: string;
   role: "player" | "venue_owner";
+  captchaToken?: string;
 }): Promise<{ email: string } | ActionError> {
   const name = input.name.trim();
   if (!name) return actionError("Enter your name.");
@@ -76,6 +97,16 @@ export async function signUpWithPhone(input: {
   const role = input.role === "venue_owner" ? "venue_owner" : "player";
   const digits = normalizePhone(input.phone);
   const email = syntheticEmailForPhone(digits);
+
+  if (!(await captchaPassed(input.captchaToken))) {
+    return actionError("Couldn't confirm you're not a bot. Refresh the page and try again.");
+  }
+  if (
+    !(await underRateLimit("phone-signup-ip", await clientIp(), 5, 60 * 60)) ||
+    !(await underRateLimit("phone-signup-phone", digits, 3, 60 * 60))
+  ) {
+    return actionError("Too many sign-up attempts. Wait a while and try again.");
+  }
 
   let admin;
   try {

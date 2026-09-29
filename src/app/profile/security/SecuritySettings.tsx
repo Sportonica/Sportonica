@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { deleteMyAccount } from "@/lib/auth/deleteAccount";
 import { changePassword as changePasswordAction } from "@/lib/auth/password";
 import { isActionError } from "@/lib/actionError";
+import { useCaptcha, CAPTCHA_FAILED } from "@/lib/captcha/useCaptcha";
 import { PASSWORD_MIN } from "@/lib/validation/password";
 
 const PASSWORD_ERRORS: Record<string, string> = {
@@ -16,10 +17,13 @@ const PASSWORD_ERRORS: Record<string, string> = {
   REAUTH_REQUIRED: "For your security, sign in again before changing your password.",
   SIGNED_OUT: "You've been signed out. Sign in again to continue.",
   UNAVAILABLE: "Couldn't update your password. Please try again.",
+  CAPTCHA_FAILED,
 };
 
 export default function SecuritySettings({ name, hasPassword }: { name: string; hasPassword: boolean }) {
   const [pending, startTransition] = useTransition();
+  // Only the current-password check signs in, so only it needs a token.
+  const { captchaRef, getToken } = useCaptcha(hasPassword);
 
   // ── Change password ──
   const [current, setCurrent] = useState("");
@@ -36,7 +40,9 @@ export default function SecuritySettings({ name, hasPassword }: { name: string; 
     if (pw.length < PASSWORD_MIN) { setPwMsg(`Password needs at least ${PASSWORD_MIN} characters.`); return; }
     if (pw !== confirm) { setPwMsg("Those passwords don't match."); return; }
     startTransition(async () => {
-      const res = await changePasswordAction(current, pw);
+      const captchaToken = hasPassword ? await getToken().catch(() => null) : undefined;
+      if (captchaToken === null) { setPwMsg(CAPTCHA_FAILED); return; }
+      const res = await changePasswordAction(current, pw, captchaToken);
       if (isActionError(res)) {
         setPwCode(res.message);
         setPwMsg(PASSWORD_ERRORS[res.message] ?? PASSWORD_ERRORS.UNAVAILABLE);
@@ -120,6 +126,8 @@ export default function SecuritySettings({ name, hasPassword }: { name: string; 
             )}
           </div>
         )}
+
+        <div ref={captchaRef} style={{ marginTop: 10 }} />
 
         <div style={{ marginTop: 16 }}>
           <button className="pf-btn" onClick={changePassword} disabled={pending || !pw || !confirm}>

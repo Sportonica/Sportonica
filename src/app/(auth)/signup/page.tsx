@@ -21,6 +21,7 @@ import { PASSWORD_MIN } from "@/lib/validation/password";
 import { safeRedirect } from "@/lib/validation/redirect";
 import { signUpWithPhone } from "@/lib/auth/actions";
 import { isActionError } from "@/lib/actionError";
+import { useCaptcha, CAPTCHA_FAILED } from "@/lib/captcha/useCaptcha";
 
 type Role = "player" | "venue_owner";
 
@@ -28,6 +29,8 @@ const BAD_IDENTIFIER = "Enter a valid email address or a 10-digit mobile number.
 
 function friendlySignupError(raw: string): string {
   const m = raw.toLowerCase();
+  if (m.includes("captcha")) return CAPTCHA_FAILED;
+  if (m.includes("rate limit")) return "Too many sign-up attempts. Wait a while and try again.";
   if (m.includes("phone_taken") || (m.includes("phone") && m.includes("already"))) {
     return "An account with this phone number already exists.";
   }
@@ -46,6 +49,9 @@ function friendlySignupError(raw: string): string {
 function SignupInner() {
   const sb = createClient();
   const router = useRouter();
+  const { captchaRef, getToken } = useCaptcha();
+  // null = the CAPTCHA couldn't produce a token (script blocked, timed out).
+  const captchaToken = () => getToken().catch(() => null);
   const params = useSearchParams();
   const redirect = params.get("redirect");
   const [name, setName] = useState("");
@@ -86,9 +92,15 @@ function SignupInner() {
     if (!looksLikeEmail(id)) {
       if (!isValidLocalPhone(id)) { setErr(BAD_IDENTIFIER); return; }
       setLoading(true); setErr(null); setNote(null);
-      const res = await signUpWithPhone({ name: name.trim(), phone: id, password, role });
+      const signupToken = await captchaToken();
+      if (signupToken === null) { setErr(CAPTCHA_FAILED); setLoading(false); return; }
+      const res = await signUpWithPhone({ name: name.trim(), phone: id, password, role, captchaToken: signupToken });
       if (isActionError(res)) { setErr(res.message); setLoading(false); return; }
-      const { error } = await sb.auth.signInWithPassword({ email: res.email, password });
+      const { error } = await sb.auth.signInWithPassword({
+        email: res.email,
+        password,
+        options: { captchaToken: (await captchaToken()) ?? undefined },
+      });
       if (error) { setErr("Account created. Please sign in."); router.push("/login"); return; }
       afterAuth();
       return;
@@ -96,10 +108,12 @@ function SignupInner() {
 
     if (!isValidEmail(id)) { setErr(BAD_IDENTIFIER); return; }
     setLoading(true); setErr(null); setNote(null);
+    const token = await captchaToken();
+    if (token === null) { setErr(CAPTCHA_FAILED); setLoading(false); return; }
     const { data, error } = await sb.auth.signUp({
       email: normalizeEmail(id),
       password,
-      options: { data: { full_name: name.trim(), role } },
+      options: { data: { full_name: name.trim(), role }, captchaToken: token },
     });
     if (error) { setErr(friendlySignupError(error.message)); setLoading(false); return; }
     if (!data.session) {
@@ -189,6 +203,7 @@ function SignupInner() {
             onChange={(v) => { setAgreed(v); if (v) setConsentErr(false); }}
           />
 
+          <div ref={captchaRef} className="auth-captcha" />
           <SubmitButton loading={loading} onClick={signup}>Create account</SubmitButton>
 
           <div className="auth-or"><span>or</span></div>
