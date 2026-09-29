@@ -18,6 +18,7 @@ import {
 } from "@/lib/validation/identity";
 import { safeRedirect } from "@/lib/validation/redirect";
 import { signInWithPhone } from "@/lib/auth/actions";
+import { phoneVerificationNeeded } from "@/lib/phone/actions";
 import { isActionError } from "@/lib/actionError";
 import { useCaptcha, CaptchaError, CAPTCHA_FAILED } from "@/lib/captcha/useCaptcha";
 
@@ -104,7 +105,13 @@ function LoginInner() {
       });
       if (!error) {
         navigating = true;
-        router.push(target(data.user?.user_metadata?.role));
+        let dest = target(data.user?.user_metadata?.role);
+        // Phone-signup accounts from before SMS codes confirm their number
+        // first (SEC-03). A failed check shouldn't block signing in.
+        if (!looksLikeEmail(id) && (await phoneVerificationNeeded().catch(() => false))) {
+          dest = `/profile/verify-phone?redirect=${encodeURIComponent(dest)}`;
+        }
+        router.push(dest);
         router.refresh();
         return;
       }

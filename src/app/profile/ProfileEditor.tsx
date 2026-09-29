@@ -9,10 +9,13 @@ import { Upload, Check, ExternalLink, Globe, Lock } from "lucide-react";
 import { updateProfile, claimUsername, uploadAvatar } from "@/lib/profile/actions";
 import { isActionError } from "@/lib/actionError";
 import type { PlayerProfile } from "@/lib/profile/queries";
+import PhoneVerifier from "./PhoneVerifier";
 
 
 
-export default function ProfileEditor({ profile, origin }: { profile: PlayerProfile; origin: string }) {
+export default function ProfileEditor({
+  profile, origin, smsEnabled,
+}: { profile: PlayerProfile; origin: string; smsEnabled: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -69,7 +72,12 @@ export default function ProfileEditor({ profile, origin }: { profile: PlayerProf
     setMsg(null);
     startTransition(async () => {
       try {
-        const res = await updateProfile({ full_name: name.trim(), phone: phone.trim(), bio: bio.trim(), city: city.trim(), sports, is_public: isPublic });
+        // With SMS set up, the phone is saved by PhoneVerifier once its code
+        // checks out, never by this form.
+        const res = await updateProfile({
+          full_name: name.trim(), bio: bio.trim(), city: city.trim(), sports, is_public: isPublic,
+          ...(smsEnabled ? {} : { phone: phone.trim() }),
+        });
         if (isActionError(res)) { setMsg(res.message); return; }
         setOk(true);
         setTimeout(() => setOk(false), 1800);
@@ -130,12 +138,20 @@ export default function ProfileEditor({ profile, origin }: { profile: PlayerProf
           <input className="pf-in" value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Phone">
-          <input
-            className="pf-in" type="tel" inputMode="numeric" maxLength={10}
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-            placeholder="98XXXXXXXX (used for phone login)"
-          />
+          {smsEnabled ? (
+            <PhoneVerifier
+              initialPhone={profile.phone}
+              verified={!!profile.phone_verified_at}
+              onVerified={() => router.refresh()}
+            />
+          ) : (
+            <input
+              className="pf-in" type="tel" inputMode="numeric" maxLength={10}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+              placeholder="98XXXXXXXX (used for phone login)"
+            />
+          )}
         </Field>
         <Field label="City">
           <input className="pf-in" value={city} onChange={(e) => setCity(e.target.value)} />

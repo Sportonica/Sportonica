@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { actionError, type ActionError } from "@/lib/actionError";
 import { isValidLocalPhone, normalizePhone, PHONE_ERROR } from "@/lib/validation/identity";
+import { smsEnabled } from "@/lib/phone/sms";
 
 async function requireUser() {
   const sb = await createClient();
@@ -55,6 +56,11 @@ export async function updateProfile(patch: {
   if (typeof patch.is_public === "boolean") clean.is_public = patch.is_public;
   if (typeof patch.phone === "string") {
     const raw = patch.phone.trim();
+    // With SMS set up a number only lands through confirmMyPhone() after
+    // a correct code (SEC-03); clearing it is still fine.
+    if (raw !== "" && smsEnabled()) {
+      return actionError("Verify your phone number with the code we text you.");
+    }
     if (raw === "") {
       clean.phone = null; // clearing it is allowed
     } else if (!isValidLocalPhone(raw)) {
