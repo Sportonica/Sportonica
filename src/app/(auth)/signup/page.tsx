@@ -2,7 +2,7 @@
 
 import { useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { Lock, AtSign, User } from "lucide-react";
+import { Lock, AtSign, User, MessageSquare } from "lucide-react";
 import GoogleButton from "@/components/GoogleButton";
 import AppleButton from "@/components/AppleButton";
 import BackButton from "@/components/nav/BackButton";
@@ -15,7 +15,7 @@ import SubmitButton from "@/components/auth/SubmitButton";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
-  normalizeEmail, isValidEmail, isValidLocalPhone, looksLikeEmail, PHONE_ERROR,
+  normalizeEmail, normalizePhone, isValidEmail, isValidLocalPhone, looksLikeEmail, PHONE_ERROR,
 } from "@/lib/validation/identity";
 import { PASSWORD_MIN } from "@/lib/validation/password";
 import { safeRedirect } from "@/lib/validation/redirect";
@@ -64,6 +64,11 @@ function SignupInner() {
   const [loading, setLoading] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [consentErr, setConsentErr] = useState(false);
+  // Phone signup with SMS set up: the number a code was texted to, and
+  // the code typed back. Editing the number starts over.
+  const [codeFor, setCodeFor] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const codeStep = codeFor !== null && isValidLocalPhone(identifier.trim()) && normalizePhone(identifier.trim()) === codeFor;
 
   const identifierValid = useMemo(() => {
     const id = identifier.trim();
@@ -76,6 +81,32 @@ function SignupInner() {
     if (redirect) router.push(safeRedirect(redirect));
     else router.push(role === "venue_owner" ? "/admin" : "/discover");
     router.refresh();
+  }
+
+  // First call (no code) texts a code when SMS is set up; with the code it
+  // creates the account. Without SMS it creates the account straight away.
+  async function phoneSignup(id: string, withCode?: string) {
+    setLoading(true); setErr(null); setNote(null);
+    const signupToken = await captchaToken();
+    if (signupToken === null) { setErr(CAPTCHA_FAILED); setLoading(false); return; }
+    const res = await signUpWithPhone({
+      name: name.trim(), phone: id, password, role, captchaToken: signupToken, code: withCode,
+    });
+    if (isActionError(res)) { setErr(res.message); setLoading(false); return; }
+    if ("codeSent" in res) {
+      setCodeFor(normalizePhone(id));
+      setCode("");
+      setNote(`We texted a 6-digit code to ${normalizePhone(id)}. Enter it below to finish.`);
+      setLoading(false);
+      return;
+    }
+    const { error } = await sb.auth.signInWithPassword({
+      email: res.email,
+      password,
+      options: { captchaToken: (await captchaToken()) ?? undefined },
+    });
+    if (error) { setErr("Account created. Please sign in."); router.push("/login"); return; }
+    afterAuth();
   }
 
   async function signup() {
@@ -91,18 +122,8 @@ function SignupInner() {
 
     if (!looksLikeEmail(id)) {
       if (!isValidLocalPhone(id)) { setErr(BAD_IDENTIFIER); return; }
-      setLoading(true); setErr(null); setNote(null);
-      const signupToken = await captchaToken();
-      if (signupToken === null) { setErr(CAPTCHA_FAILED); setLoading(false); return; }
-      const res = await signUpWithPhone({ name: name.trim(), phone: id, password, role, captchaToken: signupToken });
-      if (isActionError(res)) { setErr(res.message); setLoading(false); return; }
-      const { error } = await sb.auth.signInWithPassword({
-        email: res.email,
-        password,
-        options: { captchaToken: (await captchaToken()) ?? undefined },
-      });
-      if (error) { setErr("Account created. Please sign in."); router.push("/login"); return; }
-      afterAuth();
+      if (codeStep && !/^\d{6}$/.test(code.trim())) { setErr("Enter the 6-digit code we texted you."); return; }
+      await phoneSignup(id, codeStep ? code.trim() : undefined);
       return;
     }
 
@@ -194,6 +215,29 @@ function SignupInner() {
             onEnter={signup}
           />
 
+          {codeStep && (
+            <>
+              <AuthInput
+                label="6-digit code"
+                value={code}
+                onChange={(v) => setCode(v.replace(/\D/g, "").slice(0, 6))}
+                icon={<MessageSquare size={16} />}
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                valid={/^\d{6}$/.test(code)}
+                onEnter={signup}
+              />
+              <button
+                type="button"
+                className="auth-resend"
+                disabled={loading}
+                onClick={() => phoneSignup(identifier.trim())}
+              >
+                Send a new code
+              </button>
+            </>
+          )}
+
           {err && <div className="auth-error">{err}</div>}
           {note && <div className="auth-note">{note}</div>}
 
@@ -204,7 +248,9 @@ function SignupInner() {
           />
 
           <div ref={captchaRef} className="auth-captcha" />
-          <SubmitButton loading={loading} onClick={signup}>Create account</SubmitButton>
+          <SubmitButton loading={loading} onClick={signup}>
+            {codeStep ? "Verify and create account" : "Create account"}
+          </SubmitButton>
 
           <div className="auth-or"><span>or</span></div>
           <GoogleButton

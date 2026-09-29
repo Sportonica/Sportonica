@@ -7,6 +7,8 @@ export interface PlayerProfile {
   full_name: string | null;
   name: string | null;
   phone: string | null;
+  // Only on your own profile (get_my_profile); set once an SMS code checks out.
+  phone_verified_at?: string | null;
   bio: string | null;
   city: string | null;
   avatar_url: string | null;

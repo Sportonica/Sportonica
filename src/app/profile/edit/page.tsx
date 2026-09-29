@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import { getMyProfile } from "@/lib/profile/queries";
+import { smsEnabled } from "@/lib/phone/sms";
 import ProfileEditor from "../ProfileEditor";
 import "../../p/profile.css";
 
@@ -24,7 +25,7 @@ export default async function EditProfilePage() {
       <div className="pf-wrap" style={{ maxWidth: 640 }}>
         <Link href="/profile" className="pf-back"><ArrowLeft size={15} /> Profile</Link>
       </div>
-      <ProfileEditor profile={profile} origin={`${proto}://${host}`} />
+      <ProfileEditor profile={profile} origin={`${proto}://${host}`} smsEnabled={smsEnabled()} />
     </div>
   );
 }
