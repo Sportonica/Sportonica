@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
+import { SUPABASE_COOKIE_OPTIONS } from '@/lib/supabase/cookieOptions'
 
 // A real singleton, not a factory — this used to create a brand new
 // client (new session listeners, new internal auth-state machinery) on
@@ -15,7 +16,8 @@ import { createBrowserClient } from '@supabase/ssr'
 // top-level call keeps the exact type a live call site would produce.
 const client = createBrowserClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  { cookieOptions: SUPABASE_COOKIE_OPTIONS }
 )
 
 export function createClient() {
