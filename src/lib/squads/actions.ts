@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { actionError, type ActionError } from "@/lib/actionError";
+import { filterSafeSearchTerm } from "@/lib/validation/search";
 
 async function requireUser() {
   const sb = await createClient();
@@ -87,7 +88,7 @@ export async function searchPlayers(q: string, squadId: string): Promise<
 > {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
-  const term = q.trim();
+  const term = filterSafeSearchTerm(q);
   if (term.length < 2) return [];
 
   const { data: existing } = await sb

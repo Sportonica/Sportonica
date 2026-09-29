@@ -16,6 +16,7 @@ import type {
   TournamentRaceCategory, TournamentRaceResult, RaceResultRow, RaceResultStatus,
 } from "./types";
 import { TEAM_PUBLIC_COLUMNS, TEAM_PRIVATE_FIELDS } from "./columns";
+import { filterSafeSearchTerm } from "@/lib/validation/search";
 
 async function requireUser() {
   const sb = await createClient();
@@ -214,7 +215,7 @@ export async function searchPlayersForTeam(q: string, teamId: string): Promise<
 > {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
-  const term = q.trim();
+  const term = filterSafeSearchTerm(q);
   if (term.length < 2) return [];
 
   const { data: existing } = await sb.from("tournament_team_players").select("user_id").eq("team_id", teamId);
