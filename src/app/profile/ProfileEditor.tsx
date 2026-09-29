@@ -10,6 +10,7 @@ import { updateProfile, claimUsername, uploadAvatar } from "@/lib/profile/action
 import { isActionError } from "@/lib/actionError";
 import type { PlayerProfile } from "@/lib/profile/queries";
 import PhoneVerifier from "./PhoneVerifier";
+import { shrinkImage, IMAGE_MAX } from "@/lib/images/shrink";
 
 
 
@@ -37,12 +38,13 @@ export default function ProfileEditor({
     setSports((p) => (p.includes(s) ? p.filter((x) => x !== s) : [...p, s]));
 
   function pickAvatar(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { setMsg("Image must be under 5 MB."); return; }
+    const picked = e.target.files?.[0];
+    if (!picked) return;
     setMsg(null);
     startTransition(async () => {
       try {
+        const file = await shrinkImage(picked, { maxSize: IMAGE_MAX.avatar });
+        if (file.size > 5 * 1024 * 1024) { setMsg("Image must be under 5 MB."); return; }
         const url = await uploadAvatar(file);
         if (isActionError(url)) { setMsg(url.message); return; }
         setAvatar(url);

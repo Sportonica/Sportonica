@@ -127,7 +127,9 @@ export async function uploadAvatar(file: File): Promise<string | ActionError> {
   const ext = extMap[file.type];
   const path = `${user.id}/${Date.now()}.${ext}`;
 
-  const { error: upErr } = await sb.storage.from("avatars").upload(path, file, { upsert: false });
+// Paths are unique per upload (timestamped), so a file never changes
+  // under its URL and browsers can keep it for a year.
+  const { error: upErr } = await sb.storage.from("avatars").upload(path, file, { upsert: false, cacheControl: "31536000" });
   if (upErr) return actionError(upErr.message);
 
   const { data: pub } = sb.storage.from("avatars").getPublicUrl(path);
