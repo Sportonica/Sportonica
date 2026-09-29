@@ -42,7 +42,10 @@ const securityHeaders = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Discover asks for location; nothing uses the camera, mic or payments API.
   { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=(), geolocation=(self)" },
-  { key: "Strict-Transport-Security", value: "max-age=63072000" },
+  // includeSubDomains: every *.sportonica.com is served over HTTPS by
+  // Vercel (wildcard DNS; checked 2026-09-29). Don't point a subdomain at
+  // anything HTTP-only. No `preload` (hard to undo).
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
 ];
 
 const nextConfig: NextConfig = {
