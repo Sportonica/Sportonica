@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import { getMyProfile } from "@/lib/profile/queries";
+import { getUser } from "@/lib/supabase/server";
 import SecuritySettings from "./SecuritySettings";
 import "../../p/profile.css";
 
@@ -13,13 +14,19 @@ export const metadata: Metadata = { title: "Login & Security — Sportonica" };
 export default async function SecurityPage() {
   const profile = await getMyProfile();
   if (!profile) redirect("/login?redirect=/profile/security");
+  const user = await getUser();
+  // Google/Apple-only accounts have no current password to ask for.
+  const hasPassword = !!user?.identities?.some((i) => i.provider === "email");
 
   return (
     <div className="pf">
       <div className="pf-wrap" style={{ maxWidth: 640 }}>
         <Link href="/profile" className="pf-back"><ArrowLeft size={15} /> Profile</Link>
         <h1 className="pf-hub-name" style={{ marginTop: 18 }}>Login &amp; Security</h1>
-        <SecuritySettings name={profile.full_name ?? profile.name ?? profile.username} />
+        <SecuritySettings
+          name={profile.full_name ?? profile.name ?? profile.username}
+          hasPassword={hasPassword}
+        />
       </div>
     </div>
   );

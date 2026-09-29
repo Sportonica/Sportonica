@@ -10,6 +10,8 @@ import AuthInput from "@/components/auth/AuthInput";
 import PasswordStrength from "@/components/auth/PasswordStrength";
 import SubmitButton from "@/components/auth/SubmitButton";
 import { createClient } from "@/lib/supabase/client";
+import { canResetPassword, resetPassword } from "@/lib/auth/password";
+import { isActionError } from "@/lib/actionError";
 import { PASSWORD_MIN } from "@/lib/validation/password";
 
 type Phase = "checking" | "ready" | "invalid" | "done";
@@ -25,13 +27,18 @@ function ResetPasswordInner() {
 
   // The /auth/callback route exchanges the emailed code for a session and
   // forwards here. Give the cookie a beat to surface, and also listen for
-  // the auth event in case it lands just after mount.
+  // the auth event in case it lands just after mount. Being signed in
+  // isn't enough: the session has to have come from a reset link, which
+  // the server checks (SEC-05).
   useEffect(() => {
     let done = false;
     const settle = (hasSession: boolean) => {
       if (done) return;
       done = true;
-      setPhase(hasSession ? "ready" : "invalid");
+      if (!hasSession) { setPhase("invalid"); return; }
+      canResetPassword()
+        .then((ok) => setPhase(ok ? "ready" : "invalid"))
+        .catch(() => setPhase("invalid"));
     };
 
     sb.auth.getSession().then(({ data }) => {
@@ -57,11 +64,10 @@ function ResetPasswordInner() {
     if (password !== confirm) { setErr("Those passwords don't match."); return; }
 
     setLoading(true); setErr(null);
-    const { error } = await sb.auth.updateUser({ password });
-    if (error) {
-      const m = error.message.toLowerCase();
+    const res = await resetPassword(password);
+    if (isActionError(res)) {
       setErr(
-        m.includes("different from the old")
+        res.message === "SAME_PASSWORD"
           ? "Choose a password you haven't used before."
           : "Couldn't update your password. Your reset link may have expired. Request a new one.",
       );
@@ -83,7 +89,7 @@ function ResetPasswordInner() {
         </Link>
         <div className="auth-tagline">
           <h2>New password, <em>fresh start.</em></h2>
-          <p>Pick something you&apos;ll remember. You&apos;ll stay signed in on this device.</p>
+          <p>Pick something you&apos;ll remember. You&apos;ll stay signed in on this device and be signed out everywhere else.</p>
         </div>
         <div className="auth-foot">NEPAL · SINCE 2026</div>
       </div>
