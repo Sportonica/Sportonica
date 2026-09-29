@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Plus, Trash2, X, Users, UserPlus, Pencil, Download } from "lucide-react";
+import { Check, Plus, Trash2, X, Users, UserPlus, Pencil, Download, Star } from "lucide-react";
 import {
   openTournamentRegistration, closeTournamentRegistration, reopenTournamentRegistration, cancelTournament, approveTournament, completeTournament,
   startSingleEvent, createWalkinTeam, markWalkinTeamPaid,
-  getTeamRoster, searchPlayersForTeam, addTeamPlayer, removeTeamPlayerAdmin,
+  getTeamRoster, searchPlayersForTeam, addTeamPlayer, removeTeamPlayerAdmin, setTeamCaptain,
   addWalkinTeamPlayer, updateTeamPlayerGuest, updateTeamManager, updateTeamName, setTeamPlayerJerseyNumber, setTeamPlayerPosition,
   deleteTournamentTeam,
 } from "@/lib/tournaments/actions";
@@ -623,6 +623,10 @@ function WalkinTeamModal({
   function removeMember(i: number) {
     setMembers((prev) => prev.filter((_, idx) => idx !== i));
   }
+  // One captain at most; tapping the current captain clears it (no captain).
+  function toggleCaptain(i: number) {
+    setMembers((prev) => prev.map((m, idx) => ({ ...m, captain: idx === i ? !m.captain : false })));
+  }
 
   function submit() {
     if (!teamName.trim()) { setErr("Enter a team name."); return; }
@@ -680,7 +684,7 @@ function WalkinTeamModal({
           Members ({members.length}/{maxMembers})
         </div>
         {members.map((m, i) => (
-          <div className="tc-member-row" key={i} style={{ gridTemplateColumns: "1.4fr 1fr 1fr 0.7fr 0.9fr auto" }}>
+          <div className="tc-member-row" key={i} style={{ gridTemplateColumns: "1.4fr 1fr 1fr 0.7fr 0.9fr auto auto" }}>
             <input value={m.name} onChange={(e) => updateMember(i, "name", e.target.value)} placeholder="Name" />
             <input value={m.phone} onChange={(e) => updateMember(i, "phone", e.target.value)} placeholder="Phone (optional)" />
             <input value={m.email ?? ""} onChange={(e) => updateMember(i, "email", e.target.value)} placeholder="Email (optional)" />
@@ -689,13 +693,21 @@ function WalkinTeamModal({
               onChange={(e) => updateMember(i, "jerseyNumber", e.target.value)} placeholder="Jersey #"
             />
             <input value={m.position ?? ""} onChange={(e) => updateMember(i, "position", e.target.value)} placeholder="Position (optional)" />
+            <button
+              type="button" onClick={() => toggleCaptain(i)}
+              aria-pressed={!!m.captain} aria-label={m.captain ? `Member ${i + 1} is captain` : `Make member ${i + 1} captain`}
+              title={m.captain ? "Captain (tap to unset)" : "Make captain"}
+              style={{ color: m.captain ? "#E8B53C" : "inherit", opacity: m.captain ? 1 : 0.45 }}
+            >
+              <Star size={15} fill={m.captain ? "currentColor" : "none"} />
+            </button>
             <button onClick={() => removeMember(i)} disabled={members.length <= 1} aria-label={`Remove member ${i + 1}`} style={{ opacity: members.length <= 1 ? 0.3 : 0.7 }}>
               <Trash2 size={15} />
             </button>
           </div>
         ))}
         <p className="tc-dim" style={{ fontSize: 11, marginTop: 6 }}>
-          Only a name is required. Add each player&apos;s email so they can sign in later and see their own stats.
+          Only a name is required. Tap the star to pick the captain (optional). Add each player&apos;s email so they can sign in later and see their own stats.
         </p>
         {members.length < maxMembers && (
           <button className="tc-btn" style={{ padding: "8px 12px", marginTop: 4 }} onClick={addMember}>
@@ -801,6 +813,16 @@ function TeamRosterModal({ team, onClose, onChanged }: {
     }, 300);
     return () => clearTimeout(t);
   }, [query, team.id]);
+
+  function makeCaptain(playerId: string) {
+    setErr(null);
+    startTransition(async () => {
+      const res = await setTeamCaptain(playerId, team.tournament_id);
+      if (isActionError(res)) { setErr(res.message); return; }
+      load();
+      onChanged();
+    });
+  }
 
   function remove(playerId: string, name: string) {
     if (!window.confirm(`Remove ${name} from ${team.name}?`)) return;
@@ -1007,6 +1029,19 @@ function TeamRosterModal({ team, onClose, onChanged }: {
                     >
                       <Pencil size={13} />
                     </button>
+                  )}
+                  {p.role === "player" && (
+                    <button
+                      aria-label={`Make ${p.name} captain`} title="Make captain" disabled={pending} onClick={() => makeCaptain(p.id)}
+                      style={{ background: "none", border: "none", color: "inherit", opacity: 0.5, cursor: "pointer", padding: 4, display: "flex" }}
+                    >
+                      <Star size={13} />
+                    </button>
+                  )}
+                  {p.role === "captain" && (
+                    <span title="Captain" aria-label="Captain" style={{ color: "#E8B53C", padding: 4, display: "flex" }}>
+                      <Star size={13} fill="currentColor" />
+                    </span>
                   )}
                   {p.role !== "captain" && (
                     <button
