@@ -1,3 +1,4 @@
+import "server-only";
 import { createHash } from "crypto";
 import { headers } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/admin";

@@ -1,3 +1,4 @@
+import "server-only";
 // SERVER ONLY — uses the service-role key. One-time SMS codes for phone
 // verification (SEC-03), kept hashed in public.phone_codes
 // (supabase/phone_verification.sql on the `changes` branch).

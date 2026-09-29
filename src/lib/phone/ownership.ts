@@ -1,3 +1,4 @@
+import "server-only";
 // SERVER ONLY — uses the service-role key. Who holds a phone number, and
 // moving it to whoever proves they own it (SEC-03). A number verified by
 // SMS beats one that was only typed in: the unverified holder loses it.
