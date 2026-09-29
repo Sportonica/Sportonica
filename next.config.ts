@@ -34,7 +34,14 @@ const csp = [
   ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
+// Vercel adds `Access-Control-Allow-Origin: *` to pages it serves from its
+// cache (e.g. prerendered /tournaments). Nothing reads our pages
+// cross-origin (the mobile apps load the site itself), so name our own
+// origin instead of a wildcard (security audit, CORS). No credentials.
+const SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com").replace(/\/+$/, "");
+
 const securityHeaders = [
+  { key: "Access-Control-Allow-Origin", value: SITE_ORIGIN },
   { key: "Content-Security-Policy", value: csp },
   // Older browsers that don't know frame-ancestors.
   { key: "X-Frame-Options", value: "DENY" },
