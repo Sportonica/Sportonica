@@ -19,6 +19,7 @@ import {
 import { safeRedirect } from "@/lib/validation/redirect";
 import { signInWithPhone } from "@/lib/auth/actions";
 import { isActionError } from "@/lib/actionError";
+import { useCaptcha, CaptchaError, CAPTCHA_FAILED } from "@/lib/captcha/useCaptcha";
 
 // Shown for a wrong account OR wrong password alike, so an attacker can't
 // tell "no such account" from "wrong password" (spec §21).
@@ -41,6 +42,7 @@ const CALLBACK_ERRORS: Record<string, string> = {
 function messageFor(error: AuthError): string {
   if (isAuthRetryableFetchError(error)) return NETWORK;
   if (error.code === "email_not_confirmed") return NOT_CONFIRMED;
+  if (error.code === "captcha_failed") return CAPTCHA_FAILED;
   if (error.status === 429) return RATE_LIMITED;
   if (error.status && error.status >= 500) return UNAVAILABLE;
   return BAD_CREDENTIALS;
@@ -50,11 +52,13 @@ const ACTION_MESSAGES: Record<string, string> = {
   EMAIL_NOT_CONFIRMED: NOT_CONFIRMED,
   RATE_LIMITED,
   UNAVAILABLE,
+  CAPTCHA_FAILED,
 };
 
 function LoginInner() {
   const sb = createClient();
   const router = useRouter();
+  const { captchaRef, getToken } = useCaptcha();
   const params = useSearchParams();
   const redirect = params.get("redirect");
   const [identifier, setIdentifier] = useState("");
@@ -93,7 +97,11 @@ function LoginInner() {
     setLoading(true); setErr(null);
     let navigating = false;
     try {
-      const { data, error } = await sb.auth.signInWithPassword({ email: signInEmail, password });
+      const { data, error } = await sb.auth.signInWithPassword({
+        email: signInEmail,
+        password,
+        options: { captchaToken: await getToken() },
+      });
       if (!error) {
         navigating = true;
         router.push(target(data.user?.user_metadata?.role));
@@ -112,7 +120,7 @@ function LoginInner() {
 
       // A phone that belongs to an account with a real email: resolved and
       // signed in server-side so that email is never sent to the browser.
-      const res = await signInWithPhone(id, password);
+      const res = await signInWithPhone(id, password, await getToken());
       if (!isActionError(res)) {
         navigating = true;
         // Session was set as cookies by the server — a full load makes the
@@ -121,8 +129,8 @@ function LoginInner() {
         return;
       }
       setErr(ACTION_MESSAGES[res.message] ?? BAD_CREDENTIALS);
-    } catch {
-      setErr(NETWORK);
+    } catch (e) {
+      setErr(e instanceof CaptchaError ? CAPTCHA_FAILED : NETWORK);
     } finally {
       if (!navigating) setLoading(false);
     }
@@ -131,7 +139,8 @@ function LoginInner() {
   async function resendConfirmation() {
     if (!unconfirmed || resend !== "idle") return;
     setResend("sending");
-    const { error } = await sb.auth.resend({ type: "signup", email: unconfirmed }).catch(
+    const captchaToken = await getToken().catch(() => undefined);
+    const { error } = await sb.auth.resend({ type: "signup", email: unconfirmed, options: { captchaToken } }).catch(
       () => ({ error: { status: 0 } as AuthError }),
     );
     if (error) {
@@ -224,6 +233,7 @@ function LoginInner() {
             </div>
           )}
 
+          <div ref={captchaRef} className="auth-captcha" />
           <SubmitButton loading={loading} onClick={login}>Sign in</SubmitButton>
 
           <div className="auth-or"><span>or</span></div>

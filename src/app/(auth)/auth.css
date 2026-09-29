@@ -592,3 +592,10 @@
 [data-theme="paper"] .ident-badge.mobile { color: #0369a1; background: rgba(3,105,161,0.10); }
 [data-theme="paper"] .pwstr-bar { background: rgba(40,32,18,0.15); }
 [data-theme="paper"] .auth-card-glow { background: radial-gradient(circle, rgba(10,143,95,0.12), transparent 65%); }
+
+/* Turnstile slot — empty unless Cloudflare decides to show a challenge. */
+.auth-captcha:not(:empty) {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0;
+}

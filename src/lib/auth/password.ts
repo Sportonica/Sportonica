@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAnonClient } from "@/lib/supabase/anonServer";
 import { actionError, type ActionError } from "@/lib/actionError";
 import { PASSWORD_MIN } from "@/lib/validation/password";
+import { underRateLimit } from "@/lib/security/abuse";
 
 // Password changes go through the server so they can't be done with a
 // session alone (SEC-05). A stolen session cookie shouldn't be enough to
@@ -50,6 +51,7 @@ function updateFailed(error: { code?: string; message: string }): ActionError {
 export async function changePassword(
   current: string,
   next: string,
+  captchaToken?: string,
 ): Promise<{ ok: true } | ActionError> {
   if (next.length < PASSWORD_MIN) return actionError("WEAK_PASSWORD");
 
@@ -63,11 +65,21 @@ export async function changePassword(
 
   if (hasPassword) {
     if (!current) return actionError("WRONG_PASSWORD");
+    // The check below is a password sign-in from our server, which
+    // Supabase's per-IP limit can't attribute to this visitor (SEC-04).
+    if (!(await underRateLimit("password-check-user", user.id, 10, 15 * 60))) {
+      return actionError("RATE_LIMITED");
+    }
     // Check it on a throwaway client so the cookie session isn't touched,
     // then revoke the session that check created.
     const probe = createAnonClient();
-    const { data, error } = await probe.auth.signInWithPassword({ email: user.email!, password: current });
+    const { data, error } = await probe.auth.signInWithPassword({
+      email: user.email!,
+      password: current,
+      options: { captchaToken },
+    });
     if (error) {
+      if (error.code === "captcha_failed") return actionError("CAPTCHA_FAILED");
       if (error.status === 429) return actionError("RATE_LIMITED");
       return actionError("WRONG_PASSWORD");
     }

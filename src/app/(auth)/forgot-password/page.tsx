@@ -10,6 +10,7 @@ import SubmitButton from "@/components/auth/SubmitButton";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { normalizeEmail, isValidEmail, looksLikeEmail } from "@/lib/validation/identity";
+import { useCaptcha, CAPTCHA_FAILED } from "@/lib/captcha/useCaptcha";
 
 const SUPPORT = "info@sportonica.com";
 // Phone-only accounts have a synthetic @phone.sportonica.com address with
@@ -20,6 +21,7 @@ const PHONE_HELP =
 function ForgotPasswordInner() {
   const sb = createClient();
   const params = useSearchParams();
+  const { captchaRef, getToken } = useCaptcha();
   const [email, setEmail] = useState(params.get("email")?.trim() ?? "");
   // /auth/callback sends a reset link that failed to sign in back here.
   const [err, setErr] = useState<string | null>(() =>
@@ -40,11 +42,16 @@ function ForgotPasswordInner() {
     setLoading(true); setErr(null);
     // Route the email link through the existing PKCE callback, which
     // exchanges the code for a session and forwards to /reset-password.
-    await sb.auth.resetPasswordForEmail(normalizeEmail(id), {
+    const captchaToken = await getToken().catch(() => null);
+    if (captchaToken === null) { setErr(CAPTCHA_FAILED); setLoading(false); return; }
+    const { error } = await sb.auth.resetPasswordForEmail(normalizeEmail(id), {
       redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
+      captchaToken,
     });
-    // Always land on the same confirmation — never reveal whether an
-    // account exists for this address.
+    // A failed CAPTCHA says nothing about the account, so it can be shown.
+    if (error?.code === "captcha_failed") { setErr(CAPTCHA_FAILED); setLoading(false); return; }
+    // Otherwise always land on the same confirmation — never reveal
+    // whether an account exists for this address.
     setLoading(false);
     setSent(true);
   }
@@ -98,6 +105,7 @@ function ForgotPasswordInner() {
 
               {err && <div className="auth-error" role="alert">{err}</div>}
 
+              <div ref={captchaRef} className="auth-captcha" />
               <SubmitButton loading={loading} onClick={submit}>Send reset link</SubmitButton>
 
               <div className="auth-alt">

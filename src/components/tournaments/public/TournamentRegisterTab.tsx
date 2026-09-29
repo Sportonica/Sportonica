@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { getCachedUser } from "@/lib/supabase/authCache";
 import { isActionError } from "@/lib/actionError";
+import { useCaptcha } from "@/lib/captcha/useCaptcha";
 import { getSportKind } from "@/lib/sports";
 import PaymentStep from "@/components/payments/PaymentStep";
 import { type Tournament, type TournamentTeam, type TournamentRaceCategory } from "@/lib/tournaments/types";
@@ -56,6 +57,7 @@ export default function TournamentRegisterTab({
   const [iPlay, setIPlay] = useState(false);
   const [ackTerms, setAckTerms] = useState(false);
   const [anonErr, setAnonErr] = useState(false);
+  const { captchaRef, getToken } = useCaptcha(!loggedIn);
 
   // No account required to register a team — sign in a fresh anonymous
   // Supabase session behind the scenes instead of sending the visitor to
@@ -73,9 +75,12 @@ export default function TournamentRegisterTab({
   useEffect(() => {
     if (loggedIn) return;
     let cancelled = false;
-    getCachedUser().catch(() => null).then(() => {
+    getCachedUser().catch(() => null).then(async () => {
       if (cancelled) return undefined;
-      return createClient().auth.signInAnonymously();
+      // Anonymous sign-ins need a CAPTCHA token too (SEC-04).
+      const captchaToken = await getToken();
+      if (cancelled) return undefined;
+      return createClient().auth.signInAnonymously({ options: { captchaToken } });
     }).then((res) => {
       if (cancelled || !res) return;
       if (res.error) { setAnonErr(true); return; }
@@ -85,7 +90,7 @@ export default function TournamentRegisterTab({
       setAnonErr(true);
     });
     return () => { cancelled = true; };
-  }, [loggedIn, router]);
+  }, [loggedIn, router, getToken]);
 
   function submitLogo(file: File) {
     setLogoUploading(true);
@@ -337,6 +342,7 @@ export default function TournamentRegisterTab({
                 <p>One moment while we get the registration form ready.</p>
               </>
             )}
+            <div ref={captchaRef} style={{ display: "flex", justifyContent: "center" }} />
           </div>
         </>
       ) : !team && (!regOpen || full) ? (
