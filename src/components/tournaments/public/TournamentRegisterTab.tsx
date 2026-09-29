@@ -17,6 +17,7 @@ import { useCaptcha } from "@/lib/captcha/useCaptcha";
 import { getSportKind } from "@/lib/sports";
 import PaymentStep from "@/components/payments/PaymentStep";
 import { type Tournament, type TournamentTeam, type TournamentRaceCategory } from "@/lib/tournaments/types";
+import { shrinkImage, IMAGE_MAX } from "@/lib/images/shrink";
 
 type RosterPlayer = {
   id: string; user_id: string | null; role: string; name: string; username: string | null;
@@ -96,7 +97,7 @@ export default function TournamentRegisterTab({
     setLogoUploading(true);
     setErr(null);
     startTransition(async () => {
-      const res = await uploadTeamLogo(file);
+      const res = await uploadTeamLogo(await shrinkImage(file, { maxSize: IMAGE_MAX.logo }));
       setLogoUploading(false);
       if (isActionError(res)) { setErr(res.message); return; }
       setLogoUrl(res);

@@ -373,7 +373,7 @@ export async function uploadTournamentBanner(file: File): Promise<string | Actio
   const ext = extMap[file.type];
   const path = `${user.id}/${Date.now()}.${ext}`;
 
-  const { error } = await sb.storage.from("tournament-banners").upload(path, file, { upsert: false });
+  const { error } = await sb.storage.from("tournament-banners").upload(path, file, { upsert: false, cacheControl: "31536000" });
   if (error) return actionError(error.message);
 
   const { data: pub } = sb.storage.from("tournament-banners").getPublicUrl(path);
@@ -630,7 +630,7 @@ export async function uploadTeamLogo(file: File): Promise<string | ActionError> 
   const ext = extMap[file.type];
   const path = `${user.id}/${Date.now()}.${ext}`;
 
-  const { error } = await sb.storage.from("team-logos").upload(path, file, { upsert: false });
+  const { error } = await sb.storage.from("team-logos").upload(path, file, { upsert: false, cacheControl: "31536000" });
   if (error) return actionError(error.message);
 
   const { data: pub } = sb.storage.from("team-logos").getPublicUrl(path);

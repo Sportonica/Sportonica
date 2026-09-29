@@ -74,6 +74,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      // Bundled images were served with max-age=0, so every page view
+      // re-asked the server about every photo — slow on mobile data. Their
+      // names aren't content-hashed, so keep it to a week, then serve the
+      // cached copy while quietly re-checking. Replacing one of these files?
+      // Give it a new name so phones pick it up straight away.
+      ...["/sports/:path*", "/icons/:path*", "/awards/:path*", "/nepal-provinces.geojson"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=2592000" }],
+      })),
       {
         source: "/.well-known/apple-app-site-association",
         headers: [{ key: "Content-Type", value: "application/json" }],

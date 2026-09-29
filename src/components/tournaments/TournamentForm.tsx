@@ -9,6 +9,7 @@ import { parseMapsUrl } from "@/lib/admin/location";
 import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS, TOURNAMENT_FORMATS, HOST_PAYMENT_METHODS, HOST_PAYMENT_METHOD_LABELS } from "@/lib/tournaments/types";
 import type { Tournament, TournamentFormat, HostPaymentMethod } from "@/lib/tournaments/types";
+import { shrinkImage, IMAGE_MAX } from "@/lib/images/shrink";
 
 const KTM_OFFSET = "+05:45";
 const todayKTM = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" });
@@ -151,12 +152,15 @@ export default function TournamentForm({
     if (!f) return;
     const okTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!okTypes.includes(f.type)) { setErr("Upload a JPG, PNG or WebP image."); return; }
-    if (f.size > 5 * 1024 * 1024) { setErr("Image must be under 5 MB."); return; }
     setErr(null);
     if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
     setBannerPreview(URL.createObjectURL(f));
     setBannerUploading(true);
-    uploadTournamentBanner(f)
+    shrinkImage(f, { maxSize: IMAGE_MAX.banner })
+      .then((small) => {
+        if (small.size > 5 * 1024 * 1024) throw new Error("Image must be under 5 MB.");
+        return uploadTournamentBanner(small);
+      })
       .then((url) => {
         if (isActionError(url)) {
           if (url.message === "UNAUTHORIZED") {

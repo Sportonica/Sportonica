@@ -184,8 +184,10 @@ export async function uploadVenuePhoto(venueId: string, file: File): Promise<str
   const ext = file.name.split(".").pop() ?? "jpg";
   const path = `${venueId}/${Date.now()}.${ext}`;
 
+  // Paths are unique per upload (timestamped), so a file never changes
+  // under its URL and browsers can keep it for a year.
   const { error: upErr } = await sb.storage.from("venue-photos").upload(path, file, {
-    cacheControl: "3600",
+    cacheControl: "31536000",
     upsert: false,
   });
   if (upErr) return actionError(upErr.message);

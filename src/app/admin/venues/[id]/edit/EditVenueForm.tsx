@@ -9,6 +9,7 @@ import { updateVenue, uploadVenuePhoto, addVenuePhotoUrl, removeVenuePhoto } fro
 import { saveVenueLocation } from "@/lib/admin/location";
 import { isActionError } from "@/lib/actionError";
 import type { Venue, AdvancePaymentMode } from "@/lib/admin/types";
+import { shrinkImage, IMAGE_MAX } from "@/lib/images/shrink";
 
 
 const AMENITIES = ["Floodlights", "Parking", "Changing room", "Water", "Showers", "Seating", "Equipment rental"];
@@ -68,12 +69,13 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
     set(list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
 
   function onFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { setMsg("Image must be under 5 MB."); return; }
+    const picked = e.target.files?.[0];
+    if (!picked) return;
     setUploading(true); setMsg(null);
     startTransition(async () => {
       try {
+        const file = await shrinkImage(picked, { maxSize: IMAGE_MAX.venuePhoto });
+        if (file.size > 5 * 1024 * 1024) { setMsg("Image must be under 5 MB."); return; }
         const url = await uploadVenuePhoto(venue.id, file);
         if (isActionError(url)) { setMsg(url.message); return; }
         setPhotos((p) => [...p, url]);
