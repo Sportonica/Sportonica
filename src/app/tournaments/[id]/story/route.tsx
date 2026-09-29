@@ -4,6 +4,7 @@ import { getTournament, getDisplayVenueName } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS } from "@/lib/tournaments/types";
 import { sportColor } from "@/lib/sports";
+import { storageImageUrl } from "@/lib/security/storageImage";
 
 export const runtime = "nodejs";
 
@@ -52,11 +53,7 @@ export async function GET(
   // Old rows can also hold a bare filename from before the upload flow
   // existed, which this same check correctly rejects (Satori's <img>
   // requires an absolute URL and 500s the route otherwise).
-  const bannerPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tournament-banners/`;
-  const safeBanner =
-    tournament.banner_url && tournament.banner_url.startsWith(bannerPrefix)
-      ? tournament.banner_url
-      : null;
+  const safeBanner = storageImageUrl(tournament.banner_url, "tournament-banners");
 
   const isSingleEvent = tournament.format === "single_event";
 

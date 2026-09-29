@@ -49,21 +49,27 @@ function isAllowedMapsUrl(url: string): boolean {
 }
 
 // Short links (maps.app.goo.gl / goo.gl/maps) don't contain coordinates.
-// We follow the redirect server-side to get the real URL, then parse that.
+// We follow the redirects server-side to get the real URL, then parse that.
+// Each hop is checked against the allowlist BEFORE it's requested:
+// `redirect: "follow"` would fetch every intermediate hop blind, and
+// *.google.com includes open redirectors (google.com/url?q=…) that can
+// bounce to an internal address (security audit, SSRF).
+const MAX_HOPS = 5;
 async function expandShortLink(url: string): Promise<string> {
-  if (!isAllowedMapsUrl(url)) return url;
-  try {
-    const res = await fetch(url, {
-      redirect: "follow",
-      method: "GET",
-      signal: AbortSignal.timeout(5000),
-    });
-    // The redirect target must still be a Google host — a shortlink could
-    // 302 anywhere otherwise.
-    return isAllowedMapsUrl(res.url) ? res.url : url;
-  } catch {
-    return url;
+  let current = url;
+  for (let hop = 0; hop < MAX_HOPS; hop++) {
+    if (!isAllowedMapsUrl(current)) return url;
+    let res: Response;
+    try {
+      res = await fetch(current, { redirect: "manual", method: "GET", signal: AbortSignal.timeout(5000) });
+    } catch {
+      return url;
+    }
+    const location = res.headers.get("location");
+    if (res.status < 300 || res.status >= 400 || !location) return current;
+    current = new URL(location, current).toString();
   }
+  return isAllowedMapsUrl(current) ? current : url;
 }
 
 // Parse a pasted Google Maps link into coordinates. Returns coords + the
@@ -71,6 +77,11 @@ async function expandShortLink(url: string): Promise<string> {
 export async function parseMapsUrl(rawUrl: string): Promise<{
   lat: number; lng: number; url: string;
 } | ActionError> {
+  // Makes an outbound request, so not for anonymous callers (it's only used
+  // in the venue and tournament forms, which need an account anyway).
+  const { data: { user } } = await (await createClient()).auth.getUser();
+  if (!user || user.is_anonymous) return actionError("Sign in to add a map location.");
+
   const url = rawUrl.trim();
   if (!/^https:\/\//.test(url) || !isAllowedMapsUrl(url)) {
     return actionError("Paste a full Google Maps link (starting with https://).");
