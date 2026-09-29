@@ -1,17 +1,23 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-// Only these prefixes gate on auth/role. Every other route is public
-// browsing (home, /discover, /tournaments, /play-together, …) and does
-// NOT need a Supabase auth round-trip in middleware — the page/action
-// checks auth itself where it matters. Skipping getUser() for public
-// navigations removes a network round-trip from the critical path of
-// almost every page load.
+// Only these prefixes gate on auth/role, with a full getUser() check
+// against the auth server. Every other route is public browsing (home,
+// /discover, /tournaments, /play-together, …) — the page/action checks
+// auth itself where it matters.
 const AUTH_PREFIXES = ['/profile', '/admin', '/welcome', '/platform', '/my-games', '/organize']
+
+// @supabase/ssr's session cookie: sb-<project-ref>-auth-token, split into
+// .0/.1 chunks when large.
+const hasSessionCookie = (request: NextRequest) =>
+  request.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
-  if (!AUTH_PREFIXES.some((p) => path === p || path.startsWith(p + '/'))) {
+  const gated = AUTH_PREFIXES.some((p) => path === p || path.startsWith(p + '/'))
+
+  // Signed-out visitors on public pages: nothing to check or refresh.
+  if (!gated && !hasSessionCookie(request)) {
     return NextResponse.next({ request })
   }
 
@@ -33,6 +39,19 @@ export async function proxy(request: NextRequest) {
       },
     }
   )
+
+  if (!gated) {
+    // Keep the session fresh on public pages too (P-01). Otherwise an
+    // expired access token gets refreshed during a Server Component
+    // render, which can't write cookies — the browser keeps the old,
+    // now-used refresh token, and replaying it can trip Supabase's
+    // refresh-token reuse detection and sign the user out. getClaims()
+    // verifies the ES256 token locally against cached JWKS, so this only
+    // costs a network call when the token has actually expired — and
+    // then the new cookies are written here, where that's allowed.
+    await supabase.auth.getClaims()
+    return response
+  }
 
   const { data: { user } } = await supabase.auth.getUser()
   // Anonymous sessions (silently created for tournament registration —
