@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, MapPin, ImageIcon, ShieldCheck } from "lucide-react";
 import { getVenueForBooking } from "@/lib/play/queries";
+import { normalizeSport, resolveSportParam } from "@/lib/sports";
 import BookingFlow from "./BookingFlow";
 import { getVenuePricingRules } from "@/lib/play/pricing";
 
@@ -29,13 +30,20 @@ export default async function VenueBookingPage({
   const timeMins = time != null && /^\d+$/.test(time) ? Number(time) : undefined;
   // Independent queries — pricing rules don't depend on the venue lookup's
   // result, so there's no reason to wait on one before starting the other.
-  const [{ venue, courts, hoursByCourt }, pricingRules] = await Promise.all([
+  const [{ venue, courts: allCourts, hoursByCourt }, pricingRules] = await Promise.all([
     getVenueForBooking(id),
     getVenuePricingRules(id),
   ]);
   if (!venue) notFound();
 
-  const backHref = sport ? `/create?sport=${encodeURIComponent(sport)}` : "/create";
+  // Arriving from a sport's section ("/create?sport=Basketball") shows
+  // only that sport's courts. A ground with none has no business being
+  // opened from there, so send the visitor back to that sport's list.
+  const wanted = resolveSportParam(sport);
+  const courts = wanted ? allCourts.filter((c) => normalizeSport(c.sport) === wanted) : allCourts;
+  if (wanted && courts.length === 0) redirect(`/create?sport=${encodeURIComponent(wanted)}`);
+
+  const backHref = wanted ? `/create?sport=${encodeURIComponent(wanted)}` : "/create";
 
   const photo = venue.photos?.[0];
 

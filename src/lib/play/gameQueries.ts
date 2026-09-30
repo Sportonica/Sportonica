@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { bookableSports, normalizeSport } from "@/lib/sports";
 
 export interface GamePlayer {
   user_id: string;
@@ -82,7 +83,7 @@ export async function getNearbyVenues(game: GameFull, limit = 4) {
   const sb = await createClient();
   const { data } = await sb
     .from("venues")
-    .select("id, name, address, photos, lat, lng, maps_url")
+    .select("id, name, address, photos, lat, lng, maps_url, sports, courts(sport, status)")
     .eq("verification_status", "verified")
     .eq("status", "open")
     .not("lat", "is", null)
@@ -91,6 +92,8 @@ export async function getNearbyVenues(game: GameFull, limit = 4) {
   const R = 6371;
   const toRad = (v: number) => (v * Math.PI) / 180;
   return (data ?? [])
+    // a futsal ground is no use next to a basketball game
+    .filter((v) => bookableSports(v.sports, v.courts as { sport: string | null; status: string | null }[] | null).includes(normalizeSport(game.sport)))
     .map((v) => {
       const dLat = toRad((v.lat as number) - game.venue_lat!);
       const dLng = toRad((v.lng as number) - game.venue_lng!);

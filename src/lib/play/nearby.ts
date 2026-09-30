@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { bookableSports } from "@/lib/sports";
 
 export interface NearbyVenue {
   id: string; name: string; venue_type: string;
@@ -31,7 +32,7 @@ export async function nearbyVenuesAndGames(lat: number, lng: number): Promise<Ne
 
   const [venuesRes, gamesRes] = await Promise.allSettled([
     sb.from("venues")
-      .select("id, name, venue_type, sports, lat, lng")
+      .select("id, name, venue_type, sports, lat, lng, courts(sport, status)")
       .eq("verification_status", "verified")
       .eq("status", "open")
       .not("lat", "is", null)
@@ -51,7 +52,7 @@ export async function nearbyVenuesAndGames(lat: number, lng: number): Promise<Ne
     venues: (venues ?? [])
       .map((v) => ({
         id: v.id, name: v.name, venue_type: v.venue_type,
-        sports: v.sports,
+        sports: bookableSports(v.sports, v.courts as { sport: string | null; status: string | null }[] | null),
         km: km(lat, lng, v.lat as number, v.lng as number),
       }))
       .sort((a, b) => a.km - b.km)
