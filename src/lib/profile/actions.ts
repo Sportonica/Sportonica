@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { actionError, type ActionError } from "@/lib/actionError";
 import { isValidLocalPhone, normalizePhone, PHONE_ERROR } from "@/lib/validation/identity";
 import { smsEnabled } from "@/lib/phone/sms";
+import { isRealImage } from "@/lib/security/imageBytes";
 
 async function requireUser() {
   const sb = await createClient();
@@ -122,6 +123,9 @@ export async function uploadAvatar(file: File): Promise<string | ActionError> {
   };
   if (file.size > 5 * 1024 * 1024) {
     return actionError("Image must be under 5 MB.");
+  }
+  if (!(await isRealImage(file, okTypes))) {
+    return actionError("That file isn't a real JPG, PNG or WebP image.");
   }
 
   const ext = extMap[file.type];

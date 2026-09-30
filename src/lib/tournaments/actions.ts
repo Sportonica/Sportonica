@@ -17,6 +17,7 @@ import type {
 } from "./types";
 import { TEAM_PUBLIC_COLUMNS, TEAM_PRIVATE_FIELDS } from "./columns";
 import { filterSafeSearchTerm } from "@/lib/validation/search";
+import { isRealImage } from "@/lib/security/imageBytes";
 
 async function requireUser() {
   const sb = await createClient();
@@ -391,6 +392,7 @@ export async function uploadTournamentBanner(file: File): Promise<string | Actio
   const okTypes = ["image/jpeg", "image/png", "image/webp"];
   if (!okTypes.includes(file.type)) return actionError("Upload a JPG, PNG or WebP image.");
   if (file.size > 5 * 1024 * 1024) return actionError("Image must be under 5 MB.");
+  if (!(await isRealImage(file, okTypes))) return actionError("That file isn't a real JPG, PNG or WebP image.");
 
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];
@@ -415,6 +417,7 @@ export async function uploadTournamentQr(file: File): Promise<string | ActionErr
   const okTypes = ["image/jpeg", "image/png", "image/webp"];
   if (!okTypes.includes(file.type)) return actionError("Upload a JPG, PNG or WebP QR image.");
   if (file.size > 5 * 1024 * 1024) return actionError("QR image must be under 5 MB.");
+  if (!(await isRealImage(file, okTypes))) return actionError("That file isn't a real JPG, PNG or WebP image.");
 
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];
@@ -648,6 +651,7 @@ export async function uploadTeamLogo(file: File): Promise<string | ActionError> 
   const okTypes = ["image/jpeg", "image/png", "image/webp"];
   if (!okTypes.includes(file.type)) return actionError("Upload a JPG, PNG or WebP image.");
   if (file.size > 5 * 1024 * 1024) return actionError("Image must be under 5 MB.");
+  if (!(await isRealImage(file, okTypes))) return actionError("That file isn't a real JPG, PNG or WebP image.");
 
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];

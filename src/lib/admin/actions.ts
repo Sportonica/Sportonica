@@ -8,6 +8,7 @@ import { friendlyBookingError } from "@/lib/bookings/types";
 import { isValidLocalPhone } from "@/lib/validation/identity";
 import { friendlyPaymentError } from "@/lib/payments/types";
 import { VENUE_HAS_HISTORY, COURT_HAS_HISTORY } from "@/lib/admin/types";
+import { sniffImageType, IMAGE_EXT } from "@/lib/security/imageBytes";
 
 // Columns a venue owner may set/change themselves. verification_status,
 // payout_cap, owner_id, status and the like are platform-controlled —
@@ -181,12 +182,18 @@ export async function uploadVenuePhoto(venueId: string, file: File): Promise<str
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   if (!(await requireVenueAccess(sb, venueId))) return actionError("FORBIDDEN");
-  const ext = file.name.split(".").pop() ?? "jpg";
+  // Checked on the server by the file's actual bytes, and named by the
+  // detected type, not the uploader's file name (security audit).
+  if (file.size > 5 * 1024 * 1024) return actionError("Image must be under 5 MB.");
+  const sniffed = await sniffImageType(file);
+  if (!sniffed) return actionError("Upload a JPG, PNG, WebP or GIF image.");
+  const ext = IMAGE_EXT[sniffed];
   const path = `${venueId}/${Date.now()}.${ext}`;
 
   // Paths are unique per upload (timestamped), so a file never changes
   // under its URL and browsers can keep it for a year.
   const { error: upErr } = await sb.storage.from("venue-photos").upload(path, file, {
+    contentType: sniffed,
     cacheControl: "31536000",
     upsert: false,
   });

@@ -6,6 +6,7 @@ import { friendlyPaymentError } from "./types";
 import type { BookingType, Payment, PaymentMethod, PaymentMethodConfig } from "./types";
 import { notifyPaymentSubmitted, notifyHostedEventIfPublished, notifyPlayTogetherGamePublishedIfAny } from "@/lib/mail/notify";
 import { actionError, type ActionError } from "@/lib/actionError";
+import { isRealImage } from "@/lib/security/imageBytes";
 
 async function requireUser() {
   const sb = await createClient();
@@ -40,6 +41,9 @@ export async function uploadPaymentProof(
   }
   if (file.size > 5 * 1024 * 1024) {
     return actionError("Screenshot must be under 5 MB.");
+  }
+  if (!(await isRealImage(file, okTypes))) {
+    return actionError("That file isn't a real JPG, PNG or WebP image.");
   }
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];

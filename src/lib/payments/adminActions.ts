@@ -7,6 +7,7 @@ import type { Payment, PaymentMethod, PaymentMethodConfig } from "./types";
 import { notifyPaymentReviewed, notifyHostedEventIfPublished, notifyPlayTogetherGamePublishedIfAny } from "@/lib/mail/notify";
 import { actionError, type ActionError } from "@/lib/actionError";
 import type { User } from "@supabase/supabase-js";
+import { isRealImage } from "@/lib/security/imageBytes";
 
 type SuperAdminAuth =
   | { error: ActionError; sb?: undefined; user?: undefined }
@@ -67,6 +68,9 @@ export async function uploadPaymentQr(method: PaymentMethod, file: File): Promis
   }
   if (file.size > 5 * 1024 * 1024) {
     return actionError("QR image must be under 5 MB.");
+  }
+  if (!(await isRealImage(file, okTypes))) {
+    return actionError("That file isn't a real JPG, PNG or WebP image.");
   }
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];
