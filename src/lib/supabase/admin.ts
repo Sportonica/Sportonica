@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 // Service-role Supabase client — bypasses RLS and can call the auth admin

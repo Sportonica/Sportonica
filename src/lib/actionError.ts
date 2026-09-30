@@ -43,3 +43,29 @@ export function safeActionError(
   console.error("[action]", message);
   return actionError(fallback);
 }
+
+// For a Supabase/Postgres error returned straight from a query or RPC.
+// Our own database functions raise UPPER_CASE business codes
+// (ROSTER_LOCKED, FORBIDDEN, …) that the UI maps to friendly text — those
+// pass through. Anything else is raw Postgres/PostgREST text that names
+// tables, columns, policies and functions, so it's logged server-side and
+// the client gets a generic sentence (security audit, ERROR_HANDLING).
+const RAISED_SENTENCES = new Set([
+  "Cannot start a conversation with yourself",
+  "Court not found",
+  "End time must be after start time",
+]);
+
+export function isBusinessErrorMessage(message: string): boolean {
+  return /^[A-Z][A-Z0-9_]{2,}$/.test(message) || RAISED_SENTENCES.has(message);
+}
+
+export function dbActionError(
+  error: unknown,
+  fallback = "Something went wrong. Please try again.",
+): ActionError {
+  const message = (error as { message?: string } | null)?.message ?? String(error);
+  if (isBusinessErrorMessage(message)) return actionError(message);
+  console.error("[action:db]", message);
+  return actionError(fallback);
+}

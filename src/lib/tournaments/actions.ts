@@ -3,7 +3,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { actionError, isActionError, type ActionError } from "@/lib/actionError";
+import { actionError, isActionError, type ActionError, dbActionError } from "@/lib/actionError";
 import { friendlyTournamentError } from "./types";
 import { bookingLabel, friendlyPaymentError, type Payment } from "@/lib/payments/types";
 import { notifyPaymentReviewed } from "@/lib/mail/notify";
@@ -15,6 +15,9 @@ import type {
   TournamentCricketPlayerStat, TournamentCricketStatRow,
   TournamentRaceCategory, TournamentRaceResult, RaceResultRow, RaceResultStatus,
 } from "./types";
+import { TEAM_PUBLIC_COLUMNS, TEAM_PRIVATE_FIELDS } from "./columns";
+import { filterSafeSearchTerm } from "@/lib/validation/search";
+import { isRealImage } from "@/lib/security/imageBytes";
 
 async function requireUser() {
   const sb = await createClient();
@@ -30,7 +33,7 @@ export async function getMyVendorTournaments(): Promise<Tournament[] | ActionErr
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb.from("tournaments").select("*").order("created_at", { ascending: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as Tournament[];
 }
 
@@ -45,7 +48,7 @@ export const listAllTournaments = getMyVendorTournaments;
 export const getTournament = cache(async function getTournament(id: string): Promise<Tournament | null | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.from("tournaments").select("*").eq("id", id).maybeSingle();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return data as Tournament | null;
 });
 
@@ -87,19 +90,39 @@ export async function listPublicTournaments(): Promise<(Tournament & { venue_nam
     .or(`ends_at.gte.${nowIso},ends_at.is.null,status.in.(live,completed)`)
     .order("starts_at", { ascending: true, nullsFirst: false })
     .limit(100);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return ((data ?? []) as unknown as (Tournament & { venues: { name: string } | null })[]).map((t) => {
     const { venues, ...rest } = t;
     return { ...rest, venue_name: venues?.name ?? t.own_venue_name ?? "—" };
   });
 }
 
+// Team contact details (address, contact person/phone/email, manager
+// email) aren't readable from tournament_teams. team_private_contacts()
+// returns them only for rows the caller runs or belongs to; everyone else
+// gets null for those fields.
+async function withPrivateContacts(
+  sb: Awaited<ReturnType<typeof createClient>>,
+  teams: TournamentTeam[],
+): Promise<TournamentTeam[]> {
+  const empty = Object.fromEntries(TEAM_PRIVATE_FIELDS.map((f) => [f, null]));
+  if (teams.length === 0) return teams;
+  const { data } = await sb.rpc("team_private_contacts", { p_team_ids: teams.map((t) => t.id) });
+  const byId = new Map(((data ?? []) as ({ id: string } & Record<string, string | null>)[]).map((r) => [r.id, r]));
+  return teams.map((t) => {
+    const priv = byId.get(t.id);
+    const { id: _id, ...fields } = priv ?? { id: t.id };
+    void _id;
+    return { ...t, ...empty, ...fields } as TournamentTeam;
+  });
+}
+
 export async function listTournamentTeams(tournamentId: string): Promise<TournamentTeam[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb
-    .from("tournament_teams").select("*").eq("tournament_id", tournamentId).order("created_at", { ascending: true });
-  if (error) return actionError(error.message);
-  return (data ?? []) as TournamentTeam[];
+    .from("tournament_teams").select(TEAM_PUBLIC_COLUMNS).eq("tournament_id", tournamentId).order("created_at", { ascending: true });
+  if (error) return dbActionError(error);
+  return withPrivateContacts(sb, (data ?? []) as unknown as TournamentTeam[]);
 }
 
 // True only for someone who can run this tournament's Control Center —
@@ -145,9 +168,10 @@ export async function getMyTeamForTournament(tournamentId: string): Promise<Tour
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb
-    .from("tournament_teams").select("*").eq("tournament_id", tournamentId).eq("captain_id", user.id).maybeSingle();
-  if (error) return actionError(error.message);
-  return data as TournamentTeam | null;
+    .from("tournament_teams").select(TEAM_PUBLIC_COLUMNS).eq("tournament_id", tournamentId).eq("captain_id", user.id).maybeSingle();
+  if (error) return dbActionError(error);
+  if (!data) return null;
+  return (await withPrivateContacts(sb, [data as unknown as TournamentTeam]))[0];
 }
 
 export async function getTeamRoster(teamId: string): Promise<
@@ -156,7 +180,7 @@ export async function getTeamRoster(teamId: string): Promise<
   const sb = await createClient();
   const { data: rows, error } = await sb
     .from("tournament_team_players").select("*").eq("team_id", teamId).order("joined_at", { ascending: true });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   const players = (rows ?? []) as TournamentTeamPlayer[];
   const ids = players.map((p) => p.user_id).filter((id): id is string => id !== null);
   const { data: profiles } = ids.length
@@ -180,7 +204,7 @@ export async function getTeamRoster(teamId: string): Promise<
 export async function getTeamRosterPublic(teamId: string): Promise<{ id: string; name: string; role: string; is_linked: boolean }[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.rpc("get_team_roster_public", { p_team_id: teamId });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as { id: string; name: string; role: string; is_linked: boolean }[];
 }
 
@@ -192,7 +216,7 @@ export async function searchPlayersForTeam(q: string, teamId: string): Promise<
 > {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
-  const term = q.trim();
+  const term = filterSafeSearchTerm(q);
   if (term.length < 2) return [];
 
   const { data: existing } = await sb.from("tournament_team_players").select("user_id").eq("team_id", teamId);
@@ -223,7 +247,7 @@ export async function listTournamentPayments(tournamentId: string): Promise<
   const sb = await createClient();
   const { data: teams, error: teamsErr } = await sb
     .from("tournament_teams").select("id, name").eq("tournament_id", tournamentId);
-  if (teamsErr) return actionError(teamsErr.message);
+  if (teamsErr) return dbActionError(teamsErr);
   const teamIds = (teams ?? []).map((t) => t.id);
   if (teamIds.length === 0) return [];
 
@@ -232,7 +256,7 @@ export async function listTournamentPayments(tournamentId: string): Promise<
     .select("tournament_registration_id, status, payment_method, expected_amount, submitted_at")
     .in("tournament_registration_id", teamIds)
     .order("submitted_at", { ascending: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   const nameMap = new Map((teams ?? []).map((t) => [t.id, t.name]));
   const latestByTeam = new Map<string, typeof payments[number]>();
@@ -268,7 +292,7 @@ export async function listTournamentPaymentsForReviewAsHost(
 
   const { data: teams, error: teamsErr } = await sb
     .from("tournament_teams").select("id, name").eq("tournament_id", tournamentId);
-  if (teamsErr) return actionError(teamsErr.message);
+  if (teamsErr) return dbActionError(teamsErr);
   const teamIds = (teams ?? []).map((t) => t.id);
   if (teamIds.length === 0) return [];
 
@@ -278,7 +302,7 @@ export async function listTournamentPaymentsForReviewAsHost(
     .eq("booking_type", "tournament_registration")
     .in("tournament_registration_id", teamIds)
     .order("submitted_at", { ascending: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   const payments = (data ?? []) as Payment[];
 
   const teamNameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
@@ -345,12 +369,12 @@ export async function getSignedTournamentPaymentProofUrl(paymentId: string): Pro
 
   const { data: row, error } = await sb
     .from("payments").select("screenshot_path").eq("id", paymentId).maybeSingle();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   if (!row?.screenshot_path) return actionError("No payment screenshot on file for this payment.");
 
   const { data, error: sErr } = await sb.storage
     .from("payment-proofs").createSignedUrl(row.screenshot_path, 300);
-  if (sErr) return actionError(sErr.message);
+  if (sErr) return dbActionError(sErr);
   return data.signedUrl;
 }
 
@@ -368,13 +392,14 @@ export async function uploadTournamentBanner(file: File): Promise<string | Actio
   const okTypes = ["image/jpeg", "image/png", "image/webp"];
   if (!okTypes.includes(file.type)) return actionError("Upload a JPG, PNG or WebP image.");
   if (file.size > 5 * 1024 * 1024) return actionError("Image must be under 5 MB.");
+  if (!(await isRealImage(file, okTypes))) return actionError("That file isn't a real JPG, PNG or WebP image.");
 
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];
   const path = `${user.id}/${Date.now()}.${ext}`;
 
   const { error } = await sb.storage.from("tournament-banners").upload(path, file, { upsert: false, cacheControl: "31536000" });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   const { data: pub } = sb.storage.from("tournament-banners").getPublicUrl(path);
   return pub.publicUrl;
@@ -392,13 +417,14 @@ export async function uploadTournamentQr(file: File): Promise<string | ActionErr
   const okTypes = ["image/jpeg", "image/png", "image/webp"];
   if (!okTypes.includes(file.type)) return actionError("Upload a JPG, PNG or WebP QR image.");
   if (file.size > 5 * 1024 * 1024) return actionError("QR image must be under 5 MB.");
+  if (!(await isRealImage(file, okTypes))) return actionError("That file isn't a real JPG, PNG or WebP image.");
 
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];
   const path = `${user.id}/${Date.now()}.${ext}`;
 
   const { error } = await sb.storage.from("tournament-qr").upload(path, file, { upsert: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   const { data: pub } = sb.storage.from("tournament-qr").getPublicUrl(path);
   return pub.publicUrl;
@@ -625,13 +651,14 @@ export async function uploadTeamLogo(file: File): Promise<string | ActionError> 
   const okTypes = ["image/jpeg", "image/png", "image/webp"];
   if (!okTypes.includes(file.type)) return actionError("Upload a JPG, PNG or WebP image.");
   if (file.size > 5 * 1024 * 1024) return actionError("Image must be under 5 MB.");
+  if (!(await isRealImage(file, okTypes))) return actionError("That file isn't a real JPG, PNG or WebP image.");
 
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];
   const path = `${user.id}/${Date.now()}.${ext}`;
 
   const { error } = await sb.storage.from("team-logos").upload(path, file, { upsert: false, cacheControl: "31536000" });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   const { data: pub } = sb.storage.from("team-logos").getPublicUrl(path);
   return pub.publicUrl;
@@ -843,7 +870,7 @@ export async function getTournamentMatches(tournamentId: string): Promise<Tourna
   const { data, error } = await sb
     .from("tournament_matches").select("*").eq("tournament_id", tournamentId)
     .order("stage", { ascending: true }).order("round", { ascending: true });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as TournamentMatch[];
 }
 
@@ -853,7 +880,7 @@ export async function getTeamNames(teamIds: string[]): Promise<Record<string, st
   if (teamIds.length === 0) return {};
   const sb = await createClient();
   const { data, error } = await sb.from("tournament_teams").select("id,name").in("id", teamIds);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return Object.fromEntries((data ?? []).map((t) => [t.id as string, t.name as string]));
 }
 
@@ -862,14 +889,14 @@ export async function getTournamentAnnouncements(tournamentId: string): Promise<
   const { data, error } = await sb
     .from("tournament_announcements").select("*").eq("tournament_id", tournamentId)
     .order("created_at", { ascending: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as TournamentAnnouncement[];
 }
 
 export async function getTournamentStandings(tournamentId: string, groupName?: string): Promise<TournamentStanding[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.rpc("tournament_standings", { p_tournament_id: tournamentId, p_group_name: groupName ?? null });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as TournamentStanding[];
 }
 
@@ -972,7 +999,7 @@ export async function recordMatchResult(
 export async function getMatchPlayerStats(matchId: string): Promise<TournamentMatchPlayerStat[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.from("tournament_match_player_stats").select("*").eq("match_id", matchId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as TournamentMatchPlayerStat[];
 }
 
@@ -991,7 +1018,7 @@ export async function recordMatchPlayerStats(
 export async function getTournamentPlayerStats(tournamentId: string): Promise<TournamentPlayerStatRow[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.rpc("get_tournament_player_stats", { p_tournament_id: tournamentId });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as TournamentPlayerStatRow[];
 }
 
@@ -1120,7 +1147,7 @@ export async function getTournamentAwards(tournamentId: string): Promise<Tournam
     sb.from("tournament_matches").select("*").eq("tournament_id", tournamentId).in("round_label", ["Final", "Semifinal"]),
     listTournamentTeams(tournamentId),
   ]);
-  if (mErr) return actionError(mErr.message);
+  if (mErr) return dbActionError(mErr);
   const teams = isActionError(teamsRes) ? [] : teamsRes;
   const nameOf = (id: string | null) => teams.find((t) => t.id === id)?.name ?? null;
 
@@ -1157,7 +1184,7 @@ export async function getTournamentTeamFines(tournamentId: string): Promise<{ te
 export async function getPlayerScorecard(userId: string): Promise<PlayerScorecard | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.rpc("get_player_scorecard", { p_user_id: userId }).maybeSingle();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? { goals: 0, matches_played: 0, tournaments_played: 0, mom_count: 0 }) as PlayerScorecard;
 }
 
@@ -1169,7 +1196,7 @@ export async function claimGuestTournamentEntries(): Promise<number | ActionErro
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb.rpc("claim_guest_tournament_entries");
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? 0) as number;
 }
 
@@ -1223,7 +1250,7 @@ export async function recordCricketResult(
 export async function getMatchCricketStats(matchId: string): Promise<TournamentCricketPlayerStat[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.from("tournament_cricket_player_stats").select("*").eq("match_id", matchId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as TournamentCricketPlayerStat[];
 }
 
@@ -1244,7 +1271,7 @@ export async function recordCricketPlayerStats(
 export async function getTournamentCricketStats(tournamentId: string): Promise<TournamentCricketStatRow[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.rpc("get_tournament_cricket_stats", { p_tournament_id: tournamentId });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as TournamentCricketStatRow[];
 }
 
@@ -1255,7 +1282,7 @@ export async function listRaceCategories(tournamentId: string): Promise<Tourname
   const { data, error } = await sb
     .from("tournament_race_categories").select("*").eq("tournament_id", tournamentId)
     .order("sort_order", { ascending: true }).order("created_at", { ascending: true });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as TournamentRaceCategory[];
 }
 
@@ -1321,6 +1348,6 @@ export async function recordRaceResult(
 export async function getRaceResults(tournamentId: string): Promise<RaceResultRow[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.rpc("get_race_results", { p_tournament_id: tournamentId });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as RaceResultRow[];
 }

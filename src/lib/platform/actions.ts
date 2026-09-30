@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 import type { User } from "@supabase/supabase-js";
 
 // Registering for a tournament while logged out silently creates an
@@ -106,7 +106,7 @@ export async function allBookingsForPlatform() {
     .select("id, starts_at, ends_at, price, state, payment_status, source, customer_name, phone, venue_id, court_id")
     .order("starts_at", { ascending: false })
     .limit(500);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   const bookingIds = (data ?? []).map((b) => b.id);
   const venueIds = [...new Set((data ?? []).map((b) => b.venue_id).filter(Boolean))];
@@ -169,7 +169,7 @@ export async function setUserRole(userId: string, role: "player" | "venue_owner"
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.error;
   const { error } = await auth.sb.from("profiles").update({ role }).eq("id", userId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/platform/users");
 }
 
@@ -214,7 +214,7 @@ export async function markVenuePaid(venueId: string) {
     .update({ payout_status: "paid" })
     .eq("venue_id", venueId)
     .eq("payout_status", "pending");
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/platform/revenue");
 }
 
@@ -242,7 +242,7 @@ export async function setReportStatus(reportId: string, status: "reviewed" | "di
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.error;
   const { error } = await auth.sb.from("reports").update({ status }).eq("id", reportId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/platform/reports");
 }
 
@@ -253,6 +253,6 @@ export async function setVenueVerification(venueId: string, status: "verified" |
     .from("venues")
     .update({ verification_status: status })
     .eq("id", venueId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/platform");
 }

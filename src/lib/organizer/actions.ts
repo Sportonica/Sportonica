@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 import { friendlyTournamentError, type Tournament } from "@/lib/tournaments/types";
 
 export interface Partnership {
@@ -72,7 +72,7 @@ export async function listPendingOrganizerRequests(): Promise<
   if (!isSuperAdmin) return actionError("FORBIDDEN");
   const { data, error } = await sb
     .from("profiles").select("id, full_name, name, username").eq("role", "organizer_pending");
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []).map((p) => ({ id: p.id, name: p.full_name ?? p.name ?? p.username ?? "Player" }));
 }
 
@@ -95,7 +95,7 @@ export async function searchVenuesToPartner(q: string): Promise<
     .ilike("name", `%${term}%`)
     .neq("owner_id", user.id)
     .limit(10);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return data ?? [];
 }
 
@@ -120,7 +120,7 @@ export async function listMyPartnerships(): Promise<
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb
     .from("partnerships").select("*").eq("organizer_id", user.id).order("created_at", { ascending: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   const rows = (data ?? []) as Partnership[];
 
   const vendorIds = [...new Set(rows.map((r) => r.vendor_id))];
@@ -140,7 +140,7 @@ export async function listPartnershipInvitesForVendor(): Promise<
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb
     .from("partnerships").select("*").eq("vendor_id", user.id).order("created_at", { ascending: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   const rows = (data ?? []) as Partnership[];
 
   const organizerIds = [...new Set(rows.map((r) => r.organizer_id))];
@@ -159,7 +159,7 @@ export async function respondToPartnership(
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb.from("partnerships").update({ status }).eq("id", id).select().single();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/admin/partnerships");
   revalidatePath("/organize/partnerships");
   return data as Partnership;
@@ -181,7 +181,7 @@ export async function getMyPartneredVenues(): Promise<
   if (vendorIds.length === 0) return [];
 
   const { data, error } = await sb.from("venues").select("id, name").in("owner_id", vendorIds).order("name");
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return data ?? [];
 }
 
@@ -194,7 +194,7 @@ export async function listVendorTournamentBookings(): Promise<
   if (!user) return actionError("UNAUTHORIZED");
 
   const { data: venues, error: venuesError } = await sb.from("venues").select("id").eq("owner_id", user.id);
-  if (venuesError) return actionError(venuesError.message);
+  if (venuesError) return dbActionError(venuesError);
   const venueIds = (venues ?? []).map((v) => v.id);
   if (venueIds.length === 0) return [];
 
@@ -203,7 +203,7 @@ export async function listVendorTournamentBookings(): Promise<
     .select("id, name, status, venue_booking_status, starts_at, venues(name)")
     .in("venue_id", venueIds)
     .order("starts_at", { ascending: true });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return ((data ?? []) as unknown as { id: string; name: string; status: string; venue_booking_status: string; starts_at: string; venues: { name: string } | null }[])
     .map((t) => ({ id: t.id, name: t.name, status: t.status, venue_booking_status: t.venue_booking_status, starts_at: t.starts_at, venue_name: t.venues?.name ?? "—" }));
 }
@@ -235,7 +235,7 @@ export async function getMyOrganizerTournaments(): Promise<Tournament[] | Action
 
   const { data: managed, error: managedErr } = await sb
     .from("tournament_managers").select("tournament_id").eq("user_id", user.id);
-  if (managedErr) return actionError(managedErr.message);
+  if (managedErr) return dbActionError(managedErr);
   const managedIds = (managed ?? []).map((m) => m.tournament_id);
 
   const filters = [`owner_id.eq.${user.id}`];
@@ -243,6 +243,6 @@ export async function getMyOrganizerTournaments(): Promise<Tournament[] | Action
 
   const { data, error } = await sb
     .from("tournaments").select("*").or(filters.join(",")).order("created_at", { ascending: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as Tournament[];
 }

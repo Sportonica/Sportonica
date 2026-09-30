@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 import { sendMail } from "@/lib/mail/mailer";
 import { fmtWhen } from "@/lib/mail/templates";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 import type { User } from "@supabase/supabase-js";
 
 async function requireUser() {
@@ -69,7 +70,7 @@ export async function updateHostedGame(input: {
   if (input.notes !== undefined) patch.notes = input.notes;
 
   const { error } = await sb.from("events").update(patch).eq("id", input.eventId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   // Tell everyone who joined that the details moved.
   const timeChanged = input.event_date != null && input.event_date !== ev.event_date;
@@ -82,8 +83,10 @@ export async function updateHostedGame(input: {
 
     const ids = (joins ?? []).map((j: { user_id: string }) => j.user_id);
     if (ids.length) {
-      // In-app notifications for each player.
-      await sb.from("notifications").insert(
+      // In-app notifications for each player. Service role: the insert
+      // policy on notifications was removed (any signed-in user could
+      // write into anyone's bell); the host check above is the gate.
+      await createServiceClient().from("notifications").insert(
         ids.map((uid) => ({
           user_id: uid,
           kind: "event",
@@ -142,7 +145,7 @@ export async function invitePlayers(input: {
       paid_by_host: hostPays,
     }))
   );
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   const link = `${process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com"}/game/${input.eventId}`;
   await sendMail(
@@ -177,6 +180,6 @@ export async function cancelInvite(inviteId: string, eventId: string) {
   const auth = await requireHost(eventId);
   if (auth.error) return auth.error;
   const { error } = await auth.sb.from("invites").delete().eq("id", inviteId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/my-games");
 }

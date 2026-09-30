@@ -1,3 +1,4 @@
+import "server-only";
 import { createHash } from "crypto";
 import { headers } from "next/headers";
 import { createServiceClient } from "@/lib/supabase/admin";
@@ -9,11 +10,15 @@ import { createServiceClient } from "@/lib/supabase/admin";
 // need their own per-visitor limit — and the actions that create accounts
 // need their own CAPTCHA check.
 
-// The visitor's IP as Vercel reports it. x-forwarded-for is set by the
-// Vercel edge (a client-sent value is overwritten), first hop = client.
+// The visitor's IP as Vercel reports it. Prefer the headers only Vercel's
+// edge sets (a client can't supply them); x-forwarded-for is also
+// overwritten by Vercel, but is kept last as a fallback for other hosts.
+// Rate limits key on this, so it must not be spoofable (security audit,
+// RATE_LIMITING).
 export async function clientIp(): Promise<string> {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || "unknown";
+  const first = (v: string | null) => v?.split(",")[0]?.trim() || null;
+  return first(h.get("x-vercel-forwarded-for")) || first(h.get("x-real-ip")) || first(h.get("x-forwarded-for")) || "unknown";
 }
 
 const hash = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 32);

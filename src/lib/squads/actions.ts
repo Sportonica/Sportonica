@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
+import { filterSafeSearchTerm } from "@/lib/validation/search";
 
 async function requireUser() {
   const sb = await createClient();
@@ -31,7 +32,7 @@ export async function createSquad(input: {
     color: input.color ?? "#2E7D5B",
     cap: input.cap ?? 20,
   }).select().single();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   // creator auto-joins via DB trigger
   revalidatePath("/league");
   return data;
@@ -49,7 +50,7 @@ export async function joinSquad(squadId: string) {
   const { error } = await sb.from("squad_members").insert({
     squad_id: squadId, user_id: user.id, role: "member",
   });
-  if (error && !error.message.includes("duplicate")) return actionError(error.message);
+  if (error && !error.message.includes("duplicate")) return dbActionError(error);
   revalidatePath("/league");
   revalidatePath(`/league/${squadId}`);
 }
@@ -59,7 +60,7 @@ export async function leaveSquad(squadId: string) {
   if (!user) return actionError("UNAUTHORIZED");
   const { error } = await sb.from("squad_members")
     .delete().eq("squad_id", squadId).eq("user_id", user.id);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/league");
   revalidatePath(`/league/${squadId}`);
 }
@@ -77,7 +78,7 @@ export async function removeMember(squadId: string, userId: string) {
 
   const { error } = await sb.from("squad_members")
     .delete().eq("squad_id", squadId).eq("user_id", userId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/league/${squadId}`);
 }
 
@@ -87,7 +88,7 @@ export async function searchPlayers(q: string, squadId: string): Promise<
 > {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
-  const term = q.trim();
+  const term = filterSafeSearchTerm(q);
   if (term.length < 2) return [];
 
   const { data: existing } = await sb
@@ -121,7 +122,7 @@ export async function addMember(squadId: string, userId: string) {
   const { error } = await sb.from("squad_members").insert({
     squad_id: squadId, user_id: userId, role: "member",
   });
-  if (error && !error.message.includes("duplicate")) return actionError(error.message);
+  if (error && !error.message.includes("duplicate")) return dbActionError(error);
   revalidatePath(`/league/${squadId}`);
 }
 
@@ -135,7 +136,7 @@ export async function sendSquadMessage(squadId: string, body: string) {
   const { error } = await sb.from("squad_messages").insert({
     squad_id: squadId, user_id: user.id, body: text,
   });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 }
 
 // ── Squad settings (creator only, enforced by RLS) ──────────────
@@ -143,7 +144,7 @@ export async function setSquadLocked(squadId: string, locked: boolean) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { error } = await sb.from("squads").update({ locked }).eq("id", squadId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/league/${squadId}`);
   revalidatePath("/league");
 }
@@ -152,7 +153,7 @@ export async function setSquadUnlisted(squadId: string, unlisted: boolean) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { error } = await sb.from("squads").update({ unlisted }).eq("id", squadId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/league/${squadId}`);
   revalidatePath("/league");
 }
@@ -173,7 +174,7 @@ export async function fileReport(input: {
     reason: input.reason,
     details: input.details ?? null,
   });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 }
 
 // ================================================================
@@ -188,7 +189,7 @@ export async function requestToJoin(squadId: string) {
     squad_id: squadId,
     user_id: user.id,
   });
-  if (error && !error.message.includes("duplicate")) return actionError(error.message);
+  if (error && !error.message.includes("duplicate")) return dbActionError(error);
   revalidatePath(`/league/${squadId}`);
 }
 
@@ -210,7 +211,7 @@ export async function decideRequest(
     .update({ status: decision })
     .eq("id", requestId)
     .eq("squad_id", squadId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/league/${squadId}`);
 }
 

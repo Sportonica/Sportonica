@@ -68,8 +68,9 @@ export interface Game {
   cancel_reason: string | null;
   // The host's own eSewa/Khalti QR + phone — players pay the host
   // directly with these, never a Sportonica QR.
-  host_qr_path: string | null;
-  host_phone: string | null;
+  // Not readable from games (column not granted); see game_host_payment_info().
+  host_qr_path?: string | null;
+  host_phone?: string | null;
   status: GameStatus;
   created_at: string;
   updated_at: string;

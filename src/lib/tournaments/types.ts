@@ -515,5 +515,11 @@ export function friendlyTournamentError(message: string): string {
   for (const code in TOURNAMENT_ERROR_MESSAGES) {
     if (message.includes(code)) return TOURNAMENT_ERROR_MESSAGES[code];
   }
+  // Unknown raw database text (table/policy/column names) never reaches
+  // the user; our own UPPER_CASE codes still do (security audit).
+  if (!/^[A-Z][A-Z0-9_]{2,}$/.test(message)) {
+    console.error("[tournament:db]", message);
+    return "Something went wrong. Please try again.";
+  }
   return message;
 }

@@ -1,4 +1,5 @@
 import { createClient, getUser } from "@/lib/supabase/server";
+import { filterSafeSearchTerm } from "@/lib/validation/search";
 
 export type Relationship =
   | { status: "none" }
@@ -95,7 +96,7 @@ export async function listAllPlayers(search?: string): Promise<PlayerListItem[]>
   const sb = await createClient();
   const user = await getUser();
 
-  const term = search?.trim() ?? "";
+  const term = filterSafeSearchTerm(search);
   let query = sb.from("profiles").select("id, full_name, username, avatar_url").limit(30);
   query = term.length >= 2
     ? query.or(`full_name.ilike.%${term}%,username.ilike.%${term}%`)

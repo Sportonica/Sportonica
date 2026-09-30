@@ -15,8 +15,9 @@ import {
   notifyPlayTogetherPaymentRejected,
   notifyPlayTogetherCashSelected,
 } from "@/lib/mail/notify";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 import { isValidLocalPhone } from "@/lib/validation/identity";
+import { isRealImage } from "@/lib/security/imageBytes";
 
 async function requireUser() {
   const sb = await createClient();
@@ -39,12 +40,15 @@ export async function uploadHostQr(file: File): Promise<string | ActionError> {
   if (file.size > 5 * 1024 * 1024) {
     return actionError("Image must be under 5 MB.");
   }
+  if (!(await isRealImage(file, okTypes))) {
+    return actionError("That file isn't a real JPG, PNG or WebP image.");
+  }
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];
   const path = `${user.id}/${Date.now()}.${ext}`;
 
   const { error } = await sb.storage.from("host-qr").upload(path, file, { upsert: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   return path;
 }
@@ -166,12 +170,15 @@ export async function uploadGamePaymentProof(gamePlayerId: string, file: File): 
   if (file.size > 5 * 1024 * 1024) {
     return actionError("Screenshot must be under 5 MB.");
   }
+  if (!(await isRealImage(file, okTypes))) {
+    return actionError("That file isn't a real JPG, PNG or WebP image.");
+  }
   const extMap: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
   const ext = extMap[file.type];
   const path = `${user.id}/${gamePlayerId}_${Date.now()}.${ext}`;
 
   const { error } = await sb.storage.from("game-payment-proofs").upload(path, file, { upsert: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   return path;
 }
@@ -288,12 +295,12 @@ export async function getSignedGamePaymentProofUrl(gamePlayerId: string): Promis
   if (!user) return actionError("UNAUTHORIZED");
   const { data: row, error: rowErr } = await sb
     .from("game_players").select("payment_proof_path").eq("id", gamePlayerId).maybeSingle();
-  if (rowErr) return actionError(rowErr.message);
+  if (rowErr) return dbActionError(rowErr);
   if (!row?.payment_proof_path) return actionError("No payment proof on file for this request.");
 
   const { data, error } = await sb.storage
     .from("game-payment-proofs").createSignedUrl(row.payment_proof_path, 300);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return data.signedUrl;
 }
 

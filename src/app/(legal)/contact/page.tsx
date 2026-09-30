@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import "../../(play)/play.css";
 import { submitContactForm } from "@/lib/mail/contactActions";
+import { useCaptcha, CAPTCHA_FAILED } from "@/lib/captcha/useCaptcha";
 
 export default function ContactPage() {
   const [name, setName] = useState("");
@@ -13,13 +14,16 @@ export default function ContactPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const { captchaRef, getToken } = useCaptcha();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
     setBusy(true);
     try {
-      const res = await submitContactForm({ name, email, subject, message });
+      const captchaToken = await getToken().catch(() => null);
+      if (captchaToken === null) { setErr(CAPTCHA_FAILED); return; }
+      const res = await submitContactForm({ name, email, subject, message, captchaToken });
       if (!res.ok) {
         setErr(res.error ?? "Something went wrong. Please try again.");
         return;
@@ -72,6 +76,7 @@ export default function ContactPage() {
                   className="bk-in"
                   type="text"
                   value={name}
+                  maxLength={100}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Your name"
                   autoComplete="name"
@@ -84,6 +89,7 @@ export default function ContactPage() {
                   className="bk-in"
                   type="email"
                   value={email}
+                  maxLength={200}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   autoComplete="email"
@@ -96,6 +102,7 @@ export default function ContactPage() {
                   className="bk-in"
                   type="text"
                   value={subject}
+                  maxLength={150}
                   onChange={(e) => setSubject(e.target.value)}
                   placeholder="What's this about?"
                 />
@@ -106,6 +113,7 @@ export default function ContactPage() {
                   className="bk-note"
                   rows={6}
                   value={message}
+                  maxLength={5000}
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Tell us what's up..."
                   required
@@ -116,6 +124,7 @@ export default function ContactPage() {
                 <p style={{ color: "#e05d5d", fontSize: 13, marginBottom: 16 }}>{err}</p>
               )}
 
+              <div ref={captchaRef} style={{ display: "flex", justifyContent: "center", marginBottom: 10 }} />
               <button type="submit" className="play-btn gold" disabled={busy}>
                 {busy ? "Sending…" : "Send message"}
               </button>

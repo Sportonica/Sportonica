@@ -3,11 +3,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { notifyCourtBooked } from "@/lib/mail/notify";
-import { actionError, safeActionError, type ActionError } from "@/lib/actionError";
+import { actionError, safeActionError, type ActionError, dbActionError } from "@/lib/actionError";
 import { friendlyBookingError } from "@/lib/bookings/types";
 import { isValidLocalPhone } from "@/lib/validation/identity";
 import { friendlyPaymentError } from "@/lib/payments/types";
 import { VENUE_HAS_HISTORY, COURT_HAS_HISTORY } from "@/lib/admin/types";
+import { sniffImageType, IMAGE_EXT } from "@/lib/security/imageBytes";
 
 // Columns a venue owner may set/change themselves. verification_status,
 // payout_cap, owner_id, status and the like are platform-controlled —
@@ -181,16 +182,22 @@ export async function uploadVenuePhoto(venueId: string, file: File): Promise<str
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   if (!(await requireVenueAccess(sb, venueId))) return actionError("FORBIDDEN");
-  const ext = file.name.split(".").pop() ?? "jpg";
+  // Checked on the server by the file's actual bytes, and named by the
+  // detected type, not the uploader's file name (security audit).
+  if (file.size > 5 * 1024 * 1024) return actionError("Image must be under 5 MB.");
+  const sniffed = await sniffImageType(file);
+  if (!sniffed) return actionError("Upload a JPG, PNG, WebP or GIF image.");
+  const ext = IMAGE_EXT[sniffed];
   const path = `${venueId}/${Date.now()}.${ext}`;
 
   // Paths are unique per upload (timestamped), so a file never changes
   // under its URL and browsers can keep it for a year.
   const { error: upErr } = await sb.storage.from("venue-photos").upload(path, file, {
+    contentType: sniffed,
     cacheControl: "31536000",
     upsert: false,
   });
-  if (upErr) return actionError(upErr.message);
+  if (upErr) return dbActionError(upErr);
 
   const { data: pub } = sb.storage.from("venue-photos").getPublicUrl(path);
   const url = pub.publicUrl;
@@ -199,7 +206,7 @@ export async function uploadVenuePhoto(venueId: string, file: File): Promise<str
   const { data: venue } = await sb.from("venues").select("photos").eq("id", venueId).single();
   const photos = [...(venue?.photos ?? []), url];
   const { error } = await sb.from("venues").update({ photos }).eq("id", venueId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   revalidatePath(`/admin/venues/${venueId}`);
   return url;
@@ -213,7 +220,7 @@ export async function addVenuePhotoUrl(venueId: string, url: string) {
   const { data: venue } = await sb.from("venues").select("photos").eq("id", venueId).single();
   const photos = [...(venue?.photos ?? []), url];
   const { error } = await sb.from("venues").update({ photos }).eq("id", venueId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/admin/venues/${venueId}`);
 }
 
@@ -225,7 +232,7 @@ export async function removeVenuePhoto(venueId: string, url: string) {
   const { data: venue } = await sb.from("venues").select("photos").eq("id", venueId).single();
   const photos = (venue?.photos ?? []).filter((p: string) => p !== url);
   const { error } = await sb.from("venues").update({ photos }).eq("id", venueId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/admin/venues/${venueId}`);
 }
 
@@ -246,7 +253,7 @@ export async function createCourt(input: {
     .insert({ ...pickCourtFields(input as Record<string, unknown>), venue_id: input.venue_id })
     .select()
     .single();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/admin/venues/${input.venue_id}`);
   return data;
 }
@@ -258,7 +265,7 @@ export async function updateCourt(id: string, venue_id: string, patch: Record<st
   const safe = pickCourtFields(patch);
   if (Object.keys(safe).length === 0) return actionError("Nothing to update.");
   const { error } = await sb.from("courts").update(safe).eq("id", id).eq("venue_id", venue_id);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/admin/venues/${venue_id}`);
 }
 
@@ -313,7 +320,7 @@ export async function setCourtHours(
   await sb.from("court_hours").delete().eq("court_id", court_id);
   if (rows.length) {
     const { error } = await sb.from("court_hours").insert(rows.map((r) => ({ ...r, court_id })));
-    if (error) return actionError(error.message);
+    if (error) return dbActionError(error);
   }
   revalidatePath(`/admin/venues/${venue_id}/courts/${court_id}`);
 }
@@ -337,7 +344,7 @@ export async function createBlock(input: {
     .insert({ court_id, starts_at, ends_at, reason, note, created_by: user.id })
     .select()
     .single();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/admin/venues/${input.venue_id}/calendar`);
   return data;
 }
@@ -348,7 +355,7 @@ export async function deleteBlock(id: string, venue_id: string) {
   // blocks_staff (admin_schema.sql) only requires 'staff', not 'manager'.
   if (!(await requireVenueAccess(sb, venue_id, "staff"))) return actionError("FORBIDDEN");
   const { error } = await sb.from("court_blocks").delete().eq("id", id);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/admin/venues/${venue_id}/calendar`);
 }
 
@@ -473,7 +480,7 @@ export async function createPricingRule(input: {
   const { venue_id, ...row } = input;
   if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
   const { data, error } = await sb.from("pricing_rules").insert(pickPricingFields(row)).select().single();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/admin/venues/${venue_id}/pricing`);
   return data;
 }
@@ -483,7 +490,7 @@ export async function togglePricingRule(id: string, venue_id: string, active: bo
   if (!user) return actionError("UNAUTHORIZED");
   if (!(await requireVenueAccess(sb, venue_id))) return actionError("FORBIDDEN");
   const { error } = await sb.from("pricing_rules").update({ active }).eq("id", id);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/admin/venues/${venue_id}/pricing`);
 }
 
@@ -497,7 +504,7 @@ export async function findUserForStaffInvite(email: string): Promise<{ id: strin
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb.rpc("find_user_for_staff_invite", { p_email: email }).maybeSingle();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   if (!data) return actionError("USER_NOT_FOUND");
   return data as { id: string; full_name: string | null; email: string };
 }

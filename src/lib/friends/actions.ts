@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { listAllPlayers, type PlayerListItem } from "./queries";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 
 /** Live search-as-you-type for the Players tab. */
 export async function searchPlayersAction(query: string): Promise<PlayerListItem[]> {
@@ -45,7 +45,7 @@ export async function respondToRequest(requestId: string, decision: "accepted" |
       .delete()
       .eq("id", requestId)
       .eq("addressee_id", user.id);
-    if (error) return actionError(error.message);
+    if (error) return dbActionError(error);
     revalidatePath("/friends");
     return;
   }
@@ -55,7 +55,7 @@ export async function respondToRequest(requestId: string, decision: "accepted" |
     .update({ status: decision })
     .eq("id", requestId)
     .eq("addressee_id", user.id);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/friends");
 }
 
@@ -71,7 +71,7 @@ export async function removeFriend(otherUserId: string): Promise<void | ActionEr
       `and(requester_id.eq.${user.id},addressee_id.eq.${otherUserId}),` +
       `and(requester_id.eq.${otherUserId},addressee_id.eq.${user.id})`
     );
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/friends");
 }
 
@@ -85,6 +85,6 @@ export async function cancelRequest(requestId: string): Promise<void | ActionErr
     .eq("id", requestId)
     .eq("requester_id", user.id)
     .eq("status", "pending");
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/friends");
 }

@@ -45,6 +45,12 @@ export default async function PlayTogetherGamePage({ params }: { params: Promise
   // window, not only once fully confirmed — otherwise they'd have no way
   // to actually pay during 'payment_pending'/'payment_verification_pending'.
   const paymentInfoVisible = !!myPlayer && ["payment_pending", "payment_verification_pending", "joined", "payment_rejected"].includes(myPlayer.status);
+  // The host's phone and QR aren't readable from the games table; the
+  // database hands them only to the host and to players at this stage.
+  const hostPay = paymentInfoVisible
+    ? ((await sb.rpc("game_host_payment_info", { p_game_id: gameId }).maybeSingle()).data as
+        { host_phone: string | null; host_qr_path: string | null } | null)
+    : null;
 
   const spots = availablePlayerSpots(game);
   const spotsLeft = Math.max(spots - players.length, 0);
@@ -202,8 +208,8 @@ export default async function PlayTogetherGamePage({ params }: { params: Promise
                 contribution={game.contribution_amount}
                 sport={game.sport}
                 venueName={game.venues?.name ?? "the venue"}
-                hostQrPath={paymentInfoVisible ? game.host_qr_path : null}
-                hostPhone={paymentInfoVisible ? game.host_phone : null}
+                hostQrPath={hostPay?.host_qr_path ?? null}
+                hostPhone={hostPay?.host_phone ?? null}
               />
             </div>
           </div>

@@ -47,8 +47,13 @@ export async function getProfileByUsername(username: string) {
     .select(PUBLIC_PROFILE_COLUMNS)
     .ilike("username", username)
     .maybeSingle();
+  if (!data) return null;
   // phone isn't readable through the API — never someone else's anyway.
-  return data ? ({ ...data, phone: null } as PlayerProfile) : null;
+  // bio/city come from profile_about(), which returns nothing for a
+  // private profile unless it's yours.
+  const { data: about } = await sb.rpc("profile_about", { p_user_id: data.id }).maybeSingle();
+  const { bio = null, city = null } = (about ?? {}) as { bio?: string | null; city?: string | null };
+  return { ...data, phone: null, bio, city } as unknown as PlayerProfile;
 }
 
 export async function getMyProfile() {
@@ -172,7 +177,12 @@ export async function getProfileByUsernameAnon(username: string) {
     "profiles",
     `username=ilike.${encodeURIComponent(username)}&select=${PUBLIC_PROFILE_COLUMNS}&limit=1`
   );
-  return rows[0] ?? null;
+  const p = rows[0];
+  if (!p) return null;
+  const { createAnonClient } = await import("@/lib/supabase/anonServer");
+  const { data: about } = await createAnonClient().rpc("profile_about", { p_user_id: p.id }).maybeSingle();
+  const { bio = null, city = null } = (about ?? {}) as { bio?: string | null; city?: string | null };
+  return { ...p, bio, city };
 }
 
 export async function getPlayerStatsAnon(userId: string): Promise<PlayerStats> {

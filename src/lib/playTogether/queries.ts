@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import type { Game, GamePlayer } from "./types";
+import { GAME_PUBLIC_COLUMNS } from "./columns";
 
 export interface GameWithVenue extends Game {
   venues: { name: string; address: string | null; lat: number | null; lng: number | null } | null;
@@ -13,7 +14,7 @@ export async function listPublishedGames(): Promise<(GameWithVenue & { joined_co
   const sb = await createClient();
   const { data: games } = await sb
     .from("games")
-    .select("*, venues(name), courts(name)")
+    .select(`${GAME_PUBLIC_COLUMNS}, venues(name), courts(name)`)
     .eq("status", "published")
     .gt("starts_at", new Date().toISOString())
     .order("starts_at", { ascending: true });
@@ -26,7 +27,7 @@ export async function listPublishedGames(): Promise<(GameWithVenue & { joined_co
   const counts = new Map<string, number>();
   (players ?? []).forEach((p) => counts.set(p.game_id, (counts.get(p.game_id) ?? 0) + 1));
 
-  return (games as GameWithVenue[]).map((g) => ({ ...g, joined_count: counts.get(g.id) ?? 0 }));
+  return (games as unknown as GameWithVenue[]).map((g) => ({ ...g, joined_count: counts.get(g.id) ?? 0 }));
 }
 
 // RLS scopes this to: published (anyone), or the host (any status), or a
@@ -46,9 +47,9 @@ export async function getGame(gameId: string): Promise<GameWithVenue | null> {
   try { await sb.rpc("expire_stale_play_together_requests"); } catch { /* best-effort */ }
   const { data } = await sb
     .from("games")
-    .select("*, venues(name, address, lat, lng), courts(name), host:profiles!host_id(full_name, name, avatar_url)")
+    .select(`${GAME_PUBLIC_COLUMNS}, venues(name, address, lat, lng), courts(name), host:profiles!host_id(full_name, name, avatar_url)`)
     .eq("id", gameId).maybeSingle();
-  return data as GameWithVenue | null;
+  return data as unknown as GameWithVenue | null;
 }
 
 // Other upcoming Play Together games in the same sport — mirrors
@@ -57,14 +58,14 @@ export async function getSimilarPublishedGames(game: Pick<Game, "id" | "sport">,
   const sb = await createClient();
   const { data } = await sb
     .from("games")
-    .select("*, venues(name, address, lat, lng), courts(name), host:profiles!host_id(full_name, name, avatar_url)")
+    .select(`${GAME_PUBLIC_COLUMNS}, venues(name, address, lat, lng), courts(name), host:profiles!host_id(full_name, name, avatar_url)`)
     .eq("sport", game.sport)
     .neq("id", game.id)
     .eq("status", "published")
     .gt("starts_at", new Date().toISOString())
     .order("starts_at", { ascending: true })
     .limit(limit);
-  return (data as GameWithVenue[]) ?? [];
+  return (data as unknown as GameWithVenue[]) ?? [];
 }
 
 export interface GamePlayerWithProfile extends GamePlayer {
