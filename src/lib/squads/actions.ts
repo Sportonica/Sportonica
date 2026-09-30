@@ -91,9 +91,12 @@ export async function searchPlayers(q: string, squadId: string): Promise<
   const term = filterSafeSearchTerm(q);
   if (term.length < 2) return [];
 
-  const { data: existing } = await sb
-    .from("squad_members").select("user_id").eq("squad_id", squadId);
-  const already = new Set((existing ?? []).map((m) => m.user_id));
+  // Hide people who are already in, or already have an invite waiting.
+  const [{ data: existing }, { data: invited }] = await Promise.all([
+    sb.from("squad_members").select("user_id").eq("squad_id", squadId),
+    sb.from("squad_invites").select("user_id").eq("squad_id", squadId).eq("status", "pending"),
+  ]);
+  const already = new Set([...(existing ?? []), ...(invited ?? [])].map((m) => m.user_id));
 
   const { data } = await sb
     .from("profiles")
@@ -111,18 +114,24 @@ export async function searchPlayers(q: string, squadId: string): Promise<
     }));
 }
 
-// Add a player directly to the squad (creator invites them in).
-export async function addMember(squadId: string, userId: string) {
+// Invite a player. They get a notification and only join once they
+// accept it — the database no longer lets an owner add someone directly
+// (supabase/squad_invites.sql).
+export async function inviteMember(squadId: string, userId: string) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
+  const { error } = await sb.rpc("invite_to_squad", { p_squad_id: squadId, p_user_id: userId });
+  if (error) return dbActionError(error);
+  revalidatePath(`/league/${squadId}`);
+}
 
-  const { data: sq } = await sb.from("squads").select("creator_id").eq("id", squadId).maybeSingle();
-  if (!sq || sq.creator_id !== user.id) return actionError("FORBIDDEN");
-
-  const { error } = await sb.from("squad_members").insert({
-    squad_id: squadId, user_id: userId, role: "member",
-  });
-  if (error && !error.message.includes("duplicate")) return dbActionError(error);
+// The invited player's answer. Accepting adds them to the squad.
+export async function respondToInvite(inviteId: string, squadId: string, accept: boolean) {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { error } = await sb.rpc("respond_squad_invite", { p_invite_id: inviteId, p_accept: accept });
+  if (error) return dbActionError(error);
+  revalidatePath("/league");
   revalidatePath(`/league/${squadId}`);
 }
 

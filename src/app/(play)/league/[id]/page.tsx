@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ArrowLeft, Users, MapPin, Calendar } from "lucide-react";
-import { getSquad, getSquadMembers, myMemberships, getSquadMessages, getSquadPolls } from "@/lib/squads/queries";
+import { getSquad, getSquadMembers, myMemberships, getSquadMessages, getSquadPolls, myPendingInvite } from "@/lib/squads/queries";
 import { createClient } from "@/lib/supabase/server";
 import SquadJoinButton from "./SquadJoinButton";
+import SquadInviteBanner from "./SquadInviteBanner";
 import SquadChat from "./SquadChat";
 import SquadSettings from "./SquadSettings";
 import ReportButton from "@/components/ReportButton";
@@ -23,8 +24,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function SquadPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [squad, members, memberships, messages, polls] = await Promise.all([
-    getSquad(id), getSquadMembers(id), myMemberships(), getSquadMessages(id), getSquadPolls(id),
+  const [squad, members, memberships, messages, polls, inviteId] = await Promise.all([
+    getSquad(id), getSquadMembers(id), myMemberships(), getSquadMessages(id), getSquadPolls(id), myPendingInvite(id),
   ]);
   if (!squad) notFound();
 
@@ -58,6 +59,8 @@ export default async function SquadPage({ params }: { params: Promise<{ id: stri
         </div>
 
         {squad.description && <p style={{ fontSize: 15, lineHeight: 1.6, color: "var(--dim)", marginBottom: 22 }}>{squad.description}</p>}
+
+        {inviteId && !isIn && <SquadInviteBanner inviteId={inviteId} squadId={squad.id} />}
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <SquadJoinButton squadId={squad.id} initialJoined={isIn} />

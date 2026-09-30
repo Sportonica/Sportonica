@@ -103,6 +103,18 @@ export interface ChatMessage {
 }
 
 // Initial message history (Realtime streams new ones after this).
+// The signed-in user's pending invite to this squad, if the owner sent one.
+export async function myPendingInvite(squadId: string): Promise<string | null> {
+  const user = await getUser();
+  if (!user) return null;
+  const sb = await createClient();
+  const { data } = await sb
+    .from("squad_invites").select("id")
+    .eq("squad_id", squadId).eq("user_id", user.id).eq("status", "pending")
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
 export async function getSquadMessages(squadId: string): Promise<ChatMessage[]> {
   const sb = await createClient();
   const { data } = await sb
