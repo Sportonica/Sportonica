@@ -40,7 +40,7 @@ Other high-impact findings, all fixed and verified: fake notifications/push to a
 ## Where the fixes are
 
 - **Database / storage — already live** (run 2026-09-29/30, each verified with before/after tests): storage policy hardening, notifications policy + lookup functions, view filters, partnership policies, helper-function EXECUTE revokes, NULL-safe checks (2 parts), write guards on teams/friend requests/bookings, bucket upload limits. SQL on branch `docs/security-audit` (off `changes`).
-- **App code — not yet deployed:** branch `fix/security-audit` (off `main`), 12 commits.
+- **App code — not yet deployed:** branch `fix/security-audit` (off `main`), 11 commits.
 - **Separate feature done during the audit:** organizer chooses the team captain — PRs #63 (app) and #62 (SQL, already live).
 
 ## Live scan (vibe-check `check.py`)
