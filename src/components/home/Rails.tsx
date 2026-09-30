@@ -20,6 +20,16 @@ function when(iso: string) {
   return `${d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: KTM })} · ${time}`;
 }
 
+// The day a live or finished match was played, for the card's meta
+// line: "Today", "Yesterday", else "25 Sep" (Kathmandu time).
+function playedOn(iso: string) {
+  const key = (x: Date) => x.toLocaleDateString("en-CA", { timeZone: KTM });
+  const d = new Date(iso);
+  if (key(d) === key(new Date())) return "Today";
+  if (key(d) === key(new Date(Date.now() - 864e5))) return "Yesterday";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: KTM });
+}
+
 /** Shared shell: title, "see all" link, arrows, horizontal scroller. */
 function Rail({
   title, sub, href, hrefLabel, children,
@@ -204,7 +214,11 @@ export function MatchCard({ m }: { m: RailMatch }) {
     <article className="rc rc-match" style={{ ["--rc-accent" as string]: accent }}>
       <Link href={`/tournaments/${m.tournamentId}`} className="rc-match-hit">
         <div className="rc-match-comp">{m.tournamentName}</div>
-        <div className="rc-match-meta">{m.sport} · {m.roundLabel}</div>
+        <div className="rc-match-meta">
+          {m.sport} · {m.roundLabel}
+          {/* Upcoming cards already carry their date in the pill. */}
+          {started && m.startsAt && <> · {playedOn(m.startsAt)}</>}
+        </div>
 
         <div className="rc-match-vs">
           <MatchSide team={m.teamA} />
@@ -247,7 +261,7 @@ export function MatchesRail({ matches }: { matches: RailMatch[] }) {
   if (matches.length === 0) return null;
   return (
     <Rail
-      title="Live scores"
+      title="Live Scores"
       sub="Live and upcoming matches from tournaments on Sportonica."
       href="/tournaments" hrefLabel="See all tournaments"
     >

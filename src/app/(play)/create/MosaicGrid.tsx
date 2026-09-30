@@ -18,7 +18,7 @@ const HUES = [
 import BookFilters, { NO_BOOK_FILTERS, bookActiveCount, timeLabel, type BookQuery } from "./BookFilters";
 import DateStrip from "@/components/shared/DateStrip";
 import { useCity, inCity, kmFrom } from "@/lib/city";
-import { normalizeSport, SPORT_NAMES } from "@/lib/sports";
+import { bookableSports, SPORT_NAMES } from "@/lib/sports";
 import { useTheme } from "@/lib/hooks/useTheme";
 import { getDaySlots } from "@/lib/play/availability";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -85,12 +85,12 @@ export default function MosaicGrid({
     // The header already asked which city — don't make them say it twice.
     if (!inCity(v.lat, v.lng, city, area)) return false;
     if (needle) {
-      const hay = [v.name, v.venue_type, ...v.sports].join(" ").toLowerCase();
+      const hay = [v.name, v.venue_type, ...bookableSports(v.sports, v.courts)].join(" ").toLowerCase();
       if (!hay.includes(needle)) return false;
     }
     if (q.sport) {
-      const list = (v.sports ?? []).map(normalizeSport);
-      if (!list.includes(q.sport)) return false;
+      // by what its courts are, not by what the listing claims
+      if (!bookableSports(v.sports, v.courts).includes(q.sport)) return false;
     }
     if (q.venueType && v.venue_type !== q.venueType) return false;
     if (q.maxKm != null) {
@@ -270,7 +270,8 @@ export default function MosaicGrid({
               const from = v.courts.length
                 ? Math.min(...v.courts.map((c) => Number(c.base_price)).filter((n) => n > 0))
                 : null;
-              const sports = v.sports.length ? v.sports : [v.venue_type];
+              const offered = bookableSports(v.sports, v.courts);
+              const sports = offered.length ? offered : [v.venue_type];
               const shown = sports.slice(0, 3);
               const extra = sports.length - shown.length;
               // Real position if we have it, else the area picked in the header.

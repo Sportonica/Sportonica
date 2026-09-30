@@ -235,7 +235,7 @@ function DiscoverInner() {
                 ) : (
                   <>
                     <p>No games on this day. Try another date.</p>
-                    <Link href="/create">Book a court and host →</Link>
+                    <Link href={sportFilter ? `/create?sport=${encodeURIComponent(sportFilter)}` : "/create"}>Book a court and host →</Link>
                   </>
                 )}
               </div>

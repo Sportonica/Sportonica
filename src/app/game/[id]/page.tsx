@@ -180,7 +180,7 @@ export default async function GamePage({ params }: { params: Promise<{ id: strin
               <div className="gm-card">
                 <div className="gm-card-t">Venues nearby</div>
                 {nearby.map((v) => (
-                  <Link key={v.id} href={`/create/${v.id}`} className="gm-near">
+                  <Link key={v.id} href={`/create/${v.id}?sport=${encodeURIComponent(game.sport)}`} className="gm-near">
                     <div>
                       <div className="gm-near-n">{v.name}</div>
                       <div className="gm-near-d">{v.km.toFixed(1)} km away</div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ImageIcon } from "lucide-react";
 import { browseVenues } from "@/lib/play/queries";
+import { normalizeSport, resolveSportParam } from "@/lib/sports";
 
 export const dynamic = "force-dynamic";
 
@@ -10,8 +11,12 @@ export const metadata: Metadata = {
   description: "Book and pay for the venue upfront. Players join and reimburse you in cash at the venue.",
 };
 
-export default async function NewGameVenuePickerPage() {
-  const venues = await browseVenues();
+export default async function NewGameVenuePickerPage({ searchParams }: { searchParams: Promise<{ sport?: string }> }) {
+  const wanted = resolveSportParam((await searchParams).sport);
+  // with a sport chosen, only grounds that have a court for it
+  const venues = (await browseVenues())
+    .map((v) => (wanted ? { ...v, courts: v.courts.filter((c) => normalizeSport(c.sport) === wanted) } : v))
+    .filter((v) => v.courts.length > 0);
 
   return (
     <div className="play">
@@ -27,16 +32,16 @@ export default async function NewGameVenuePickerPage() {
 
         {venues.length === 0 ? (
           <div className="play-empty">
-            <h3>No venues available yet</h3>
+            <h3>{wanted ? `No ${wanted} venues available yet` : "No venues available yet"}</h3>
             <p>Check back soon.</p>
           </div>
         ) : (
           <div className="play-grid pt-venue-grid">
-            {venues.filter((v) => v.courts.length > 0).map((v) => {
+            {venues.map((v) => {
               const photo = v.photos?.[0];
               const cheapest = v.courts.reduce((m, c) => Math.min(m, Number(c.base_price)), Infinity);
               return (
-                <Link key={v.id} href={`/play-together/new/${v.id}`} className="venue-card">
+                <Link key={v.id} href={`/play-together/new/${v.id}${wanted ? `?sport=${encodeURIComponent(wanted)}` : ""}`} className="venue-card">
                   <div className="venue-photo">
                     {photo ? (
                       // eslint-disable-next-line @next/next/no-img-element
