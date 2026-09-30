@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 
 async function requireUser() {
   const sb = await createClient();
@@ -43,12 +43,12 @@ export async function createPoll(input: {
     question: input.question.trim(),
     multi: input.multi ?? false,
   }).select().single();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   const { error: optErr } = await sb.from("squad_poll_options").insert(
     clean.map((label, i) => ({ poll_id: poll.id, label, position: i }))
   );
-  if (optErr) return actionError(optErr.message);
+  if (optErr) return dbActionError(optErr);
 
   revalidatePath(`/league/${input.squadId}`);
   return poll;
@@ -81,7 +81,7 @@ export async function castVote(pollId: string, optionId: string, squadId: string
     const { error } = await sb.from("squad_poll_votes").insert({
       poll_id: pollId, option_id: optionId, user_id: user.id,
     });
-    if (error && !error.message.includes("duplicate")) return actionError(error.message);
+    if (error && !error.message.includes("duplicate")) return dbActionError(error);
   }
 
   revalidatePath(`/league/${squadId}`);
@@ -91,6 +91,6 @@ export async function closePoll(pollId: string, squadId: string) {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { error } = await sb.from("squad_polls").update({ closed: true }).eq("id", pollId);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath(`/league/${squadId}`);
 }

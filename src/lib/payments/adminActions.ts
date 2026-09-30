@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { friendlyPaymentError, bookingLabel } from "./types";
 import type { Payment, PaymentMethod, PaymentMethodConfig } from "./types";
 import { notifyPaymentReviewed, notifyHostedEventIfPublished, notifyPlayTogetherGamePublishedIfAny } from "@/lib/mail/notify";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 import type { User } from "@supabase/supabase-js";
 import { isRealImage } from "@/lib/security/imageBytes";
 
@@ -32,7 +32,7 @@ export async function getPaymentMethodsAdmin(): Promise<(PaymentMethodConfig & {
   if (auth.error) return auth.error;
   const { sb } = auth;
   const { data, error } = await sb.from("payment_methods").select("*").order("method");
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   const methods = (data ?? []) as PaymentMethodConfig[];
 
   const updaterIds = [...new Set(methods.map((m) => m.updated_by).filter((id): id is string => !!id))];
@@ -51,7 +51,7 @@ export async function setPaymentMethodConfig(
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.error;
   const { error } = await auth.sb.from("payment_methods").update(patch).eq("method", method);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/platform/payments");
 }
 
@@ -77,10 +77,10 @@ export async function uploadPaymentQr(method: PaymentMethod, file: File): Promis
   const path = `${method}/${Date.now()}.${ext}`;
 
   const { error: upErr } = await sb.storage.from("payment-qr").upload(path, file, { upsert: false });
-  if (upErr) return actionError(upErr.message);
+  if (upErr) return dbActionError(upErr);
 
   const { error } = await sb.from("payment_methods").update({ qr_path: path }).eq("method", method);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   revalidatePath("/platform/payments");
   return path;
@@ -93,7 +93,7 @@ export async function removePaymentQr(method: PaymentMethod) {
   const { data: current } = await sb.from("payment_methods").select("qr_path").eq("method", method).maybeSingle();
 
   const { error } = await sb.from("payment_methods").update({ qr_path: null }).eq("method", method);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   // Best-effort cleanup — the config change (above) is what actually
   // matters; a leftover orphaned file in storage isn't a correctness bug.
@@ -113,7 +113,7 @@ export async function listPendingPayments() {
     .select("*")
     .eq("status", "PENDING_VERIFICATION")
     .order("submitted_at", { ascending: true });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   const payments = (data ?? []) as Payment[];
   return attachDisplayInfo(sb, payments);
@@ -128,7 +128,7 @@ export async function listAllPayments(limit = 200) {
     .select("*")
     .order("submitted_at", { ascending: false })
     .limit(limit);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return attachDisplayInfo(sb, (data ?? []) as Payment[]);
 }
 
@@ -143,7 +143,7 @@ export async function listTournamentPaymentsForReview(tournamentId: string) {
 
   const { data: teams, error: teamsErr } = await sb
     .from("tournament_teams").select("id").eq("tournament_id", tournamentId);
-  if (teamsErr) return actionError(teamsErr.message);
+  if (teamsErr) return dbActionError(teamsErr);
   const teamIds = (teams ?? []).map((t) => t.id);
   if (teamIds.length === 0) return [];
 
@@ -153,7 +153,7 @@ export async function listTournamentPaymentsForReview(tournamentId: string) {
     .eq("booking_type", "tournament_registration")
     .in("tournament_registration_id", teamIds)
     .order("submitted_at", { ascending: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return attachDisplayInfo(sb, (data ?? []) as Payment[]);
 }
 
@@ -248,7 +248,7 @@ export async function getPaymentBookingDetails(paymentId: string): Promise<{
   if (auth.error) return auth.error;
   const { sb } = auth;
   const { data: payment, error } = await sb.from("payments").select("*").eq("id", paymentId).maybeSingle();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   if (!payment) return actionError("Payment not found.");
 
   const fmt = (iso: string) => new Date(iso).toLocaleString("en-GB", {
@@ -340,11 +340,11 @@ export async function getSignedScreenshotUrl(paymentId: string): Promise<string 
   const { sb } = auth;
   const { data: payment, error: pErr } = await sb
     .from("payments").select("screenshot_path").eq("id", paymentId).maybeSingle();
-  if (pErr) return actionError(pErr.message);
+  if (pErr) return dbActionError(pErr);
   if (!payment) return actionError("Payment not found.");
 
   const { data, error } = await sb.storage.from("payment-proofs").createSignedUrl(payment.screenshot_path, 300);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return data.signedUrl;
 }
 

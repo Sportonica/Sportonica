@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 import { isValidLocalPhone, normalizePhone, PHONE_ERROR } from "@/lib/validation/identity";
 import { smsEnabled } from "@/lib/phone/sms";
 import { isRealImage } from "@/lib/security/imageBytes";
@@ -20,7 +20,7 @@ export async function setMyRole(role: "player" | "venue_owner"): Promise<void | 
   if (!user) return actionError("UNAUTHORIZED");
 
   const { error } = await sb.from("profiles").update({ role }).eq("id", user.id);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   // Middleware gates /admin on user_metadata, so keep the two in step.
   // If this fails the role is still saved — don't block the user on it.
@@ -101,7 +101,7 @@ export async function claimUsername(raw: string): Promise<string | ActionError> 
   if (taken) return actionError("That username is already taken.");
 
   const { error } = await sb.from("profiles").update({ username }).eq("id", user.id);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   revalidatePath("/profile");
   return username;
@@ -134,11 +134,11 @@ export async function uploadAvatar(file: File): Promise<string | ActionError> {
 // Paths are unique per upload (timestamped), so a file never changes
   // under its URL and browsers can keep it for a year.
   const { error: upErr } = await sb.storage.from("avatars").upload(path, file, { upsert: false, cacheControl: "31536000" });
-  if (upErr) return actionError(upErr.message);
+  if (upErr) return dbActionError(upErr);
 
   const { data: pub } = sb.storage.from("avatars").getPublicUrl(path);
   const { error } = await sb.from("profiles").update({ avatar_url: pub.publicUrl }).eq("id", user.id);
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   revalidatePath("/profile");
   return pub.publicUrl;

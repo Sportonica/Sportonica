@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 
 async function requireUser() {
   const sb = await createClient();
@@ -46,6 +46,6 @@ export async function markConversationRead(conversationId: string): Promise<void
     user_id: user.id,
     last_read_at: new Date().toISOString(),
   });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/messages");
 }

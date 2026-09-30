@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { friendlyPaymentError } from "./types";
 import type { BookingType, Payment, PaymentMethod, PaymentMethodConfig } from "./types";
 import { notifyPaymentSubmitted, notifyHostedEventIfPublished, notifyPlayTogetherGamePublishedIfAny } from "@/lib/mail/notify";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 import { isRealImage } from "@/lib/security/imageBytes";
 
 async function requireUser() {
@@ -19,7 +19,7 @@ async function requireUser() {
 export async function getPaymentMethods(): Promise<PaymentMethodConfig[] | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.from("payment_methods").select("*").order("method");
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return (data ?? []) as PaymentMethodConfig[];
 }
 
@@ -50,7 +50,7 @@ export async function uploadPaymentProof(
   const path = `${user.id}/${bookingType}-${bookingId}-${Date.now()}.${ext}`;
 
   const { error } = await sb.storage.from("payment-proofs").upload(path, file, { upsert: false });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
 
   return path;
 }
@@ -133,6 +133,6 @@ export async function getMyPaymentStatus(bookingType: BookingType, bookingId: st
     .order("submitted_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   return data as Payment | null;
 }

@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { actionError, type ActionError } from "@/lib/actionError";
+import { actionError, type ActionError, dbActionError } from "@/lib/actionError";
 
 async function requireUser() {
   const sb = await createClient();
@@ -18,7 +18,7 @@ export async function blockUser(userId: string): Promise<void | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { error } = await sb.rpc("block_user", { p_user_id: userId });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/friends");
   revalidatePath("/messages");
   revalidatePath("/profile/privacy");
@@ -28,6 +28,6 @@ export async function unblockUser(userId: string): Promise<void | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
   const { error } = await sb.rpc("unblock_user", { p_user_id: userId });
-  if (error) return actionError(error.message);
+  if (error) return dbActionError(error);
   revalidatePath("/profile/privacy");
 }
