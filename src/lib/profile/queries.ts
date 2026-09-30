@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/admin";
 
 export interface PlayerProfile {
   id: string;
@@ -47,12 +48,35 @@ export async function getProfileByUsername(username: string) {
   return (data as PlayerProfile) ?? null;
 }
 
+// The columns any signed-in user may read from profiles. The database
+// grants SELECT per column, not on the table: phone and
+// phone_verified_at are withheld so one player can't read another's
+// number. "select *" therefore fails outright (42501), which is what
+// used to send a signed-in user round and round between /profile and
+// /login.
+const PUBLIC_PROFILE_COLUMNS =
+  "id, username, full_name, name, bio, city, avatar_url, sports, trust_score, is_public, created_at, role";
+
 export async function getMyProfile() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
-  const { data } = await sb.from("profiles").select("*").eq("id", user.id).maybeSingle();
-  return (data as PlayerProfile) ?? null;
+  const { data, error } = await sb.from("profiles").select(PUBLIC_PROFILE_COLUMNS).eq("id", user.id).maybeSingle();
+  // A failed read must not look like "signed out".
+  if (error) { console.error("[getMyProfile] profiles read failed:", error.code, error.message); return null; }
+  if (!data) return null;
+
+  // Your own phone number is yours to see, but no browser-facing role
+  // can read that column. Fetch it server-side, for the id Supabase just
+  // verified, and nobody else's.
+  let phone: string | null = null;
+  try {
+    const { data: own } = await createServiceClient().from("profiles").select("phone").eq("id", user.id).maybeSingle();
+    phone = (own?.phone as string | null) ?? null;
+  } catch {
+    // no service key configured: the profile still loads, the phone field starts empty
+  }
+  return { ...data, phone } as PlayerProfile;
 }
 
 export async function getPlayerStats(userId: string): Promise<PlayerStats> {
