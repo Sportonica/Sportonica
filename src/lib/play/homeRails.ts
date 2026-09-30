@@ -1,4 +1,5 @@
 import { createAnonClient } from "@/lib/supabase/anonServer";
+import { bookableSports } from "@/lib/sports";
 
 export interface RailEvent {
   id: string;
@@ -99,7 +100,7 @@ export async function getHomeRails() {
       .order("event_date", { ascending: true })
       .limit(8),
     sb.from("venues")
-      .select("id, name, venue_type, address, photos, sports, lat, lng, courts(base_price, status)")
+      .select("id, name, venue_type, address, photos, sports, lat, lng, courts(base_price, status, sport)")
       .eq("verification_status", "verified")
       .eq("status", "open")
       .order("created_at", { ascending: false })
@@ -132,7 +133,8 @@ export async function getHomeRails() {
       .select(MATCH_COLS)
       .eq("status", "live")
       .not("team_a_id", "is", null).not("team_b_id", "is", null)
-      .order("starts_at", { ascending: true })
+      // Most recently kicked off first, same pick as the hero's live card.
+      .order("starts_at", { ascending: false, nullsFirst: false })
       .limit(10),
     sb.from("tournament_matches")
       .select(MATCH_COLS)
@@ -147,7 +149,9 @@ export async function getHomeRails() {
       .eq("status", "completed")
       .not("team_a_id", "is", null).not("team_b_id", "is", null)
       .not("score_a", "is", null).not("score_b", "is", null)
-      .order("starts_at", { ascending: false })
+      // Newest first; an undated result goes last rather than (Postgres'
+      // default for descending) ahead of everything.
+      .order("starts_at", { ascending: false, nullsFirst: false })
       .limit(15),
   ]);
 
@@ -302,13 +306,14 @@ export async function getHomeRails() {
     matches,
     venues: (venuesRes.data ?? []).map((v) => {
       const { courts, ...venue } = v as typeof v & {
-        courts: { base_price: number; status: string }[] | null;
+        courts: { base_price: number; status: string; sport: string | null }[] | null;
       };
       const prices = (courts ?? [])
         .filter((c) => c.status === "active")
         .map((c) => Number(c.base_price) || 0)
         .filter((p) => p > 0);
-      return { ...venue, from_price: prices.length ? Math.min(...prices) : null };
+      // show what can be booked there, not everything the listing ticked
+      return { ...venue, sports: bookableSports(venue.sports, courts), from_price: prices.length ? Math.min(...prices) : null };
     }) as RailVenue[],
   };
 }

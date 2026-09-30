@@ -14,6 +14,7 @@ import { telHref } from "@/lib/playTogether/types";
 import { sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
 import EventTabs from "@/components/tournaments/public/EventTabs";
+import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
 import "@/app/(play)/play.css";
 import "@/app/platform/events/events.css";
 import "./tournament-hero.css";
@@ -157,6 +158,8 @@ export default async function TournamentDetailPage({
             canRegister={["published", "registration_open", "registration_closed"].includes(tournament.status)}
           />
         </div>
+
+        <LiveScoringStrip tournamentId={tournament.id} sport={tournament.sport} />
 
         <div className="bk-layout">
           <div>

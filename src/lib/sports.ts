@@ -65,6 +65,26 @@ export function resolveSportParam(param: string | null | undefined): string | nu
 }
 
 /**
+ * What a venue can actually be booked for: the sports of its ACTIVE
+ * courts. The venue's own `sports` list is whatever the owner ticked
+ * when listing it, and it drifts (a futsal ground that once ticked
+ * Cricket and Tennis showed up under both with nothing to book there).
+ * The ticked list is only used when no court data was loaded at all; a
+ * venue whose courts were loaded and none is active offers nothing.
+ */
+export function bookableSports(
+  declared: string[] | null | undefined,
+  courts?: { sport: string | null; status?: string | null }[] | null,
+): string[] {
+  if (!courts) return [...new Set((declared ?? []).map(normalizeSport))];
+  return [...new Set(
+    courts
+      .filter((c) => c.sport && (c.status == null || c.status === "active"))
+      .map((c) => normalizeSport(c.sport)),
+  )];
+}
+
+/**
  * Tournaments branch on scoring shape, not on the sport name itself —
  * this is the one place that mapping happens. "team_ball" covers every
  * sport whose matches are still two-team goals/points-style (the
