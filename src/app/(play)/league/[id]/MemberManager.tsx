@@ -89,6 +89,7 @@ function InviteModal({ squadId, onClose }: { squadId: string; onClose: () => voi
   const [q, setQ] = useState("");
   const [results, setResults] = useState<{ id: string; name: string; username: string | null; avatar_url: string | null }[]>([]);
   const [added, setAdded] = useState<Set<string>>(new Set());
+  const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function search(value: string) {
@@ -105,8 +106,17 @@ function InviteModal({ squadId, onClose }: { squadId: string; onClose: () => voi
 
   function invite(userId: string) {
     startTransition(async () => {
+      setErr(null);
       try {
-        await addMember(squadId, userId);
+        const res = await addMember(squadId, userId);
+        if (isActionError(res)) {
+          // The database only lets an owner add their own friends directly
+          // (supabase/access_control_low_items.sql).
+          setErr(res.message === "SQUAD_ADD_FRIENDS_ONLY"
+            ? "You can only add your friends directly. Anyone else can join from the group's page."
+            : res.message);
+          return;
+        }
         added.add(userId);
         setAdded(new Set(added));
       } catch { /* ignore */ }
@@ -127,6 +137,8 @@ function InviteModal({ squadId, onClose }: { squadId: string; onClose: () => voi
           <input value={q} onChange={(e) => search(e.target.value)} placeholder="Search by name or @username"
             style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: "inherit", fontFamily: "inherit", fontSize: 14 }} />
         </div>
+
+        {err && <div role="alert" style={{ fontSize: 12.5, color: "#C0392B", margin: "0 0 10px" }}>{err}</div>}
 
         <div style={{ maxHeight: 300, overflowY: "auto" }}>
           {q.trim().length < 2 ? (

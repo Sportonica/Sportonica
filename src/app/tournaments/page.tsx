@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import { listTournaments } from "@/lib/play/tournaments";
 import TournamentsClient from "./TournamentsClient";
 import "@/app/(play)/play.css";
 import "@/components/home/rails.css";
 
-// Public browse data — global, non-personalised. Edge-cache it and
-// refresh in the background rather than rendering against Sydney per hit.
-export const revalidate = 120;
+// Public browse data — global, non-personalised. The page is rendered per
+// request (CSP nonce, see src/app/layout.tsx), so cache the list itself
+// and refresh it every 2 minutes rather than querying per hit.
+const listCachedTournaments = unstable_cache(listTournaments, ["tournaments-list"], { revalidate: 120 });
 
 export const metadata: Metadata = {
   title: "Tournaments · Sportonica",
@@ -14,6 +16,6 @@ export const metadata: Metadata = {
 };
 
 export default async function TournamentsPage() {
-  const items = await listTournaments();
+  const items = await listCachedTournaments();
   return <TournamentsClient items={items} />;
 }

@@ -4,8 +4,8 @@ import { SPORT_NAMES as SPORTS, SPORT_COLORS as SPORT_COLOR } from "@/lib/sports
 
 import { useState, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, Link2, X, Check, Trash2, Star, MapPin, ExternalLink } from "lucide-react";
-import { updateVenue, uploadVenuePhoto, addVenuePhotoUrl, removeVenuePhoto } from "@/lib/admin/actions";
+import { Upload, X, Check, Trash2, Star, MapPin, ExternalLink } from "lucide-react";
+import { updateVenue, uploadVenuePhoto, removeVenuePhoto } from "@/lib/admin/actions";
 import { saveVenueLocation } from "@/lib/admin/location";
 import { isActionError } from "@/lib/actionError";
 import type { Venue, AdvancePaymentMode } from "@/lib/admin/types";
@@ -28,8 +28,6 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
   const [sports, setSports] = useState<string[]>(venue.sports ?? []);
   const [amenities, setAmenities] = useState<string[]>(venue.amenities ?? []);
   const [photos, setPhotos] = useState<string[]>(venue.photos ?? []);
-  const [urlInput, setUrlInput] = useState("");
-  const [showUrl, setShowUrl] = useState(false);
   const [saved, setSaved] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -84,21 +82,6 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
       } finally {
         setUploading(false);
         if (fileRef.current) fileRef.current.value = "";
-      }
-    });
-  }
-
-  function addUrl() {
-    if (!urlInput.trim()) return;
-    const url = urlInput.trim();
-    startTransition(async () => {
-      try {
-        const res = await addVenuePhotoUrl(venue.id, url);
-        if (isActionError(res)) { setMsg(res.message); return; }
-        setPhotos((p) => [...p, url]);
-        setUrlInput(""); setShowUrl(false);
-      } catch (err) {
-        setMsg(err instanceof Error ? err.message : "Couldn't add that URL.");
       }
     });
   }
@@ -182,18 +165,9 @@ export default function EditVenueForm({ venue }: { venue: Venue }) {
           <button className="adm-btn sm primary" onClick={() => fileRef.current?.click()} disabled={uploading || pending}>
             <Upload size={14} /> {uploading ? "Uploading…" : "Upload photo"}
           </button>
-          <button className="adm-btn sm" onClick={() => setShowUrl((v) => !v)}><Link2 size={14} /> Paste URL</button>
         </div>
 
-        {showUrl && (
-          <div className="adm-flex" style={{ gap: 8, marginTop: 12 }}>
-            <input className="adm-input" placeholder="https://…/photo.jpg" value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addUrl()} />
-            <button className="adm-btn sm primary" onClick={addUrl}>Add</button>
-          </div>
-        )}
-
-        {photos.length === 0 && !showUrl && (
+        {photos.length === 0 && (
           <p className="adm-dim" style={{ fontSize: 13, marginTop: 12, marginBottom: 0 }}>
             No photos yet. A good cover photo makes players far more likely to book.
           </p>
