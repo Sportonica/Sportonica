@@ -35,6 +35,9 @@ Six `SECURITY DEFINER` functions guarded with `if not (x = auth.uid() or …) th
 - `events_owner_write`: a venue owner can create an event naming another user as host.
 - Duplicate policies on `bookings`, `events`, `profiles`, `notifications` (tidy-up).
 
+### 7. Second NULL pattern (found under PAYMENT_WEBHOOKS)
+`if x <> auth.uid() then raise` fails open the same way — 15 occurrences (captain/host/player checks). Proven: a stranger confirmed another organizer's walk-in registration via `confirm_free_booking`. Fixed in `supabase/access_control_null_checks_2.sql` (`is distinct from`). See PAYMENT_WEBHOOKS_REPORT.
+
 ## What's at risk (before the fixes)
 
 Anyone signed in (including a throwaway anonymous session) could edit any walk-in team and its players; captains could get into a paid tournament without paying; users could force friendships and DMs on strangers; players could mark event bookings as paid.
