@@ -212,18 +212,6 @@ export async function uploadVenuePhoto(venueId: string, file: File): Promise<str
   return url;
 }
 
-// Add a photo by URL (fallback when not uploading a file).
-export async function addVenuePhotoUrl(venueId: string, url: string) {
-  const { sb, user } = await requireUser();
-  if (!user) return actionError("UNAUTHORIZED");
-  if (!(await requireVenueAccess(sb, venueId))) return actionError("FORBIDDEN");
-  const { data: venue } = await sb.from("venues").select("photos").eq("id", venueId).single();
-  const photos = [...(venue?.photos ?? []), url];
-  const { error } = await sb.from("venues").update({ photos }).eq("id", venueId);
-  if (error) return dbActionError(error);
-  revalidatePath(`/admin/venues/${venueId}`);
-}
-
 // Remove a photo from the venue's array.
 export async function removeVenuePhoto(venueId: string, url: string) {
   const { sb, user } = await requireUser();

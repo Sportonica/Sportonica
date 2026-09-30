@@ -1,38 +1,9 @@
 import type { NextConfig } from "next";
+import { buildCsp } from "./src/lib/security/csp";
 
-// Security headers (SEC-06). The CSP is an allowlist rather than
-// nonce-based: nonces force every page to render dynamically (see
-// node_modules/next/dist/docs/01-app/02-guides/content-security-policy.md),
-// which would cost the home page and /tournaments their ISR cache. So
-// Next's inline scripts are allowed via 'unsafe-inline'; what the policy
-// buys is: no framing (clickjacking), no plugins, no <base> or form
-// hijacking, scripts only from us and Turnstile, and data only sent to
-// us, Supabase and Turnstile.
-//
-// Adding a third-party script, API, font or iframe? Add its origin here
-// or the browser will block it.
-const isDev = process.env.NODE_ENV === "development";
-const supabase = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://invalid.supabase.co");
-const TURNSTILE = "https://challenges.cloudflare.com";
-
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${TURNSTILE}${isDev ? " 'unsafe-eval'" : ""}`,
-  // Leaflet's CSS comes from unpkg (SportonicaMap.tsx), Inter from Google Fonts.
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  // Avatars (Google, Supabase Storage), map tiles and markers, payment QRs.
-  "img-src 'self' data: blob: https:",
-  `connect-src 'self' ${supabase.origin} wss://${supabase.host} ${TURNSTILE}${isDev ? " ws:" : ""}`,
-  `frame-src ${TURNSTILE}`,
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  ...(isDev ? [] : ["upgrade-insecure-requests"]),
-].join("; ");
+// Security headers (SEC-06). Pages get their Content-Security-Policy from
+// src/proxy.ts, which adds a per-request nonce and overrides the one
+// below; this nonce-less copy covers what the proxy skips (static files).
 
 // Vercel adds `Access-Control-Allow-Origin: *` to pages it serves from its
 // cache (e.g. prerendered /tournaments). Nothing reads our pages
@@ -42,7 +13,7 @@ const SITE_ORIGIN = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica
 
 const securityHeaders = [
   { key: "Access-Control-Allow-Origin", value: SITE_ORIGIN },
-  { key: "Content-Security-Policy", value: csp },
+  { key: "Content-Security-Policy", value: buildCsp() },
   // Older browsers that don't know frame-ancestors.
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -59,6 +30,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // Don't advertise the framework (X-Powered-By: Next.js).
+  poweredByHeader: false,
   experimental: {
     // Payment-proof screenshots (src/components/payments/PaymentStep.tsx)
     // are validated client-side up to 5MB, a real size for an unedited

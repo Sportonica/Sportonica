@@ -7,6 +7,13 @@ import PushBridge from '@/components/PushBridge'
 import PageTransition from '@/components/PageTransition'
 import Onboarding from '@/components/onboarding/Onboarding'
 
+// Every page is rendered per request, never prerendered: the
+// Content-Security-Policy only lets inline scripts run if they carry that
+// request's nonce (src/proxy.ts, src/lib/security/csp.ts), and a page built
+// ahead of time can't have one — its scripts would be blocked and the page
+// would never become interactive.
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   // Social bots need absolute URLs for og:image. In production set
   // NEXT_PUBLIC_SITE_URL to your real domain (e.g. https://sportonica.com).

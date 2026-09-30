@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { SUPABASE_COOKIE_OPTIONS } from '@/lib/supabase/cookieOptions'
+import { buildCsp } from '@/lib/security/csp'
 
 // Only these prefixes gate on auth/role, with a full getUser() check
 // against the auth server. Every other route is public browsing (home,
@@ -14,6 +15,20 @@ const hasSessionCookie = (request: NextRequest) =>
   request.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
 
 export async function proxy(request: NextRequest) {
+  // A fresh nonce per request: Next reads it from the request's CSP header
+  // while rendering and stamps it on its inline scripts, and the browser
+  // runs only the scripts that carry it (src/lib/security/csp.ts).
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  const csp = buildCsp(nonce)
+  request.headers.set('x-nonce', nonce)
+  request.headers.set('Content-Security-Policy', csp)
+
+  const response = await gate(request)
+  response.headers.set('Content-Security-Policy', csp)
+  return response
+}
+
+async function gate(request: NextRequest) {
   const path = request.nextUrl.pathname
   const gated = AUTH_PREFIXES.some((p) => path === p || path.startsWith(p + '/'))
 

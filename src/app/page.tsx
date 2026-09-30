@@ -1,11 +1,13 @@
+import { unstable_cache } from "next/cache";
 import { getHomeRails } from "@/lib/play/homeRails";
 import HomeClient from "./HomeClient";
 
 // The homepage data (getHomeRails) is global and non-personalised — the
-// per-city view is filtered client-side in HomeClient — so it doesn't
-// need a fresh Sydney render per visitor. Serve it from the edge cache,
-// refreshed in the background every 2 minutes.
-export const revalidate = 120;
+// per-city view is filtered client-side in HomeClient. The page itself is
+// rendered per request (the CSP nonce needs that, see src/app/layout.tsx),
+// so cache the data instead: one database round trip every 2 minutes,
+// not one per visitor.
+const getCachedHomeRails = unstable_cache(getHomeRails, ["home-rails"], { revalidate: 120 });
 
 // Tells Google what kind of site this actually is, rather than leaving it
 // to infer from unstructured page text — a WebSite/Organization pairing
@@ -37,7 +39,7 @@ const JSON_LD = {
 // Server wrapper: fetches the rail data, then hands it to the (client)
 // homepage so the animations and theme hooks keep working.
 export default async function Page() {
-  const rails = await getHomeRails().catch(() => null);
+  const rails = await getCachedHomeRails().catch(() => null);
   return (
     <>
       <script

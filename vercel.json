@@ -3,6 +3,13 @@
   "regions": ["syd1"],
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" }
+      ]
+    },
+    {
       "source": "/.well-known/apple-app-site-association",
       "headers": [{ "key": "Content-Type", "value": "application/json" }]
     },
