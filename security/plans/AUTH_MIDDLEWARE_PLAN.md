@@ -19,7 +19,7 @@
 - [x] No RPC that changes state can be called without a caller check (9 helpers now denied to anon and authenticated; 0 fixtures created by the attack)
 - [x] Public RPCs that legitimately run as the visitor still work (`court_busy_slots`, `expire_stale_play_together_requests`)
 - [x] An organizer cannot activate their own partnership; the vendor still can
-- [ ] (LOW, optional) `get_player_scorecard` respects `is_public`; `are_blocked` limited to the two users
+- [ ] (LOW, optional) `get_player_scorecard` respects `is_public` — in `supabase/access_control_low_items.sql`, not yet run. `are_blocked` limited to the two users — needs its live definition first (`supabase/access_control_low_items_inspect.sql`, read-only)
 
 ## Manual verification (for the human)
 

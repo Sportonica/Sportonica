@@ -16,7 +16,7 @@
 - [x] Ownership check is separate from authentication (a signed-in stranger is refused with FORBIDDEN)
 - [x] Write policies can't be used to change ownership or status columns (team, friend request, booking)
 - [x] Legitimate owners still succeed (captain, organizer, addressee, player join/cancel)
-- [ ] (LOW) squad member add consent, poll move, event host impersonation, duplicate-policy cleanup
+- [ ] (LOW) squad member add consent, poll move, event host impersonation, duplicate-policy cleanup — SQL written 2026-09-30 (`supabase/access_control_low_items.sql`), **not yet run or tested live**
 
 ## Manual verification (for the human)
 
