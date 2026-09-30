@@ -17,7 +17,7 @@ Method: code review + live, read-only checks against production + attacks with t
 | 5 | FRONTEND_SECRETS | PASS | PASS | [report](reports/FRONTEND_SECRETS_REPORT.md) | [plan](plans/FRONTEND_SECRETS_PLAN.md) |
 | 6 | SSRF | MEDIUM | PASS | [report](reports/SSRF_REPORT.md) | [plan](plans/SSRF_PLAN.md) |
 | 7 | CSRF | LOW | PASS | [report](reports/CSRF_REPORT.md) | [plan](plans/CSRF_PLAN.md) |
-| 8 | SECURITY_HEADERS | MEDIUM | LOW (accepted: `'unsafe-inline'` scripts) | [report](reports/SECURITY_HEADERS_REPORT.md) | [plan](plans/SECURITY_HEADERS_PLAN.md) |
+| 8 | SECURITY_HEADERS | MEDIUM | LOW until `fix/vibe-check-strict` is deployed, then PASS | [report](reports/SECURITY_HEADERS_REPORT.md) | [plan](plans/SECURITY_HEADERS_PLAN.md) |
 | 9 | CORS | LOW | PASS (confirm after deploy) | [report](reports/CORS_REPORT.md) | [plan](plans/CORS_PLAN.md) |
 | 10 | RATE_LIMITING | MEDIUM | PASS | [report](reports/RATE_LIMITING_REPORT.md) | [plan](plans/RATE_LIMITING_PLAN.md) |
 | 11 | SQL_INJECTION | LOW | PASS | [report](reports/SQL_INJECTION_REPORT.md) | [plan](plans/SQL_INJECTION_PLAN.md) |
@@ -46,12 +46,14 @@ Other high-impact findings, all fixed and verified: fake notifications/push to a
 ## Live scan (vibe-check `check.py`)
 
 Before (2026-09-29, production): **2 failed, 2 warnings, 16 passed** — FAIL script-src `'unsafe-inline'`, FAIL HSTS without includeSubDomains; WARN img-src broad, WARN static-file headers (not reproducible on re-check).
-After deploy: expected 1 failed (`'unsafe-inline'`, accepted) — **re-run after `fix/security-audit` is deployed** and record the counts here.
+Re-scan 2026-09-30 (production, still without the audit branch): **2 failed, 3 warnings, 16 passed** — same two FAILs, plus WARN `X-Powered-By: Next.js`.
+Local production build of `fix/vibe-check-strict`: **0 failed, 0 warnings, 18 passed** (HSTS is skipped on localhost; the header carries `includeSubDomains`).
+**Re-run after deploy** and record the counts here. Note the scanner's ~80 requests trip Vercel's bot challenge for that IP for a while.
 
 ## Remaining manual verification
 
 **Deploy order**
-1. Merge and deploy `fix/security-audit`.
+1. Merge and deploy `fix/security-audit`, then `fix/vibe-check-strict` (nonce CSP, tighter img-src; stacked on it).
 2. Then run `supabase/database_access_step2_hide_columns.sql` (hides team contact / host payment / profile bio-city columns; must not run before the deploy).
 3. Finish the Turnstile rollout: create the widget, set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` in Vercel, redeploy, **then** Supabase → Auth → Attack Protection → CAPTCHA.
 
@@ -69,9 +71,11 @@ After deploy: expected 1 failed (`'unsafe-inline'`, accepted) — **re-run after
 - Supabase Auth: consider min password length 8 and leaked-password protection.
 - Consider Dependabot security updates on the repo.
 
+**Follow-up 2026-09-30 (not yet live)**
+- CSP nonce + listed image hosts: branch `fix/vibe-check-strict`.
+- LOW access-control items: `supabase/access_control_low_items.sql` (run `access_control_low_items_inspect.sql` first; `are_blocked` and the draft-tournament stats functions still need their live definitions).
+
 **Accepted / LOW, not fixed**
-- CSP `script-src 'unsafe-inline'` (keeps page caching; nonces would make every page dynamic).
-- `img-src https:` (venue photos can be added from any site).
 - `@capacitor/cli` → `uuid` moderate advisory (local build tool only).
 - LOW items listed in ACCESS_CONTROL (squad member add consent, poll move, event host impersonation, duplicate policies) and AUTH_MIDDLEWARE (`get_player_scorecard` ignores private profiles, `are_blocked` open).
 
