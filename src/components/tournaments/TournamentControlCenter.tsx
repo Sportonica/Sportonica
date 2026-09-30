@@ -18,6 +18,7 @@ import {
   type TournamentManager, type TournamentTeamPlayer,
 } from "@/lib/tournaments/types";
 import { getSportKind } from "@/lib/sports";
+import { sportKeyFor } from "@/lib/intelligence/registry";
 import type { Payment } from "@/lib/payments/types";
 import TournamentForm from "./TournamentForm";
 import FixturesTab from "./FixturesTab";
@@ -180,7 +181,13 @@ export default function TournamentControlCenter({
             {tournament.sport} · {venueName} · {FORMAT_LABELS[tournament.format]}
           </div>
         </div>
-        <span className={`tc-badge ${badgeClass(tournament.status)}`}>{STATUS_LABELS[tournament.status]}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {/* Event-based live scoring (basketball, cricket, volleyball ...). Futsal keeps the score entry in the Fixtures tab. */}
+          {sportKeyFor(tournament.sport) && (
+            <Link href={`/tournaments/${tournament.id}/score`} className="tc-btn primary" style={{ textDecoration: "none" }}>Live scoring</Link>
+          )}
+          <span className={`tc-badge ${badgeClass(tournament.status)}`}>{STATUS_LABELS[tournament.status]}</span>
+        </div>
       </div>
 
       <div className="tc-stats">
