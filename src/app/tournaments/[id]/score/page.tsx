@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getTeamRoster, getTournament, getTournamentMatches, listTournamentTeams } from "@/lib/tournaments/actions";
 import { canScoreTournament, getScoringRules, listTournamentContests } from "@/lib/intelligence/actions";
-import { sportKeyFor } from "@/lib/intelligence/registry";
+import { getEngine, sportKeyFor } from "@/lib/intelligence/registry";
 import { isActionError } from "@/lib/actionError";
 import ScorerHub, { type HubTeam } from "@/components/intelligence/ScorerHub";
 
@@ -36,6 +36,7 @@ export default async function ScorerHubPage({ params }: { params: Promise<{ id: 
       matches={isActionError(matches) ? [] : matches} teams={teams}
       contests={isActionError(contests) ? [] : contests}
       rules={rules && !isActionError(rules) ? rules.rules : null}
+      ruleChoices={sport ? getEngine(sport).ruleChoices : undefined}
     />
   );
 }

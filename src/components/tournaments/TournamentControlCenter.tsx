@@ -565,7 +565,7 @@ export default function TournamentControlCenter({
       )}
 
       {tab === "Standings" && (
-        <StandingsTab tournament={tournament} teams={teams} />
+        <StandingsTab tournament={tournament} teams={teams} matches={matches} />
       )}
 
       {tab === "Results" && (

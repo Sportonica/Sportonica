@@ -3,16 +3,18 @@
 // The public match centre. Basic information first (the score card),
 // with deeper statistics and analytics a tab away.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { getContestEvents, getContestIntelligence, getRacePerformance, getTournamentLeaders } from "@/lib/intelligence/actions";
+import { askContest, getContestEvents, getContestIntelligence, getRacePerformance, getTournamentLeaders } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
 import { formatDuration } from "@/lib/intelligence/core/util";
-import type { ContestIntelligence, ContestView, TimelineEntry, TournamentLeaders } from "@/lib/intelligence/types";
+import type { ContestIntelligence, ContestView, LeaderRow, TimelineEntry, TournamentLeaders } from "@/lib/intelligence/types";
+import type { MatchAnswer } from "@/lib/intelligence/core/types";
+import { SPORTS_WITH_QUESTIONS } from "@/lib/intelligence/capabilities";
 import type { SwimPerformance } from "@/lib/intelligence/sports/swimming";
 import { useLiveContest } from "./useLiveContest";
-import { ChartView, ScoreCard, StatCards, StatTableView, Timeline } from "./views";
+import { ChartView, Insights, ScoreCard, StatCards, StatTableView, Timeline } from "./views";
 import "./intelligence.css";
 
 const TABS = ["Live", "Timeline", "Statistics", "Players", "Analytics", "History"] as const;
@@ -85,6 +87,8 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
               <h2 className="si-h2">At a glance</h2>
               <div className="si-notes">{contest.summary.lines.map((l, i) => <span key={i}>{l}</span>)}</div>
             </div>
+            {SPORTS_WITH_QUESTIONS.includes(contest.sport) ? <AskCard contestId={contest.id} lastSeq={contest.lastSeq} /> : null}
+            {intel ? <Insights items={intel.analytics.insights?.slice(0, 5)} /> : null}
             {intel ? <StatCards cards={intel.analytics.cards} /> : null}
             {intel?.teams[0] ? <StatTableView table={intel.teams[0]} max={8} /> : null}
           </>
@@ -109,6 +113,7 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
         {tab === "Analytics" ? (
           intel ? (
             <>
+              <Insights items={intel.analytics.insights} />
               <StatCards cards={intel.analytics.cards} />
               {intel.analytics.charts.map((c) => <ChartView key={c.key} chart={c} />)}
               {intel.analytics.tables.map((t) => <StatTableView key={t.key} table={t} />)}
@@ -147,15 +152,94 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
               </div>
             ) : null}
             {leaders === undefined ? <div className="si-muted">Loading…</div> : leaders && leaders.rows.length ? (
-              <StatTableView table={{
-                key: "leaders", title: "This tournament so far (completed matches)",
-                columns: leaders.columns,
-                rows: leaders.rows.map((r) => ({ id: r.subjectKey, name: r.teamName && r.teamName !== r.name ? `${r.name} (${r.teamName})` : r.name, side: null, values: r.values })),
-              }} />
+              <LeadersTable leaders={leaders} />
             ) : <div className="si-info">Tournament totals appear here once a match has been completed.</div>}
           </>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+// Tournament leaders with the filters a season table needs: team,
+// minimum games played, and which figure to rank by. Rows without the
+// figure (n/a) sort last rather than counting as zero.
+function LeadersTable({ leaders }: { leaders: TournamentLeaders }) {
+  const teams = useMemo(() => [...new Set(leaders.rows.map((r) => r.teamName).filter(Boolean))].sort(), [leaders]);
+  const sortable = leaders.columns.filter((c) => c.format !== "text");
+  const [team, setTeam] = useState("");
+  const [minGames, setMinGames] = useState(1);
+  const [sortKey, setSortKey] = useState(sortable.find((c) => c.key === "ppg")?.key ?? sortable[0]?.key ?? "");
+  const val = (r: LeaderRow) => (typeof r.values[sortKey] === "number" ? (r.values[sortKey] as number) : null);
+  const rows = leaders.rows
+    .filter((r) => (!team || r.teamName === team) && r.contests >= minGames)
+    .sort((x, y) => (val(y) ?? -Infinity) - (val(x) ?? -Infinity));
+  return (
+    <>
+      <div className="si-card si-form">
+        <label className="si-label">Team
+          <select className="si-input" value={team} onChange={(e) => setTeam(e.target.value)}>
+            <option value="">All teams</option>
+            {teams.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </label>
+        <label className="si-label">Minimum games
+          <input className="si-input" inputMode="numeric" value={minGames} onChange={(e) => setMinGames(Math.max(1, Number(e.target.value) || 1))} />
+        </label>
+        <label className="si-label">Rank by
+          <select className="si-input" value={sortKey} onChange={(e) => setSortKey(e.target.value)}>
+            {sortable.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+          </select>
+        </label>
+      </div>
+      {rows.length ? (
+        <StatTableView table={{
+          key: "leaders", title: "This tournament so far (completed matches)",
+          columns: leaders.columns,
+          rows: rows.map((r) => ({ id: r.subjectKey, name: r.teamName && r.teamName !== r.name ? `${r.name} (${r.teamName})` : r.name, side: null, values: r.values })),
+        }} />
+      ) : <div className="si-info">No player matches those filters.</div>}
+    </>
+  );
+}
+
+const SUGGESTED = ["Who is leading?", "Who has the most rebounds?", "What was the biggest run?", "What caused the lead?", "How many possessions?", "What is an and-one?"];
+
+// Questions about this match, answered from its recorded events only.
+function AskCard({ contestId, lastSeq }: { contestId: string; lastSeq: number }) {
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [answers, setAnswers] = useState<{ q: string; a: MatchAnswer; seq: number }[]>([]);
+  const ask = async (question: string) => {
+    const text = question.trim();
+    if (!text || busy) return;
+    setBusy(true);
+    const res = await askContest(contestId, text);
+    setBusy(false);
+    const a: MatchAnswer = isActionError(res) ? { kind: "unknown", answer: res.message } : res;
+    setAnswers((list) => [{ q: text, a, seq: lastSeq }, ...list].slice(0, 6));
+    setQ("");
+  };
+  return (
+    <div className="si-card">
+      <h2 className="si-h2">Ask about this game</h2>
+      <form className="si-ask" onSubmit={(e) => { e.preventDefault(); void ask(q); }}>
+        <input className="si-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="How many points has … scored?" aria-label="Your question" maxLength={300} />
+        <button type="submit" className="si-btn primary" disabled={busy || !q.trim()}>Ask</button>
+      </form>
+      <div className="si-chips" style={{ marginTop: 8 }}>
+        {SUGGESTED.map((s) => <button type="button" key={s} className="si-chip" disabled={busy} onClick={() => void ask(s)}>{s}</button>)}
+      </div>
+      {answers.length ? (
+        <div className="si-answers" aria-live="polite">
+          {answers.map((x, i) => (
+            <div key={i} className={`si-answer ${x.a.kind}`}>
+              <span className="q">{x.q}{x.seq !== lastSeq ? " (answered earlier in the game)" : ""}</span>
+              <span className="a">{x.a.answer}</span>
+            </div>
+          ))}
+        </div>
+      ) : <div className="si-muted" style={{ fontSize: 12.5, marginTop: 8 }}>Answers come only from what the scorer has recorded.</div>}
     </div>
   );
 }

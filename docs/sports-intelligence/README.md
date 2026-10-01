@@ -8,6 +8,7 @@ Event-based scoring, statistics and analytics for basketball, pickleball, cricke
 | [02-sport-rules.md](02-sport-rules.md) | Rule specification for each sport |
 | [03-database-plan.md](03-database-plan.md) | Tables, constraints, indexes, functions, security |
 | [04-adding-a-sport.md](04-adding-a-sport.md) | How to add another sport |
+| [05-basketball.md](05-basketball.md) | Basketball game intelligence: presets, fouls, possessions, formulas, standings, questions |
 
 ## Setting up
 
@@ -27,6 +28,6 @@ Event-based scoring, statistics and analytics for basketball, pickleball, cricke
 
 ## Tests
 
-`npm run test:intelligence` runs 81 checks over the core and the six engines with no database: scoring, progression, completion, refusals, derived metrics, edge cases, reconstruction, corrections and historical aggregation. The test harness drives the engines the same way the server action does (one event at a time against the running state, corrections appended, then a full rebuild compared with the live state).
+`npm run test:intelligence` runs 117 checks over the core, the six engines and basketball standings with no database: scoring, progression, completion, refusals, derived metrics, edge cases, reconstruction, corrections and historical aggregation. The test harness drives the engines the same way the server action does (one event at a time against the running state, corrections appended, then a full rebuild compared with the live state).
 
 The database functions and the pages that use them are not covered by automated tests. They need the SQL applied to a real Supabase project.

@@ -14,12 +14,15 @@ export interface Sport {
   squad: number;
   /** short line used on cards and empty states */
   tagline: string;
+  /** a tournament team's default size: players on court plus bench substitutes */
+  team?: { onCourt: number; substitutes: number };
 }
 
 export const SPORTS: Sport[] = [
   { name: "Futsal",     color: "#2E7D5B", squad: 5,  tagline: "Floodlit nights, fast feet" },
   { name: "Cricket",    color: "#f97316", squad: 8,  tagline: "Box cages after dark" },
-  { name: "Basketball", color: "#A78BFA", squad: 5,  tagline: "Three on three, all week" },
+  // a game roster is 12: five on court, seven substitutes on the bench
+  { name: "Basketball", color: "#A78BFA", squad: 5,  tagline: "Five a side, full court, all week", team: { onCourt: 5, substitutes: 7 } },
   { name: "Volleyball", color: "#3b82f6", squad: 6,  tagline: "Sand, net, sunset" },
   { name: "Badminton",  color: "#a855f7", squad: 2,  tagline: "Dawn doubles, indoor courts" },
   { name: "Tennis",     color: "#ec4899", squad: 2,  tagline: "Baseline rallies" },
@@ -38,6 +41,11 @@ export const SPORT_COLORS: Record<string, string> = Object.fromEntries(
 
 export function sportColor(name: string | null | undefined): string {
   return (name && SPORT_COLORS[name]) || "#006241";
+}
+
+/** Default tournament team size for a sport, or null to keep the form's generic defaults. */
+export function sportTeamSize(name: string | null | undefined): { onCourt: number; substitutes: number } | null {
+  return SPORTS.find((s) => s.name === name)?.team ?? null;
 }
 
 export function sportSquad(name: string | null | undefined): number {

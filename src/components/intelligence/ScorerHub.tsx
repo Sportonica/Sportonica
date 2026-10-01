@@ -19,9 +19,11 @@ export interface HubTeam { id: string; name: string; players: { id: string; name
 
 const label = (key: string): string => key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
-export default function ScorerHub({ tournamentId, tournamentName, sportName, sport, matches, teams, contests, rules }: {
+export default function ScorerHub({ tournamentId, tournamentName, sportName, sport, matches, teams, contests, rules, ruleChoices }: {
   tournamentId: string; tournamentName: string; sportName: string; sport: SportKey | null;
   matches: TournamentMatch[]; teams: HubTeam[]; contests: ContestView[]; rules: Record<string, unknown> | null;
+  // rules whose value is one of a fixed set, from the sport's engine
+  ruleChoices?: Record<string, readonly string[]>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -62,7 +64,7 @@ export default function ScorerHub({ tournamentId, tournamentName, sportName, spo
           </>
         ) : (
           <>
-            {rules ? <RulesForm tournamentId={tournamentId} sport={sport} initial={rules} onError={setError} /> : null}
+            {rules ? <RulesForm tournamentId={tournamentId} sport={sport} initial={rules} sportChoices={ruleChoices} onError={setError} /> : null}
             <div className="si-card">
               <h2 className="si-h2">Fixtures</h2>
               {matches.length ? matches.map((m) => {
@@ -93,13 +95,16 @@ export default function ScorerHub({ tournamentId, tournamentName, sportName, spo
 
 // Every rule of the sport, as the engine reports it: numbers, switches
 // and choices. Nothing here knows which sport it is editing.
-function RulesForm({ tournamentId, sport, initial, onError }: { tournamentId: string; sport: SportKey; initial: Record<string, unknown>; onError: (m: string | null) => void }) {
+function RulesForm({ tournamentId, sport, initial, sportChoices, onError }: {
+  tournamentId: string; sport: SportKey; initial: Record<string, unknown>; sportChoices?: Record<string, readonly string[]>; onError: (m: string | null) => void;
+}) {
   const [rules, setRules] = useState(initial);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
   const set = (k: string, v: unknown) => { setSaved(false); setRules({ ...rules, [k]: v }); };
-  const choices: Record<string, string[]> = {
+  const choices: Record<string, readonly string[]> = {
     preset: ["t20", "odi", "test", "custom"], format: ["singles", "doubles"], scoring: ["side_out", "rally"], nextGameServe: ["alternate", "winner", "loser"],
+    ...sportChoices,
   };
   const editable = Object.entries(rules).filter(([, v]) => v === null || ["number", "boolean", "string"].includes(typeof v));
 

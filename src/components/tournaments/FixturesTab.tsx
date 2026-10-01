@@ -2,6 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Plus, Trash2, X, History, Pencil, Search, ChevronDown, Check } from "lucide-react";
 import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
@@ -11,6 +12,8 @@ import {
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { getSportKind, type SportKind } from "@/lib/sports";
+import { sportKeyFor } from "@/lib/intelligence/registry";
+import { standingsScheme } from "@/lib/tournaments/standings";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry } from "@/lib/tournaments/types";
 
 const inputStyle: React.CSSProperties = {
@@ -302,6 +305,10 @@ export default function FixturesTab({
   const [bulkCourt, setBulkCourt] = useState("");
   const errRef = useRef<HTMLDivElement | null>(null);
   const sportKind = getSportKind(tournament.sport);
+  // sports with an event scorer (basketball …) are scored live from
+  // /score, not with the football +1 buttons; their stats come from it too
+  const liveScoringHref = sportKeyFor(tournament.sport) ? `/tournaments/${tournament.id}/score` : null;
+  const drawless = !standingsScheme(tournament.sport, tournament.scoring_rules).draws;
 
   // The error banner sits at the top of a card that can scroll for a
   // while (many rounds/matches) — an action taken far down the list
@@ -631,6 +638,8 @@ export default function FixturesTab({
                     // saved elsewhere (another admin, or the +1 buttons) after refresh.
                     key={`${m.id}:${m.status}:${m.score_a}:${m.score_b}`} match={m} teams={teams} matches={matches} teamName={teamName} pending={pending}
                     sportKind={sportKind}
+                    liveScoringHref={liveScoringHref}
+                    drawless={drawless}
                     selected={selected.has(m.id)}
                     onToggleSelect={() => toggleSelected(m.id)}
                     onResult={(a, b, winnerId, et, pens, confirmCascade) => run(() => recordMatchResult(m.id, a, b, winnerId, et, pens, confirmCascade))}
@@ -905,12 +914,15 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, drawless, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
   teamName: (id: string | null) => string;
   sportKind: SportKind;
+  liveScoringHref: string | null;
+  // no draws in this sport (basketball): a level score is never a result
+  drawless: boolean;
   selected: boolean;
   onToggleSelect: () => void;
   onResult: (
@@ -960,10 +972,10 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onLive
   // result on their own. When regulation is tied, reveal extra time;
   // if that's also tied, reveal penalties — same fallback order the
   // server enforces in record_match_result().
-  const needsDecisiveWinner = match.stage === "knockout";
+  const needsDecisiveWinner = match.stage === "knockout" || drawless;
   const regTied = scoreA !== "" && scoreB !== "" && Number(scoreA) === Number(scoreB);
   const etTied = scoreAEt !== "" && scoreBEt !== "" && Number(scoreAEt) === Number(scoreBEt);
-  const showEt = needsDecisiveWinner && regTied;
+  const showEt = needsDecisiveWinner && regTied && !drawless;
   const showPens = showEt && (etTied || (scoreAEt === "" && scoreBEt === ""));
   const decisive =
     !regTied
@@ -1118,7 +1130,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onLive
         ) : "—"}
       </td>
       <td>
-        {match.status === "completed" && match.team_a_id && match.team_b_id && match.score_a !== null && match.score_b !== null && (
+        {!liveScoringHref && match.status === "completed" && match.team_a_id && match.team_b_id && match.score_a !== null && match.score_b !== null && (
           <button className="tc-btn" disabled={pending} onClick={onRecordStats} style={{ padding: "6px 10px", marginRight: 6 }}>Player stats</button>
         )}
         <button
@@ -1199,7 +1211,11 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onLive
                 +1 pushes the new score straight to the public pages. The
                 inputs below correct it ("Update live score") or finish it
                 ("Full-time", which records the result and advances the winner). */}
-            {!done && (live ? (
+            {!done && liveScoringHref ? (
+              <Link className="tc-btn primary" href={liveScoringHref} style={{ padding: "6px 10px", fontSize: 11.5, textDecoration: "none" }}>
+                Score live
+              </Link>
+            ) : !done && (live ? (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 <span className="tc-badge live">Live</span>
                 <button className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
@@ -1250,6 +1266,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, onResult, onLive
                 </button>
               )}
             </div>
+            {drawless && regTied && (
+              <span className="tc-dim" style={{ fontSize: 11 }}>A game can&apos;t end level. Enter the score after overtime.</span>
+            )}
 
             {showEt && (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>

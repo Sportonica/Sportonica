@@ -34,7 +34,7 @@ export interface TimelineEntry {
   recordedBy: string | null;
   // cancelled by a reversal, or replaced by a later event
   superseded: boolean;
-  correction: { kind: "void" | "replace"; targetSeq: number | null; reason: string } | null;
+  correction: { kind: "void" | "replace"; targetSeq: number | null; reason: string; scoreBefore?: string; scoreAfter?: string } | null;
   // what the rules worked out from this event (game won, side out ...)
   derived: string[];
   payload: Record<string, unknown>;

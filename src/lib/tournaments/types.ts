@@ -115,6 +115,10 @@ export interface Tournament {
   status: TournamentStatus;
   cancel_reason: string | null;
   venue_booking_status: "pending" | "confirmed" | "declined";
+  // Sports Intelligence competition rules (basketball preset, fouls,
+  // timeouts, league table points ...); null = the sport's defaults.
+  // Written only through si_set_scoring_rules().
+  scoring_rules?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }

@@ -5,6 +5,8 @@ import { effectiveEvents, reconstruct } from "../../src/lib/intelligence/core/en
 import { formatDuration, parseDuration, ratio, pct } from "../../src/lib/intelligence/core/util.ts";
 import { sumRaw } from "../../src/lib/intelligence/aggregate.ts";
 import { makeContext, openMatch, section } from "./harness.mjs";
+import { ENGINES } from "../../src/lib/intelligence/registry.ts";
+import { SPORTS_WITH_QUESTIONS } from "../../src/lib/intelligence/capabilities.ts";
 
 const E = basketballEngine;
 const ctx = makeContext("basketball");
@@ -197,4 +199,9 @@ section("core: historical sums keep extremes as extremes", () => {
   assert.deepEqual(
     sumRaw([{ pts: 10, longestStreak: 4, fastestMs: 53000, place: 2 }, { pts: 7, longestStreak: 9, fastestMs: 52340, place: 1 }]),
     { pts: 17, longestStreak: 9, fastestMs: 52340 });
+});
+
+section("core: the capability list matches the engines", () => {
+  const answering = Object.entries(ENGINES).filter(([, e]) => typeof e.answerQuestion === "function").map(([k]) => k).sort();
+  assert.deepEqual([...SPORTS_WITH_QUESTIONS].sort(), answering);
 });

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Trophy, Upload, X, Users, User, Handshake, MapPin } from "lucide-react";
-import { SPORT_NAMES as SPORTS } from "@/lib/sports";
+import { SPORT_NAMES as SPORTS, sportTeamSize } from "@/lib/sports";
 import { createTournament, updateTournamentDraft, publishTournament, uploadTournamentBanner, uploadTournamentQr } from "@/lib/tournaments/actions";
 import { parseMapsUrl } from "@/lib/admin/location";
 import { isActionError } from "@/lib/actionError";
@@ -382,7 +382,13 @@ export default function TournamentForm({
       <div className="ev-row">
         <div className="ev-field">
           <label>Sport</label>
-          <select value={sport} onChange={(e) => setSport(e.target.value)}>
+          <select value={sport} onChange={(e) => {
+            const next = e.target.value;
+            setSport(next);
+            // a new tournament starts from the sport's own team size (basketball: 5 + 7 substitutes)
+            const size = sportTeamSize(next);
+            if (size && !existing) { setMinPlayers(size.onCourt); setMaxPlayers(size.onCourt); setSubLimit(size.substitutes); }
+          }}>
             {SPORTS.map((s) => <option key={s}>{s}</option>)}
           </select>
         </div>
@@ -649,6 +655,12 @@ export default function TournamentForm({
             <input type="number" min={1} value={maxPlayers} onChange={(e) => setMaxPlayers(Number(e.target.value))} />
           </div>
         </div>
+      )}
+      {format !== "single_event" && (
+        <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
+          Each team can register up to {maxPlayers + subLimit} people: {maxPlayers} player{maxPlayers === 1 ? "" : "s"} and {subLimit} substitute{subLimit === 1 ? "" : "s"}.
+          {sportTeamSize(sport) ? ` ${sport} standard: ${sportTeamSize(sport)!.onCourt} on court and ${sportTeamSize(sport)!.substitutes} substitutes (${sportTeamSize(sport)!.onCourt + sportTeamSize(sport)!.substitutes} in total).` : ""}
+        </p>
       )}
       <div className="ev-row">
         <div className="ev-field">
