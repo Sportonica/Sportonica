@@ -38,24 +38,42 @@ export interface RecentGame {
   sport_color: string | null;
 }
 
-export async function getProfileByUsername(username: string) {
-  const sb = await createClient();
-  const { data } = await sb
-    .from("profiles")
-    .select("*")
-    .ilike("username", username)
-    .maybeSingle();
-  return (data as PlayerProfile) ?? null;
-}
-
 // The columns any signed-in user may read from profiles. The database
 // grants SELECT per column, not on the table: phone and
 // phone_verified_at are withheld so one player can't read another's
 // number. "select *" therefore fails outright (42501), which is what
 // used to send a signed-in user round and round between /profile and
-// /login.
+// /login. bio and city have also been withheld since 2026-10-01, so
+// they are read server-side below rather than through this list:
+// asking for a column the role can't read fails the whole row.
 const PUBLIC_PROFILE_COLUMNS =
-  "id, username, full_name, name, bio, city, avatar_url, sports, trust_score, is_public, created_at, role";
+  "id, username, full_name, name, avatar_url, sports, trust_score, is_public, created_at, role";
+
+// Columns no browser-facing role can read, fetched server-side for one
+// profile id the caller is already allowed to see. Without a service
+// key they come back empty and the profile still loads.
+async function serverOnlyFields<K extends "bio" | "city" | "phone">(id: string, cols: K[]): Promise<Partial<Record<K, string | null>>> {
+  try {
+    const { data } = await createServiceClient().from("profiles").select(cols.join(", ")).eq("id", id).maybeSingle();
+    return (data ?? {}) as Partial<Record<K, string | null>>;
+  } catch {
+    return {};
+  }
+}
+
+export async function getProfileByUsername(username: string) {
+  const sb = await createClient();
+  const { data, error } = await sb
+    .from("profiles")
+    .select(PUBLIC_PROFILE_COLUMNS)
+    .ilike("username", username)
+    .maybeSingle();
+  if (error) { console.error("[getProfileByUsername] profiles read failed:", error.code, error.message); return null; }
+  if (!data) return null;
+  // bio and city are on the public player card
+  const extra = await serverOnlyFields(data.id, ["bio", "city"]);
+  return { ...data, bio: extra.bio ?? null, city: extra.city ?? null, phone: null } as PlayerProfile;
+}
 
 export async function getMyProfile() {
   const sb = await createClient();
@@ -66,17 +84,11 @@ export async function getMyProfile() {
   if (error) { console.error("[getMyProfile] profiles read failed:", error.code, error.message); return null; }
   if (!data) return null;
 
-  // Your own phone number is yours to see, but no browser-facing role
-  // can read that column. Fetch it server-side, for the id Supabase just
-  // verified, and nobody else's.
-  let phone: string | null = null;
-  try {
-    const { data: own } = await createServiceClient().from("profiles").select("phone").eq("id", user.id).maybeSingle();
-    phone = (own?.phone as string | null) ?? null;
-  } catch {
-    // no service key configured: the profile still loads, the phone field starts empty
-  }
-  return { ...data, phone } as PlayerProfile;
+  // Your own phone number, bio and city are yours to see, but no
+  // browser-facing role can read those columns. Fetch them server-side,
+  // for the id Supabase just verified, and nobody else's.
+  const own = await serverOnlyFields(user.id, ["phone", "bio", "city"]);
+  return { ...data, phone: own.phone ?? null, bio: own.bio ?? null, city: own.city ?? null } as PlayerProfile;
 }
 
 export async function getPlayerStats(userId: string): Promise<PlayerStats> {

@@ -151,15 +151,28 @@ export async function allUsersForPlatform() {
   const [{ data }, anonIds] = await Promise.all([
     sb
       .from("profiles")
-      .select("id, full_name, name, username, role, trust_score, city, is_public")
+      .select("id, full_name, name, username, role, trust_score, is_public")
       .order("trust_score", { ascending: false })
       .limit(500),
     anonymousProfileIds(),
   ]);
+  // city isn't readable by browser-facing roles; this is a super-admin
+  // view, so read it server-side for the rows being listed
+  const ids = (data ?? []).map((u) => u.id);
+  let cities = new Map<string, string | null>();
+  if (ids.length) {
+    try {
+      const { data: rows } = await createServiceClient().from("profiles").select("id, city").in("id", ids);
+      cities = new Map((rows ?? []).map((r) => [r.id as string, (r.city as string | null) ?? null]));
+    } catch {
+      // no service key configured: the list still loads without cities
+    }
+  }
   return (data ?? [])
     .filter((u) => !anonIds.has(u.id))
     .map((u) => ({
       ...u,
+      city: cities.get(u.id) ?? null,
       display_name: u.full_name ?? u.name ?? u.username ?? "—",
     }));
 }

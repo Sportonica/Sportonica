@@ -11,13 +11,13 @@ export type Profile = {
   full_name: string | null;
   avatar_url: string | null;
   role: "player" | "venue_owner" | "admin" | "super_admin";
-  phone: string | null;
   trust_score: number;
-  games_played: number;
-  games_hosted: number;
-  cancellations: number;
   created_at: string;
 };
+
+// profiles grants SELECT per column (phone, bio and city are withheld),
+// so "select *" fails with 42501. Ask only for what the app shows here.
+const PROFILE_COLUMNS = "id, full_name, avatar_url, role, trust_score, created_at";
 
 type UserRef = { id: string; email: string | undefined };
 
@@ -46,11 +46,15 @@ async function loadProfile(): Promise<void> {
 
   const { data, error } = await sb()
     .from("profiles")
-    .select("*")
+    .select(PROFILE_COLUMNS)
     .eq("id", u.id)
     .maybeSingle();
 
-  if (error || !data) {
+  // A failed read is not a missing profile: never recreate over it.
+  if (error) {
+    console.error("[useProfile] profiles read failed:", error.code, error.message);
+    setSnapshot({ profile: null, loading: false });
+  } else if (!data) {
     // Profile doesn't exist yet — create it
     const { data: created } = await sb()
       .from("profiles")
@@ -59,7 +63,7 @@ async function loadProfile(): Promise<void> {
         full_name: u.user_metadata?.full_name ?? u.email ?? null,
         role:      u.user_metadata?.role ?? "player",
       }, { onConflict: "id" })
-      .select()
+      .select(PROFILE_COLUMNS)
       .single();
     setSnapshot({ profile: created as Profile | null, loading: false });
   } else {
@@ -120,7 +124,7 @@ export function useProfile() {
     return ensureLoaded();
   }, []);
 
-  const update = useCallback(async (patch: Partial<Pick<Profile, "full_name" | "phone" | "avatar_url">>) => {
+  const update = useCallback(async (patch: Partial<Pick<Profile, "full_name" | "avatar_url">>) => {
     if (!snapshot.user) return { error: "Not authenticated" };
     const { error } = await sb().from("profiles").update(patch).eq("id", snapshot.user.id);
     if (!error) {
@@ -136,7 +140,7 @@ export function useProfile() {
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data } = await sb()
     .from("profiles")
-    .select("*")
+    .select(PROFILE_COLUMNS)
     .eq("id", userId)
     .maybeSingle();
   return data as Profile | null;
