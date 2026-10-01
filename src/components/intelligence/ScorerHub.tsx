@@ -8,22 +8,24 @@ import { useRouter } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
 import { getRuleDefaults, openMatchContest, openSwimRace, saveScoringRules } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
-import type { SportKey } from "@/lib/intelligence/core/types";
+import type { GuideSection, SportKey } from "@/lib/intelligence/core/types";
 import { ROUNDS, STROKES, type SwimEntry } from "@/lib/intelligence/sports/swimming";
 import type { ContestView } from "@/lib/intelligence/types";
 import type { TournamentMatch } from "@/lib/tournaments/types";
-import { StatusPill } from "./views";
+import { RulesGuide, StatusPill } from "./views";
 import "./intelligence.css";
 
 export interface HubTeam { id: string; name: string; players: { id: string; name: string; userId: string | null }[] }
 
 const label = (key: string): string => key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
-export default function ScorerHub({ tournamentId, tournamentName, sportName, sport, matches, teams, contests, rules, ruleChoices }: {
+export default function ScorerHub({ tournamentId, tournamentName, sportName, sport, matches, teams, contests, rules, ruleChoices, guide }: {
   tournamentId: string; tournamentName: string; sportName: string; sport: SportKey | null;
   matches: TournamentMatch[]; teams: HubTeam[]; contests: ContestView[]; rules: Record<string, unknown> | null;
   // rules whose value is one of a fixed set, from the sport's engine
   ruleChoices?: Record<string, readonly string[]>;
+  // "How scoring works" for the saved rules
+  guide?: GuideSection[];
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -48,7 +50,7 @@ export default function ScorerHub({ tournamentId, tournamentName, sportName, spo
         {error ? <div className="si-error" role="alert">{error}</div> : null}
 
         {!sport ? (
-          <div className="si-info">{sportName} matches are scored from the Fixtures tab of the tournament console. Event-based live scoring covers basketball, pickleball, cricket, volleyball, badminton and swimming.</div>
+          <div className="si-info">{sportName} matches are scored from the Fixtures tab of the tournament console. Event-based live scoring covers basketball, cricket, volleyball, badminton, pickleball, tennis and swimming.</div>
         ) : sport === "swimming" ? (
           <>
             <RaceForm tournamentId={tournamentId} teams={teams} onError={setError} />
@@ -65,6 +67,7 @@ export default function ScorerHub({ tournamentId, tournamentName, sportName, spo
         ) : (
           <>
             {rules ? <RulesForm tournamentId={tournamentId} sport={sport} initial={rules} sportChoices={ruleChoices} onError={setError} /> : null}
+            <RulesGuide sections={guide} />
             <div className="si-card">
               <h2 className="si-h2">Fixtures</h2>
               {matches.length ? matches.map((m) => {

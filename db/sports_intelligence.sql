@@ -1,6 +1,7 @@
 -- ────────────────────────────────────────────────────────────────
 -- Sports Intelligence: event-based scoring for basketball,
--- pickleball, cricket, volleyball, badminton and swimming.
+-- pickleball, cricket, volleyball, badminton, swimming and tennis.
+-- (An existing database adds tennis with sports_intelligence_tennis.sql.)
 --
 -- Three tables and four functions. The source of truth is the
 -- append-only event log (si_events). si_contests.state is a cache of
@@ -30,7 +31,7 @@ create table if not exists public.si_contests (
   -- set for a match between two sides; null for a swimming race
   match_id         uuid references public.tournament_matches(id) on delete cascade,
   race_category_id uuid,
-  sport            text not null check (sport in ('basketball','pickleball','cricket','volleyball','badminton','swimming')),
+  sport            text not null check (sport in ('basketball','pickleball','cricket','volleyball','badminton','swimming','tennis')),
   label            text,
   rules            jsonb not null default '{}'::jsonb,
   context          jsonb not null default '{}'::jsonb,

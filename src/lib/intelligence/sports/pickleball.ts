@@ -3,6 +3,8 @@
 // Pickleball traditional side-out scoring). Side outs, game wins and set
 // wins are computed here, never recorded, so none can be entered wrongly.
 
+import { askMatch } from "../core/ask";
+import { PICKLEBALL_KNOWLEDGE } from "../knowledge/pickleball";
 import {
   RulesError, SIDES, isSide, otherSide,
   type Analytics, type Issue, type MatchResult, type ScoreView,
@@ -118,6 +120,9 @@ export const pickleballEngine: SportIntelligenceEngine<PickleballRules, Pickleba
   sport: "pickleball",
   label: "Pickleball",
   eventTypes: ["FIRST_SERVE", "RALLY_WON"],
+
+  answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, PICKLEBALL_KNOWLEDGE); },
+  rulesGuide: (rules) => PICKLEBALL_KNOWLEDGE.guide(rules),
 
   resolveRules(input) {
     const r = mergeRules(DEFAULTS, input);

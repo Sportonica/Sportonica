@@ -1,6 +1,8 @@
 // Badminton: rallies -> points -> games -> match.
 // Rules: docs/sports-intelligence/02-sport-rules.md (defaults are BWF).
 
+import { askMatch } from "../core/ask";
+import { BADMINTON_KNOWLEDGE } from "../knowledge/badminton";
 import {
   RulesError, SIDES, isSide, otherSide,
   type Analytics, type Issue, type MatchResult, type ScoreView,
@@ -103,6 +105,9 @@ export const badmintonEngine: SportIntelligenceEngine<BadmintonRules, BadmintonS
   sport: "badminton",
   label: "Badminton",
   eventTypes: ["FIRST_SERVE", "GAME_SERVE", "RALLY_WON"],
+
+  answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, BADMINTON_KNOWLEDGE); },
+  rulesGuide: (rules) => BADMINTON_KNOWLEDGE.guide(rules),
 
   resolveRules(input) {
     const r = mergeRules(DEFAULTS, input);

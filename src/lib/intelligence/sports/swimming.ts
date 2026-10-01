@@ -5,6 +5,8 @@
 // sides and no score. Every time is an integer number of milliseconds:
 // "01:02.45" is 62 450 ms, never the decimal 1.0245.
 
+import { askMatch } from "../core/ask";
+import { SWIMMING_KNOWLEDGE } from "../knowledge/swimming";
 import {
   RulesError,
   type Analytics, type Issue, type MatchResult, type ScoreView,
@@ -159,6 +161,9 @@ export const swimmingEngine: SportIntelligenceEngine<SwimmingRules, SwimmingStat
   sport: "swimming",
   label: "Swimming",
   eventTypes: ["RACE_START", "FALSE_START", "REACTION", "SPLIT", "RACE_FINISH", "DISQUALIFICATION", "DNS", "DNF"],
+
+  answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, SWIMMING_KNOWLEDGE); },
+  rulesGuide: (rules) => SWIMMING_KNOWLEDGE.guide(rules),
 
   resolveRules(input) {
     const r = mergeRules(DEFAULTS, input);

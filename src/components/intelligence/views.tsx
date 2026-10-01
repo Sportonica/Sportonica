@@ -5,7 +5,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { ContestSummary } from "@/lib/intelligence/core/engine";
-import type { AnalyticsCard, Chart, ContestStatus, MatchContext, StatTable } from "@/lib/intelligence/core/types";
+import type { AnalyticsCard, Chart, ContestStatus, GuideSection, MatchContext, StatTable } from "@/lib/intelligence/core/types";
 import { formatStat } from "@/lib/intelligence/core/util";
 import type { TimelineEntry } from "@/lib/intelligence/types";
 
@@ -97,6 +97,24 @@ export function ScoreCard({ summary, context }: { summary: ContestSummary; conte
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** "How scoring works": the competition's rules in plain words. */
+export function RulesGuide({ sections, open = false }: { sections?: GuideSection[]; open?: boolean }) {
+  if (!sections?.length) return null;
+  return (
+    <details className="si-card si-more" open={open}>
+      <summary>How scoring works</summary>
+      <div className="si-grid" style={{ gap: 12 }}>
+        {sections.map((sec) => (
+          <div key={sec.title} className="si-grid" style={{ gap: 4 }}>
+            <div className="si-pad-name">{sec.title}</div>
+            <ul className="si-insights">{sec.lines.map((l, i) => <li key={i}>{l}</li>)}</ul>
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

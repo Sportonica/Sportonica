@@ -1,6 +1,8 @@
 // Volleyball: rallies -> points -> sets -> match.
 // Rules: docs/sports-intelligence/02-sport-rules.md (defaults are FIVB indoor).
 
+import { askMatch } from "../core/ask";
+import { VOLLEYBALL_KNOWLEDGE } from "../knowledge/volleyball";
 import {
   RulesError, SIDES, isSide, otherSide,
   type Analytics, type Issue, type MatchResult, type ScoreView,
@@ -116,6 +118,9 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
   sport: "volleyball",
   label: "Volleyball",
   eventTypes: ["FIRST_SERVE", "LINEUP", "RALLY_WON", "TOUCH", "SUBSTITUTION", "TIMEOUT"],
+
+  answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, VOLLEYBALL_KNOWLEDGE); },
+  rulesGuide: (rules) => VOLLEYBALL_KNOWLEDGE.guide(rules),
 
   resolveRules(input) {
     const r = mergeRules(DEFAULTS, input);
