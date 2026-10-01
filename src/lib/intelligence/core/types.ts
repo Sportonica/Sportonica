@@ -13,7 +13,7 @@ export const SIDES: readonly Side[] = ["a", "b"];
 export const otherSide = (s: Side): Side => (s === "a" ? "b" : "a");
 export const isSide = (v: unknown): v is Side => v === "a" || v === "b";
 
-export const SPORT_KEYS = ["basketball", "pickleball", "cricket", "volleyball", "badminton", "swimming"] as const;
+export const SPORT_KEYS = ["basketball", "pickleball", "cricket", "volleyball", "badminton", "swimming", "tennis"] as const;
 export type SportKey = (typeof SPORT_KEYS)[number];
 
 export const CONTEST_STATUS = ["scheduled", "live", "paused", "completed", "abandoned", "postponed", "cancelled"] as const;
@@ -159,6 +159,9 @@ export interface Analytics {
   insights?: string[];
 }
 
+// One section of "How scoring works", in the competition's own terms.
+export interface GuideSection { title: string; lines: string[] }
+
 // An answer to a question about one match, from its recorded data only.
 export interface MatchAnswer {
   answer: string;
@@ -231,6 +234,8 @@ export interface SportIntelligenceEngine<R = any, S = any> {
   eventLabel?(state: S, ev: EngineEvent, rules: R): string | null;
   /** A one-line description of an event for the timeline. */
   describeEvent(ev: EngineEvent, ctx: MatchContext, rules: R): string;
+  /** "How scoring works": the competition's rules in plain words. */
+  rulesGuide?(rules: R): GuideSection[];
   /** Answer a plain-language question about the match from its state; never invents a figure. */
   answerQuestion?(state: S, ctx: MatchContext, rules: R, question: string): MatchAnswer;
 }

@@ -308,7 +308,10 @@ export default function FixturesTab({
   // sports with an event scorer (basketball …) are scored live from
   // /score, not with the football +1 buttons; their stats come from it too
   const liveScoringHref = sportKeyFor(tournament.sport) ? `/tournaments/${tournament.id}/score` : null;
-  const drawless = !standingsScheme(tournament.sport, tournament.scoring_rules).draws;
+  const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
+  const drawless = !scheme.draws;
+  // what a drawless sport's final score is: basketball plays overtime, set and game sports count sets or games
+  const drawlessHint = /basketball/i.test(tournament.sport) ? "after overtime" : scheme.forName.toLowerCase();
 
   // The error banner sits at the top of a card that can scroll for a
   // while (many rounds/matches) — an action taken far down the list
@@ -640,6 +643,7 @@ export default function FixturesTab({
                     sportKind={sportKind}
                     liveScoringHref={liveScoringHref}
                     drawless={drawless}
+                    drawlessHint={drawlessHint}
                     selected={selected.has(m.id)}
                     onToggleSelect={() => toggleSelected(m.id)}
                     onResult={(a, b, winnerId, et, pens, confirmCascade) => run(() => recordMatchResult(m.id, a, b, winnerId, et, pens, confirmCascade))}
@@ -914,7 +918,7 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, drawless, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -923,6 +927,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   liveScoringHref: string | null;
   // no draws in this sport (basketball): a level score is never a result
   drawless: boolean;
+  drawlessHint: string;
   selected: boolean;
   onToggleSelect: () => void;
   onResult: (
@@ -1267,7 +1272,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
               )}
             </div>
             {drawless && regTied && (
-              <span className="tc-dim" style={{ fontSize: 11 }}>A game can&apos;t end level. Enter the score after overtime.</span>
+              <span className="tc-dim" style={{ fontSize: 11 }}>
+                A match can&apos;t end level in this sport. Enter the final score ({drawlessHint}).
+              </span>
             )}
 
             {showEt && (

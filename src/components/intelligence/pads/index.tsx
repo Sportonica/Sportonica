@@ -8,6 +8,7 @@ import type { SportKey } from "@/lib/intelligence/core/types";
 import BasketballPad from "./BasketballPad";
 import CricketPad from "./CricketPad";
 import SwimmingPad from "./SwimmingPad";
+import TennisPad from "./TennisPad";
 import RallyPad, { type RallyPadConfig } from "./RallyPad";
 import type { PadProps } from "./shared";
 
@@ -43,6 +44,7 @@ export const PADS: Record<SportKey, ComponentType<PadProps>> = {
   basketball: BasketballPad,
   cricket: CricketPad,
   swimming: SwimmingPad,
+  tennis: TennisPad,
   badminton: rally(BADMINTON),
   pickleball: rally(PICKLEBALL),
   volleyball: rally(VOLLEYBALL),

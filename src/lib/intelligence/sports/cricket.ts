@@ -6,6 +6,8 @@
 // using one up. Overs are therefore always held as a ball count;
 // "4.5" means 4 overs and 5 balls (29 balls), never the decimal 4.5.
 
+import { askMatch } from "../core/ask";
+import { CRICKET_KNOWLEDGE } from "../knowledge/cricket";
 import {
   RulesError, SIDES, isSide, otherSide,
   type Analytics, type EngineEvent, type Issue, type MatchContext, type MatchResult, type ScoreView,
@@ -295,6 +297,9 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
   sport: "cricket",
   label: "Cricket",
   eventTypes: ["TOSS", "INNINGS_START", "DELIVERY", "NEW_BATTER", "RETIRE", "PENALTY_RUNS", "DECLARE", "INNINGS_END", "TARGET_REVISED"],
+
+  answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, CRICKET_KNOWLEDGE); },
+  rulesGuide: (rules) => CRICKET_KNOWLEDGE.guide(rules),
 
   resolveRules(input) {
     const preset = (input && typeof input === "object" ? (input as { preset?: unknown }).preset : undefined) ?? "t20";

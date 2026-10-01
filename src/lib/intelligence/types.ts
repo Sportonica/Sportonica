@@ -2,7 +2,7 @@
 // contracts themselves are in ./core/types.
 
 import type { ContestSummary } from "./core/engine";
-import type { Analytics, ContestStatus, Issue, MatchContext, SportKey, StatColumn, StatTable, StatValue } from "./core/types";
+import type { Analytics, ContestStatus, GuideSection, Issue, MatchContext, SportKey, StatColumn, StatTable, StatValue } from "./core/types";
 
 export interface ContestView {
   id: string;
@@ -44,6 +44,8 @@ export interface ContestIntelligence {
   players: StatTable[];
   teams: StatTable[];
   analytics: Analytics;
+  // "How scoring works", from the rules this match is played under
+  guide?: GuideSection[];
 }
 
 export interface RecalculationReport {
@@ -131,6 +133,7 @@ export const SI_ERROR_MESSAGES: Record<string, string> = {
   EVENT_NOT_FOUND: "That event isn't part of this match.",
   SI_EVENTS_IMMUTABLE: "Recorded events can't be edited or deleted. Record a correction instead.",
   NOT_SET_UP: "Live scoring isn't set up on this database yet. Apply db/sports_intelligence.sql in Supabase.",
+  SPORT_NOT_ENABLED: "This sport isn't enabled for live scoring on this database yet. Apply db/sports_intelligence_tennis.sql in Supabase.",
 };
 
 export function friendlyIntelligenceError(message: string): string {
@@ -138,6 +141,8 @@ export function friendlyIntelligenceError(message: string): string {
   if (/si_(contests|events|stat_lines|append_event|open_contest|save_snapshot|set_scoring_rules|can_score)/.test(message) && /(does not exist|Could not find|schema cache)/i.test(message)) {
     return SI_ERROR_MESSAGES.NOT_SET_UP;
   }
+  // a sport the database's list does not have yet (tennis before its script is applied)
+  if (/si_contests_sport_check/.test(message)) return SI_ERROR_MESSAGES.SPORT_NOT_ENABLED;
   for (const code in SI_ERROR_MESSAGES) if (message.includes(code)) return SI_ERROR_MESSAGES[code];
   return message;
 }

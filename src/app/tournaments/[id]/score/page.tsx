@@ -3,9 +3,17 @@ import { getTeamRoster, getTournament, getTournamentMatches, listTournamentTeams
 import { canScoreTournament, getScoringRules, listTournamentContests } from "@/lib/intelligence/actions";
 import { getEngine, sportKeyFor } from "@/lib/intelligence/registry";
 import { isActionError } from "@/lib/actionError";
+import type { SportKey } from "@/lib/intelligence/core/types";
 import ScorerHub, { type HubTeam } from "@/components/intelligence/ScorerHub";
 
 export const dynamic = "force-dynamic";
+
+// swimming carries its rules per race, so it has no tournament-wide guide
+function guideFor(sport: SportKey, rules: Record<string, unknown> | null) {
+  const engine = getEngine(sport);
+  if (!engine.rulesGuide || !rules) return undefined;
+  try { return engine.rulesGuide(engine.resolveRules(rules)); } catch { return undefined; }
+}
 
 export default async function ScorerHubPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,6 +45,7 @@ export default async function ScorerHubPage({ params }: { params: Promise<{ id: 
       contests={isActionError(contests) ? [] : contests}
       rules={rules && !isActionError(rules) ? rules.rules : null}
       ruleChoices={sport ? getEngine(sport).ruleChoices : undefined}
+      guide={sport ? guideFor(sport, rules && !isActionError(rules) ? rules.rules : null) : undefined}
     />
   );
 }
