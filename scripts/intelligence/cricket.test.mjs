@@ -116,6 +116,8 @@ section("cricket: target, required runs and a win by wickets", () => {
   ball(m, "b2", "b1", "a1");
   ball(m, "b2", "b1", "a1", { runsBat: 1 });
   assert.deepEqual(m.summary().lines, ["Bravo 18/0", "1.0 overs", "Target: 22", "Required: 4 runs from 6 balls"]);
+  assert.equal(m.summary().view.brief, "1.0 ov · need 4 runs from 6 balls", "a card shows overs and what the chase needs");
+  assert.deepEqual(m.summary().view.score, { a: "21/3", b: "18/0" });
   const an = m.analytics();
   assert.equal(card(an, "Current run rate"), "18.00");
   assert.equal(card(an, "Required run rate"), "4.00");

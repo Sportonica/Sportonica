@@ -1,5 +1,6 @@
 import { createAnonClient } from "@/lib/supabase/anonServer";
 import { bookableSports } from "@/lib/sports";
+import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
 
 export interface RailEvent {
   id: string;
@@ -53,6 +54,10 @@ export interface RailMatch {
   pensA: number | null;
   pensB: number | null;
   winnerTeamId: string | null;
+  // Set when the match is scored event by event (basketball, cricket,
+  // volleyball ...): its score in that sport's own terms. Null for
+  // football and for any match whose score was typed in by hand.
+  intel: MatchIntel | null;
 }
 
 /**
@@ -273,6 +278,17 @@ export async function getHomeRails() {
   const tournamentById = new Map((matchTournaments ?? []).map((t) => [t.id, t]));
   const teamById = new Map((matchTeams ?? []).map((t) => [t.id, t]));
 
+  // Sport-aware scores for the matches that have them. A failure here
+  // (or the tables not existing yet) just means plain number scores.
+  const intelByMatch = new Map<string, MatchIntel>();
+  if (rawMatches.length) {
+    const { data: contests } = await sb.from("si_contests").select("id, match_id, status, summary").in("match_id", rawMatches.map((m) => m.id));
+    for (const c of contests ?? []) {
+      const intel = toMatchIntel(c);
+      if (intel && c.match_id) intelByMatch.set(c.match_id, intel);
+    }
+  }
+
   const matches: RailMatch[] = rawMatches.flatMap((m) => {
     const t = tournamentById.get(m.tournament_id);
     const a = teamById.get(m.team_a_id);
@@ -297,6 +313,7 @@ export async function getHomeRails() {
       pensA: m.score_a_pens,
       pensB: m.score_b_pens,
       winnerTeamId: m.winner_team_id,
+      intel: intelByMatch.get(m.id) ?? null,
     }];
   });
 

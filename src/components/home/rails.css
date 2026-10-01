@@ -228,6 +228,13 @@
   font-variant-numeric: tabular-nums;
 }
 .rc-match-bigscore.vs { font-size: 15px; opacity: 0.75; letter-spacing: 0.08em; }
+/* a cricket score ("164/6 : 120/10") is far wider than "2 : 1" */
+.rc-match-bigscore.long { font-size: 17px; letter-spacing: -0.02em; }
+.rc-match-bigscore.long i { font-size: 14px; }
+.rc-match-line {
+  margin-top: 10px; padding: 0 6px; text-align: center; font-size: 12px; font-weight: 600;
+  line-height: 1.35; opacity: 0.78; overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
+}
 
 .rc-match-pill {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;

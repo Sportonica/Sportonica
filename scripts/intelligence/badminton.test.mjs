@@ -55,6 +55,7 @@ section("badminton: games and match (best of three)", () => {
   assert.deepEqual(E.mirrorScore(m.env.sport, singles, m.rules), { scoreA: 2, scoreB: 1 });
   assert.deepEqual(E.validateScore(m.env.sport, singles, m.rules), []);
   assert.deepEqual(m.summary().view.periods, [{ label: "G1", a: "21", b: "0" }, { label: "G2", a: "0", b: "21" }, { label: "G3", a: "22", b: "20" }]);
+  assert.equal(m.summary().view.brief, "21-0, 0-21, 22-20", "a finished match shows its game scores on a card");
   m.assertReconstructs("three games");
 });
 

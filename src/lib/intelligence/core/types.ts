@@ -98,7 +98,14 @@ export interface ScoreView {
   subScore?: Record<Side, string> | null;
   // "Q4 · 02:31", "Set 4", "Game 2", "Heat 3 · 100m Freestyle"
   periodLabel: string;
+  // one short line for a compact score card, in the sport's own terms:
+  // the current game's points, the set scores, the overs and target ...
+  brief?: string;
   serving?: Side | null;
+  // who has the ball, where the sport tracks it (basketball)
+  possession?: Side | null;
+  // live side-by-side figures under the score: team fouls, bonus, timeouts left ...
+  facts?: { label: string; a: string; b: string }[];
   periods?: { label: string; a: string; b: string }[];
   // race: one row per lane, already ranked where possible
   lanes?: { lane: number; name: string; status: string; time: string | null; rank: number | null; detail: string | null }[];
@@ -148,6 +155,15 @@ export interface Analytics {
   cards: AnalyticsCard[];
   charts: Chart[];
   tables: StatTable[];
+  // plain-language observations, each worked out from a recorded figure
+  insights?: string[];
+}
+
+// An answer to a question about one match, from its recorded data only.
+export interface MatchAnswer {
+  answer: string;
+  // "data": read from the match; "glossary": a term explained; "unknown": not answerable from the data
+  kind: "data" | "glossary" | "unknown";
 }
 
 // Raw counters for one player or team in one contest: what si_stat_lines
@@ -184,6 +200,8 @@ export interface SportIntelligenceEngine<R = any, S = any> {
   readonly sport: SportKey;
   readonly label: string;
   readonly eventTypes: readonly string[];
+  /** Rules whose value is one of a fixed set (preset, foul window ...), for the rules form. */
+  readonly ruleChoices?: Record<string, readonly string[]>;
 
   /** competition.rules merged over the sport's defaults; throws RulesError if invalid. */
   resolveRules(input: unknown): R;
@@ -213,4 +231,6 @@ export interface SportIntelligenceEngine<R = any, S = any> {
   eventLabel?(state: S, ev: EngineEvent, rules: R): string | null;
   /** A one-line description of an event for the timeline. */
   describeEvent(ev: EngineEvent, ctx: MatchContext, rules: R): string;
+  /** Answer a plain-language question about the match from its state; never invents a figure. */
+  answerQuestion?(state: S, ctx: MatchContext, rules: R, question: string): MatchAnswer;
 }

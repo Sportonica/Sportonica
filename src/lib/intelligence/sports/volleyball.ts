@@ -294,6 +294,7 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
       score: { a: String(s.setsWon.a), b: String(s.setsWon.b) },
       subScore: s.decided ? null : { a: String(g.a), b: String(g.b) },
       periodLabel: s.decided ? "Final" : `Set ${s.sets.length}`,
+      brief: s.decided ? s.sets.map((x) => `${x.a}-${x.b}`).join(", ") : `${g.a} : ${g.b}`,
       serving: s.decided ? null : s.serving,
       periods: s.sets.map((x, i) => ({ label: `S${i + 1}`, a: String(x.a), b: String(x.b) })),
       notes: [],
