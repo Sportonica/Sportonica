@@ -246,6 +246,7 @@ export const badmintonEngine: SportIntelligenceEngine<BadmintonRules, BadmintonS
       score: { a: String(s.gamesWon.a), b: String(s.gamesWon.b) },
       subScore: s.decided ? null : { a: String(g.a), b: String(g.b) },
       periodLabel: s.decided ? "Final" : `Game ${s.games.length}`,
+      brief: s.decided ? s.games.map((x) => `${x.a}-${x.b}`).join(", ") : `${g.a} : ${g.b}`,
       serving: s.decided ? null : s.serving,
       periods: s.games.map((x, i) => ({ label: `G${i + 1}`, a: String(x.a), b: String(x.b) })),
       notes: [],

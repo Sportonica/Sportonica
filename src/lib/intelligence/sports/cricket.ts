@@ -617,6 +617,9 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
       score: { a: line("a"), b: line("b") },
       subScore: { a: sub("a"), b: sub("b") },
       periodLabel: s.result ? "Final" : !inn ? "Not started" : inn.closed ? "Innings break" : `${ordinal(inn.n)} innings`,
+      brief: s.result ? (s.result.outcome === "tie" ? "Match tied" : `${sideName(ctx, s.result.winner!)} won ${s.result.margin}`)
+        : !inn ? ""
+        : [`${oversText(inn.balls, rules.ballsPerOver)} ov`, ...chaseLines(s, rules).slice(1).map((l) => l.replace("Required: ", "need "))].join(" · "),
       serving: inn && !inn.closed ? inn.batting : null,
       periods: s.innings.map((i) => ({ label: `Inn ${i.n}`, a: i.batting === "a" ? `${i.runs}/${i.wickets}` : "", b: i.batting === "b" ? `${i.runs}/${i.wickets}` : "" })),
       notes: [],

@@ -245,6 +245,7 @@ export const pickleballEngine: SportIntelligenceEngine<PickleballRules, Pickleba
       score: { a: String(total("a")), b: String(total("b")) },
       subScore: s.decided ? null : { a: String(g.a), b: String(g.b) },
       periodLabel: s.decided ? "Final" : multiSet ? `Set ${s.sets.length}, Game ${st.games.length}` : `Game ${st.games.length}`,
+      brief: s.decided ? allGames(s).map((x) => `${x.a}-${x.b}`).join(", ") : `${g.a} : ${g.b}`,
       serving: s.decided ? null : s.serving,
       periods: s.sets.flatMap((x, si) => x.games.map((gm, gi) => ({ label: multiSet ? `S${si + 1} G${gi + 1}` : `G${gi + 1}`, a: String(gm.a), b: String(gm.b) }))),
       notes: [],

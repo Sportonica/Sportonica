@@ -47,6 +47,7 @@ section("volleyball: sets, alternating first serve, deciding set, match", () => 
   assert.deepEqual(m.env.sport.sets.slice(0, 2), [{ a: 5, b: 1, winner: "a" }, { a: 0, b: 5, winner: "b" }]);
   assert.deepEqual(m.env.sport.setsWon, { a: 1, b: 1 });
   assert.deepEqual(m.summary().lines, ["Sets level at 1-1", "Current set: 0-0", "Deciding set to 3"]);
+  assert.equal(m.summary().view.brief, "0 : 0", "during a match a card shows the current set's points");
   m.refuses("MATCH_COMPLETE", {}, /until a side has won 2 sets/, "completing at 1-1");
   m.refuses("RALLY_WON", { winner: "a" }, /serves first in the deciding set/, "deciding set needs a new toss");
   m.push("FIRST_SERVE", { side: "a" });

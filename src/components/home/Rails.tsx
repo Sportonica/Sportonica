@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { MapPin, Users, ChevronLeft, ChevronRight, ImageIcon, ShieldCheck, Star, Check } from "lucide-react";
 import { sportColor } from "@/lib/sports";
 import type { RailEvent, RailVenue, RailMatch } from "@/lib/play/homeRails";
+import { intelPill } from "@/lib/intelligence/matchIntel";
 
 const KTM = "Asia/Kathmandu";
 
@@ -199,10 +200,15 @@ export function MatchCard({ m }: { m: RailMatch }) {
   const hasTabs = m.format !== "single_event";
   const standingsTab = m.format === "knockout" ? "knockout" : "table";
   const standingsLabel = m.format === "knockout" ? "Bracket" : "Table";
+  // A match scored event by event shows its score the way that sport
+  // writes it, and opens its match centre rather than the tournament.
+  const intel = m.intel;
+  const pill = intel ? intelPill(intel) : null;
+  const long = !!intel && (intel.a.length > 3 || intel.b.length > 3);
 
   return (
     <article className="rc rc-match" style={{ ["--rc-accent" as string]: accent }}>
-      <Link href={`/tournaments/${m.tournamentId}`} className="rc-match-hit">
+      <Link href={intel ? `/tournaments/${m.tournamentId}/live/${intel.contestId}` : `/tournaments/${m.tournamentId}`} className="rc-match-hit">
         <div className="rc-match-comp">{m.tournamentName}</div>
         <div className="rc-match-meta">{m.sport} · {m.roundLabel}</div>
 
@@ -210,7 +216,13 @@ export function MatchCard({ m }: { m: RailMatch }) {
           <MatchSide team={m.teamA} />
 
           <div className="rc-match-center">
-            {started ? (
+            {intel && started ? (
+              <div className={`rc-match-bigscore${long ? " long" : ""}`}>
+                <span className={bWon ? "lose" : ""}>{intel.a || "0"}</span>
+                <i>:</i>
+                <span className={aWon ? "lose" : ""}>{intel.b || "0"}</span>
+              </div>
+            ) : started ? (
               <div className="rc-match-bigscore">
                 <span className={bWon ? "lose" : ""}>{m.scoreA}</span>
                 <i>:</i>
@@ -221,16 +233,27 @@ export function MatchCard({ m }: { m: RailMatch }) {
             )}
             {/* Always rendered (empty when there's no shootout) so the
                 status pill sits at the same height on every card. */}
-            <div className="rc-match-extra" aria-label={started && m.pensA != null && m.pensB != null ? `Penalties ${m.pensA} to ${m.pensB}` : undefined}>
-              {started && m.pensA != null && m.pensB != null ? `(${m.pensA} : ${m.pensB})` : ""}
+            <div className="rc-match-extra" aria-label={!intel && started && m.pensA != null && m.pensB != null ? `Penalties ${m.pensA} to ${m.pensB}` : undefined}>
+              {!intel && started && m.pensA != null && m.pensB != null ? `(${m.pensA} : ${m.pensB})` : ""}
             </div>
-            <div className={`rc-match-pill${live ? " live" : ""}`}>
-              {live ? <><i className="rc-live-dot" />Live</> : completed ? "Full-time" : m.startsAt ? when(m.startsAt) : "TBD"}
+            <div className={`rc-match-pill${(pill ? pill.live : live) ? " live" : ""}`}>
+              {pill && started
+                ? <>{pill.live && <i className="rc-live-dot" />}{pill.label}</>
+                : live ? <><i className="rc-live-dot" />Live</> : completed ? "Full-time" : m.startsAt ? when(m.startsAt) : "TBD"}
             </div>
           </div>
 
           <MatchSide team={m.teamB} />
         </div>
+
+        {/* The sport's own detail (quarter scores, current game, overs and
+            target). It can be a whole sentence, so it gets the card's full
+            width instead of the narrow column between the two crests. */}
+        {intel && started && (
+          <div className="rc-match-line">
+            {[intel.status === "live" || intel.status === "paused" ? intel.period : null, intel.brief].filter(Boolean).join(" · ")}
+          </div>
+        )}
       </Link>
 
       {hasTabs && (
