@@ -157,7 +157,10 @@ export async function getContestIntelligence(contestId: string): Promise<Contest
   try {
     const rules = engine.resolveRules(row.rules);
     const stats = engine.calculateStatistics(row.state.sport, row.context, rules);
-    return { players: stats.players, teams: stats.teams, analytics: engine.calculateAdvancedAnalytics(row.state.sport, row.context, rules) };
+    return {
+      players: stats.players, teams: stats.teams, analytics: engine.calculateAdvancedAnalytics(row.state.sport, row.context, rules),
+      ...(engine.rulesGuide ? { guide: engine.rulesGuide(rules) } : {}),
+    };
   } catch (e) {
     return safeActionError(e, "The statistics for this match could not be calculated.");
   }

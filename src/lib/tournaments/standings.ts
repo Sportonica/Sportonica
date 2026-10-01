@@ -39,11 +39,27 @@ const BASKETBALL: StandingsScheme = {
   forName: "Points for", againstName: "Points against", diffName: "Point difference",
 };
 
-export const isBasketball = (sport: string | null | undefined): boolean => (sport ?? "").trim().toLowerCase() === "basketball";
+// Sports decided in sets or games: no draws, no extra time or penalties,
+// and the fixture score is sets (or games) won.
+const SETS: StandingsScheme = {
+  draws: false,
+  forLabel: "SW", againstLabel: "SL", diffLabel: "+/-",
+  forName: "Sets won", againstName: "Sets lost", diffName: "Set difference",
+};
+const GAMES: StandingsScheme = {
+  draws: false,
+  forLabel: "GW", againstLabel: "GL", diffLabel: "+/-",
+  forName: "Games won", againstName: "Games lost", diffName: "Game difference",
+};
+
+const key = (sport: string | null | undefined) => (sport ?? "").trim().toLowerCase();
+export const isBasketball = (sport: string | null | undefined): boolean => key(sport) === "basketball";
 
 export function standingsScheme(sport: string | null | undefined, scoringRules?: unknown): StandingsScheme {
-  if (!isBasketball(sport)) return FOOTBALL;
-  return { ...BASKETBALL, draws: basketballRulesOf(scoringRules).allowTie };
+  if (isBasketball(sport)) return { ...BASKETBALL, draws: basketballRulesOf(scoringRules).allowTie };
+  if (key(sport) === "volleyball" || key(sport) === "tennis") return SETS;
+  if (key(sport) === "badminton" || key(sport) === "pickleball") return GAMES;
+  return FOOTBALL;
 }
 
 /** The competition's basketball rules, or the FIBA defaults if none (or invalid ones) are saved. */

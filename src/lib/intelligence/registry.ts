@@ -9,6 +9,7 @@ import { cricketEngine } from "./sports/cricket";
 import { volleyballEngine } from "./sports/volleyball";
 import { badmintonEngine } from "./sports/badminton";
 import { swimmingEngine } from "./sports/swimming";
+import { tennisEngine } from "./sports/tennis";
 
 export const ENGINES: Record<SportKey, SportIntelligenceEngine> = {
   basketball: basketballEngine,
@@ -17,6 +18,7 @@ export const ENGINES: Record<SportKey, SportIntelligenceEngine> = {
   volleyball: volleyballEngine,
   badminton: badmintonEngine,
   swimming: swimmingEngine,
+  tennis: tennisEngine,
 };
 
 export const isSportKey = (v: unknown): v is SportKey => typeof v === "string" && (SPORT_KEYS as readonly string[]).includes(v);

@@ -14,7 +14,7 @@ import type { MatchAnswer } from "@/lib/intelligence/core/types";
 import { SPORTS_WITH_QUESTIONS } from "@/lib/intelligence/capabilities";
 import type { SwimPerformance } from "@/lib/intelligence/sports/swimming";
 import { useLiveContest } from "./useLiveContest";
-import { ChartView, Insights, ScoreCard, StatCards, StatTableView, Timeline } from "./views";
+import { ChartView, Insights, RulesGuide, ScoreCard, StatCards, StatTableView, Timeline } from "./views";
 import "./intelligence.css";
 
 const TABS = ["Live", "Timeline", "Statistics", "Players", "Analytics", "History"] as const;
@@ -91,6 +91,7 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
             {intel ? <Insights items={intel.analytics.insights?.slice(0, 5)} /> : null}
             {intel ? <StatCards cards={intel.analytics.cards} /> : null}
             {intel?.teams[0] ? <StatTableView table={intel.teams[0]} max={8} /> : null}
+            {intel ? <RulesGuide sections={intel.guide} /> : null}
           </>
         ) : null}
 
