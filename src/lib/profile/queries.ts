@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/admin";
+import { PUBLIC_PROFILE_COLUMNS } from "./columns";
 
 export interface PlayerProfile {
   id: string;
@@ -7,6 +7,8 @@ export interface PlayerProfile {
   full_name: string | null;
   name: string | null;
   phone: string | null;
+  // Only on your own profile (get_my_profile); set once an SMS code checks out.
+  phone_verified_at?: string | null;
   bio: string | null;
   city: string | null;
   avatar_url: string | null;
@@ -38,57 +40,28 @@ export interface RecentGame {
   sport_color: string | null;
 }
 
-// The columns any signed-in user may read from profiles. The database
-// grants SELECT per column, not on the table: phone and
-// phone_verified_at are withheld so one player can't read another's
-// number. "select *" therefore fails outright (42501), which is what
-// used to send a signed-in user round and round between /profile and
-// /login. bio and city have also been withheld since 2026-10-01, so
-// they are read server-side below rather than through this list:
-// asking for a column the role can't read fails the whole row.
-const PUBLIC_PROFILE_COLUMNS =
-  "id, username, full_name, name, avatar_url, sports, trust_score, is_public, created_at, role";
-
-// Columns no browser-facing role can read, fetched server-side for one
-// profile id the caller is already allowed to see. Without a service
-// key they come back empty and the profile still loads.
-async function serverOnlyFields<K extends "bio" | "city" | "phone">(id: string, cols: K[]): Promise<Partial<Record<K, string | null>>> {
-  try {
-    const { data } = await createServiceClient().from("profiles").select(cols.join(", ")).eq("id", id).maybeSingle();
-    return (data ?? {}) as Partial<Record<K, string | null>>;
-  } catch {
-    return {};
-  }
-}
-
 export async function getProfileByUsername(username: string) {
   const sb = await createClient();
-  const { data, error } = await sb
+  const { data } = await sb
     .from("profiles")
     .select(PUBLIC_PROFILE_COLUMNS)
     .ilike("username", username)
     .maybeSingle();
-  if (error) { console.error("[getProfileByUsername] profiles read failed:", error.code, error.message); return null; }
   if (!data) return null;
-  // bio and city are on the public player card
-  const extra = await serverOnlyFields(data.id, ["bio", "city"]);
-  return { ...data, bio: extra.bio ?? null, city: extra.city ?? null, phone: null } as PlayerProfile;
+  // phone isn't readable through the API — never someone else's anyway.
+  // bio/city come from profile_about(), which returns nothing for a
+  // private profile unless it's yours.
+  const { data: about } = await sb.rpc("profile_about", { p_user_id: data.id }).maybeSingle();
+  const { bio = null, city = null } = (about ?? {}) as { bio?: string | null; city?: string | null };
+  return { ...data, phone: null, bio, city } as unknown as PlayerProfile;
 }
 
 export async function getMyProfile() {
   const sb = await createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return null;
-  const { data, error } = await sb.from("profiles").select(PUBLIC_PROFILE_COLUMNS).eq("id", user.id).maybeSingle();
-  // A failed read must not look like "signed out".
-  if (error) { console.error("[getMyProfile] profiles read failed:", error.code, error.message); return null; }
-  if (!data) return null;
-
-  // Your own phone number, bio and city are yours to see, but no
-  // browser-facing role can read those columns. Fetch them server-side,
-  // for the id Supabase just verified, and nobody else's.
-  const own = await serverOnlyFields(user.id, ["phone", "bio", "city"]);
-  return { ...data, phone: own.phone ?? null, bio: own.bio ?? null, city: own.city ?? null } as PlayerProfile;
+  const { data } = await sb.rpc("get_my_profile").maybeSingle();
+  return (data as PlayerProfile) ?? null;
 }
 
 export async function getPlayerStats(userId: string): Promise<PlayerStats> {
@@ -202,9 +175,14 @@ export async function getProfileByUsernameAnon(username: string) {
   const { anonSelect } = await import("@/lib/supabase/anon");
   const rows = await anonSelect<PlayerProfile>(
     "profiles",
-    `username=ilike.${encodeURIComponent(username)}&select=*&limit=1`
+    `username=ilike.${encodeURIComponent(username)}&select=${PUBLIC_PROFILE_COLUMNS}&limit=1`
   );
-  return rows[0] ?? null;
+  const p = rows[0];
+  if (!p) return null;
+  const { createAnonClient } = await import("@/lib/supabase/anonServer");
+  const { data: about } = await createAnonClient().rpc("profile_about", { p_user_id: p.id }).maybeSingle();
+  const { bio = null, city = null } = (about ?? {}) as { bio?: string | null; city?: string | null };
+  return { ...p, bio, city };
 }
 
 export async function getPlayerStatsAnon(userId: string): Promise<PlayerStats> {
