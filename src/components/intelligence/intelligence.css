@@ -80,6 +80,26 @@
 .si-team.b { text-align: right; justify-items: end; }
 .si-team-name { font-size: 15px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; display: inline-flex; align-items: center; gap: 6px; }
 .si-serve { width: 8px; height: 8px; border-radius: 50%; background: var(--si-accent); flex: none; }
+/* who has the ball: a small ring, so it never reads as the serve dot */
+.si-poss { width: 10px; height: 10px; border-radius: 50%; border: 2.5px solid var(--si-warn); flex: none; }
+.si-facts { display: grid; gap: 4px; border-top: 1px solid var(--si-line); padding-top: 10px; }
+.si-fact { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.si-fact .a { font-weight: 800; }
+.si-fact .b { font-weight: 800; text-align: right; }
+.si-fact .l { color: var(--si-text-3); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; text-align: center; }
+.si-insights { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; color: var(--si-text-2); }
+.si-ask { display: flex; gap: 8px; }
+.si-ask .si-input { flex: 1; min-width: 0; }
+.si-answers { display: grid; gap: 10px; margin-top: 10px; }
+.si-answer { display: grid; gap: 3px; }
+.si-answer .q { font-size: 12.5px; color: var(--si-text-3); font-weight: 700; }
+.si-answer .a { font-size: 14.5px; }
+.si-answer.unknown .a { color: var(--si-text-2); }
+.si-status-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.si-status-strip > div { background: var(--si-surface-2); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; color: var(--si-text-2); display: grid; gap: 2px; }
+.si-status-strip b { color: var(--si-text); font-size: 14px; }
+.si-status-strip .hot { color: var(--si-live); }
+.si-chip-badge { opacity: .75; font-weight: 600; }
 .si-team-score { font-size: clamp(30px, 9vw, 52px); font-weight: 800; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .si-team-sub { font-size: 14px; font-weight: 700; color: var(--si-text-2); font-variant-numeric: tabular-nums; }
 .si-vs { color: var(--si-text-3); font-weight: 700; font-size: 13px; }

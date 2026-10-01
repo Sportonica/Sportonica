@@ -23,7 +23,7 @@ import {
 } from "./core/engine";
 import {
   CORRECTION_VOID, RulesError,
-  type EngineEvent, type MatchContext, type MirrorScore, type Side, type SideContext, type SportIntelligenceEngine, type SportKey, type StatLine, type StoredEvent,
+  type EngineEvent, type MatchAnswer, type MatchContext, type MirrorScore, type Side, type SideContext, type SportIntelligenceEngine, type SportKey, type StatLine, type StoredEvent,
 } from "./core/types";
 import { getEngine, isSportKey, listIntelligenceSportsSync, sportKeyFor } from "./registry";
 import { aggregate } from "./aggregate";
@@ -45,6 +45,8 @@ interface EventRow {
   type: string;
   payload: Record<string, unknown>;
   occurred_at: string;
+  // when the server stored it (occurred_at is when the scorer tapped)
+  recorded_at?: string;
   recorded_by: string | null;
   client_id: string;
   voids_event_id: string | null;
@@ -108,6 +110,15 @@ export async function listIntelligenceSports() {
 
 // ── reading a contest ───────────────────────────────────────────
 
+/** The score before and after a correction, as stored with it. */
+function auditOf(payload: Record<string, unknown> | null | undefined): { scoreBefore?: string; scoreAfter?: string } {
+  const a = payload?.audit as { scoreBefore?: unknown; scoreAfter?: unknown } | undefined;
+  return {
+    ...(typeof a?.scoreBefore === "string" ? { scoreBefore: a.scoreBefore } : {}),
+    ...(typeof a?.scoreAfter === "string" ? { scoreAfter: a.scoreAfter } : {}),
+  };
+}
+
 /** GET /matches/:id, /live, /score. Public: RLS decides what is visible. */
 export async function getContest(contestId: string): Promise<ContestView | ActionError> {
   const sb = await createClient();
@@ -149,6 +160,46 @@ export async function getContestIntelligence(contestId: string): Promise<Contest
     return { players: stats.players, teams: stats.teams, analytics: engine.calculateAdvancedAnalytics(row.state.sport, row.context, rules) };
   } catch (e) {
     return safeActionError(e, "The statistics for this match could not be calculated.");
+  }
+}
+
+/**
+ * Ask a plain-language question about one match ("Who has the most
+ * rebounds?", "What is an and-one?"). Answered by the sport's engine from
+ * the match's recorded state only; nothing is estimated or invented.
+ */
+export async function askContest(contestId: string, question: string): Promise<MatchAnswer | ActionError> {
+  const q = typeof question === "string" ? question.trim().slice(0, 300) : "";
+  if (!q) return actionError("Ask a question about the match.");
+  const sb = await createClient();
+  const row = await loadContest(sb, contestId);
+  if (isActionError(row)) return row;
+  const engine = getEngine(row.sport as SportKey);
+  if (!engine.answerQuestion) return actionError("Questions are not available for this sport yet.");
+
+  // "why was this basket cancelled?": corrections live in the event log, not the game state
+  if (/(cancel|void|revers|undo|undone|removed|taken (away|off)|disallow|correct|wiped)/i.test(q)) {
+    const loaded = await loadEvents(sb, contestId);
+    if (isActionError(loaded)) return loaded;
+    const fix = [...loaded].reverse().find((e) => e.voids_event_id || e.replaces_event_id);
+    if (!fix) return { kind: "data", answer: "Nothing has been corrected or undone in this match." };
+    const target = loaded.find((e) => e.id === (fix.voids_event_id ?? fix.replaces_event_id));
+    try {
+      const rules = engine.resolveRules(row.rules);
+      const what = target ? describe(engine, toStored(target), row.context, rules) : "an event";
+      const now = fix.replaces_event_id ? `replaced by "${describe(engine, toStored(fix), row.context, rules)}"` : "reversed";
+      const { scoreBefore, scoreAfter } = auditOf(fix.payload);
+      const when = new Date(fix.recorded_at ?? fix.occurred_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kathmandu" });
+      const score = scoreBefore && scoreAfter && scoreBefore !== scoreAfter ? ` The score went from ${scoreBefore} to ${scoreAfter}.` : "";
+      return { kind: "data", answer: `"${what}" (event ${target?.seq ?? "?"}) was ${now} by a scorer at ${when}. Reason given: ${fix.reason ?? "none"}.${score}` };
+    } catch (e) {
+      return safeActionError(e, "That question could not be answered.");
+    }
+  }
+  try {
+    return engine.answerQuestion(row.state.sport, row.context, engine.resolveRules(row.rules), q);
+  } catch (e) {
+    return safeActionError(e, "That question could not be answered.");
   }
 }
 
@@ -233,7 +284,10 @@ export async function getContestEvents(
       occurredAt: e.occurred_at,
       recordedBy: e.recorded_by ? nameOf.get(e.recorded_by) ?? "Scorer" : null,
       superseded: supersededIds.has(e.id),
-      correction: target ? { kind: e.voids_event_id ? "void" : "replace", targetSeq: targetSeq.get(target) ?? null, reason: e.reason ?? "" } : null,
+      correction: target ? {
+        kind: e.voids_event_id ? "void" : "replace", targetSeq: targetSeq.get(target) ?? null, reason: e.reason ?? "",
+        ...auditOf(e.payload),
+      } : null,
       derived: derived.get(e.seq) ?? [],
       payload: e.payload ?? {},
     };
@@ -475,6 +529,10 @@ export async function correctContestEvent(
   }
 
   const snap = snapshot(engine, env, row.context, rules);
+  // the audit trail keeps the score before and after the correction
+  const scoreOf = (v: { score?: Record<Side, string> } | undefined) => (v?.score ? `${v.score.a}-${v.score.b}` : null);
+  const audit = { scoreBefore: scoreOf(row.summary?.view), scoreAfter: scoreOf(snap.summary.view) };
+  correction.payload = { ...correction.payload, audit };
   const { data, error } = await sb.rpc("si_append_event", {
     p_contest_id: contestId, p_expected_seq: row.last_seq, p_type: correction.type, p_payload: correction.payload,
     p_client_id: clientId, p_occurred_at: correction.occurredAt,

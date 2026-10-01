@@ -31,6 +31,8 @@ Shared edge cases:
 
 ## Basketball
 
+The full basketball specification (presets, fouls, timeouts, possessions, every formula, standings, questions) is [05-basketball.md](05-basketball.md). The summary below covers the core.
+
 Default format: FIBA. 4 periods of 10 minutes, overtime periods of 5 minutes, 5 fouls to foul out, 5 players on court.
 
 | Rule key | Default | Meaning |

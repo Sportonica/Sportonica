@@ -38,6 +38,7 @@ export function ScoreCard({ summary, context }: { summary: ContestSummary; conte
             <div key={side} className={`si-team ${side}`} style={{ gridColumn: i === 0 ? 1 : 3, gridRow: 1 }}>
               <span className="si-team-name">
                 {v.serving === side && <span className="si-serve" title="Serving" aria-label="Serving" />}
+                {v.possession === side && <span className="si-poss" title="Has the ball" aria-label="Has the ball" />}
                 {context.sides![side].name}
               </span>
               <span className="si-team-score">{v.score![side]}</span>
@@ -67,6 +68,18 @@ export function ScoreCard({ summary, context }: { summary: ContestSummary; conte
         </div>
       ) : null}
 
+      {v.facts?.length && context.sides ? (
+        <div className="si-facts" role="table" aria-label="Live figures">
+          {v.facts.map((f) => (
+            <div key={f.label} className="si-fact" role="row">
+              <span role="cell" className="a">{f.a}</span>
+              <span role="rowheader" className="l">{f.label}</span>
+              <span role="cell" className="b">{f.b}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       {summary.resultText ? <div className="si-result">{summary.resultText}</div> : null}
       {summary.statusReason ? <div className="si-reason">{summary.statusReason}</div> : null}
       {v.notes.length ? <div className="si-notes">{v.notes.map((n, i) => <span key={i}>{n}</span>)}</div> : null}
@@ -83,6 +96,16 @@ export function ScoreCard({ summary, context }: { summary: ContestSummary; conte
           </table>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+export function Insights({ items, title = "What the data says" }: { items?: string[]; title?: string }) {
+  if (!items?.length) return null;
+  return (
+    <div className="si-card">
+      <h2 className="si-h2">{title}</h2>
+      <ul className="si-insights">{items.map((t, i) => <li key={i}>{t}</li>)}</ul>
     </div>
   );
 }
@@ -265,6 +288,7 @@ export function Timeline({ entries, onCorrect }: { entries: TimelineEntry[]; onC
             {e.correction ? (
               <div className="si-tl-fix">
                 {e.correction.kind === "void" ? "Reverses" : "Replaces"} event #{e.correction.targetSeq ?? "?"}. Reason: {e.correction.reason}
+                {e.correction.scoreBefore && e.correction.scoreAfter && e.correction.scoreBefore !== e.correction.scoreAfter ? `. Score ${e.correction.scoreBefore} to ${e.correction.scoreAfter}` : ""}
               </div>
             ) : null}
             {e.superseded ? <div className="si-tl-fix">Corrected by a later event</div> : null}
