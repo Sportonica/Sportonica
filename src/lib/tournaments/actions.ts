@@ -993,7 +993,29 @@ export async function recordMatchResult(
     p_confirm_cascade: confirmCascade ?? false,
   });
   if (error) return actionError(friendlyTournamentError(error.message));
+  revalidateMatchViews(data as TournamentMatch);
   return data as TournamentMatch;
+}
+
+// The running score of a match in play: marks it live with this score,
+// no winner, nothing pushed into the next round (see
+// db/live_match_score.sql). Full-time still goes through recordMatchResult.
+export async function updateLiveScore(matchId: string, scoreA: number, scoreB: number): Promise<TournamentMatch | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("update_live_score", { p_match_id: matchId, p_score_a: scoreA, p_score_b: scoreB });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  revalidateMatchViews(data as TournamentMatch);
+  return data as TournamentMatch;
+}
+
+// The home page's Live scores rail is ISR-cached (page.tsx `revalidate`),
+// so a score change has to bust it or viewers see the old score for up
+// to two minutes; the public tournament page is dynamic but its client
+// cache still needs the nudge.
+function revalidateMatchViews(m: TournamentMatch) {
+  revalidatePath("/");
+  revalidatePath(`/tournaments/${m.tournament_id}`);
 }
 
 export async function getMatchPlayerStats(matchId: string): Promise<TournamentMatchPlayerStat[] | ActionError> {
@@ -1043,6 +1065,7 @@ export async function setMatchStatus(matchId: string, status: "unscheduled" | "s
   if (!user) return actionError("UNAUTHORIZED");
   const { data, error } = await sb.rpc("set_match_status", { p_match_id: matchId, p_status: status });
   if (error) return actionError(friendlyTournamentError(error.message));
+  revalidateMatchViews(data as TournamentMatch);
   return data as TournamentMatch;
 }
 
@@ -1244,6 +1267,7 @@ export async function recordCricketResult(
     p_confirm_cascade: confirmCascade ?? false,
   });
   if (error) return actionError(friendlyTournamentError(error.message));
+  revalidateMatchViews(data as TournamentMatch);
   return data as TournamentMatch;
 }
 

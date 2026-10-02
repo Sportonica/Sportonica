@@ -14,6 +14,11 @@ import { telHref } from "@/lib/playTogether/types";
 import { sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
 import EventTabs from "@/components/tournaments/public/EventTabs";
+import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
+import { listTournamentContests } from "@/lib/intelligence/actions";
+import { sportKeyFor } from "@/lib/intelligence/registry";
+import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
+import { computeBasketballStandings, isBasketball } from "@/lib/tournaments/standings";
 import "@/app/(play)/play.css";
 import "@/app/platform/events/events.css";
 import "./tournament-hero.css";
@@ -64,6 +69,15 @@ export default async function TournamentDetailPage({
     isLiveOrDone ? getTournamentAwards(id) : Promise.resolve({ winner: null, runnerUp: null, semifinalists: [] }),
   ]);
   const matches = isActionError(matchesRes) ? [] : matchesRes;
+  // sport-aware scores for fixtures that are scored event by event
+  const intel: Record<string, MatchIntel> = {};
+  if (sportKeyFor(tournament.sport)) {
+    const contests = await listTournamentContests(id);
+    for (const c of isActionError(contests) ? [] : contests) {
+      const mi = c.matchId ? toMatchIntel({ id: c.id, status: c.status, summary: c.summary }) : null;
+      if (mi && c.matchId) intel[c.matchId] = mi;
+    }
+  }
   const teams = isActionError(teamsRes) ? [] : teamsRes;
   const playerStats = isActionError(playerStatsRes) ? [] : playerStatsRes;
   const awards = isActionError(awardsRes) ? { winner: null, runnerUp: null, semifinalists: [] } : awardsRes;
@@ -73,7 +87,10 @@ export default async function TournamentDetailPage({
     ? [...new Set(teams.map((t) => t.group_name).filter((g): g is string => !!g))].sort()
     : [""];
   const standingsByGroup: Record<string, TournamentStanding[]> = {};
-  if (hasStandings && matches.length > 0) {
+  if (hasStandings && matches.length > 0 && isBasketball(tournament.sport)) {
+    // basketball tables follow the competition's own rules, from the fixtures
+    for (const g of groups) standingsByGroup[g] = computeBasketballStandings(matches, teams, tournament.scoring_rules, g || null);
+  } else if (hasStandings && matches.length > 0) {
     const entries = await Promise.all(groups.map(async (g) => {
       const res = await getTournamentStandings(id, g || undefined);
       return [g, isActionError(res) ? [] : res] as const;
@@ -158,6 +175,8 @@ export default async function TournamentDetailPage({
           />
         </div>
 
+        <LiveScoringStrip tournamentId={tournament.id} sport={tournament.sport} />
+
         <div className="bk-layout">
           <div>
             <EventTabs
@@ -170,6 +189,7 @@ export default async function TournamentDetailPage({
               myTeam={isActionError(myTeam) ? null : myTeam}
               loggedIn={!!user}
               initialTab={initialTab}
+              intel={intel}
             />
 
             {prizes.length > 0 && (

@@ -10,6 +10,7 @@ import { EventsRail, VenuesRail, GamesRail, MatchesRail, MatchCard } from "@/com
 import "@/components/home/rails.css";
 import type { getHomeRails } from "@/lib/play/homeRails";
 import { useCity, inCity } from "@/lib/city";
+import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 
 type HomeRails = Awaited<ReturnType<typeof getHomeRails>>;
 
@@ -286,6 +287,7 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
   const supabase = createClient();
   const { city, area } = useCity();
   const heroRef = useRef<HTMLDivElement>(null);
+  useLiveRefresh(!!rails?.matches.some((m) => m.status === "live"));
   const liveMatch = (rails?.matches ?? [])
     .filter((m) => m.status === "live")
     .sort((a, b) => (b.startsAt ?? "").localeCompare(a.startsAt ?? ""))[0];

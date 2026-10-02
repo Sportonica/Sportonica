@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "mailcheck": "node scripts/mailcheck.mjs",
     "test:validation": "node --experimental-strip-types scripts/validate-identity.mjs",
-    "test:bulk": "node --experimental-strip-types scripts/validate-team-bulk.mjs"
+    "test:bulk": "node --experimental-strip-types scripts/validate-team-bulk.mjs",
+    "test:intelligence": "node --experimental-strip-types --no-warnings --import ./scripts/intelligence/register.mjs scripts/intelligence/run-all.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.5.0",

@@ -115,6 +115,10 @@ export interface Tournament {
   status: TournamentStatus;
   cancel_reason: string | null;
   venue_booking_status: "pending" | "confirmed" | "declined";
+  // Sports Intelligence competition rules (basketball preset, fouls,
+  // timeouts, league table points ...); null = the sport's defaults.
+  // Written only through si_set_scoring_rules().
+  scoring_rules?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -480,6 +484,7 @@ export const TOURNAMENT_ERROR_MESSAGES: Record<string, string> = {
   SLOT_TAKEN: "That court is already booked for that time.",
   SLOT_BLOCKED: "That court is blocked for that time.",
   SCORES_REQUIRED: "Enter a score for both teams.",
+  INVALID_SCORE: "Scores can't be negative.",
   INVALID_WINNER: "Pick one of the two teams as the winner.",
   KNOCKOUT_CANNOT_DRAW: "Knockout matches can't end in a draw. Enter a winner instead.",
   INCOMPLETE_MATCHES: "Every match needs a result before the tournament can be completed.",

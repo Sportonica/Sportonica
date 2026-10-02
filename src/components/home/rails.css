@@ -212,16 +212,29 @@
    just sits directly on the card now, like the rest of the content. */
 .rc-match-bigscore {
   font-family: 'Inter', sans-serif; font-size: 30px; font-weight: 800; letter-spacing: -0.5px;
-  color: #fff; display: flex; align-items: baseline; gap: 7px; font-variant-numeric: tabular-nums;
+  color: #fff; display: flex; align-items: center; justify-content: center; gap: 7px; font-variant-numeric: tabular-nums;
+  /* Fixed height (the "VS" of an upcoming match included) so everything
+     below it lines up across cards. */
+  height: 36px; line-height: 1;
 }
 [data-theme="paper"] .rc-match-bigscore { color: #14171E; }
 .rc-match-bigscore i { font-style: normal; opacity: 0.4; font-weight: 600; font-size: 21px; }
 .rc-match-bigscore span.lose { opacity: 0.5; }
+/* Penalty shootout line, e.g. "(3 : 4)". Fixed height and always
+   present so the pill below never moves between cards. */
 .rc-match-extra {
-  display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: -4px;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.7; white-space: nowrap;
+  height: 16px; line-height: 16px; margin-top: -6px; text-align: center; align-self: stretch;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.02em; opacity: 0.7; white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .rc-match-bigscore.vs { font-size: 15px; opacity: 0.75; letter-spacing: 0.08em; }
+/* a cricket score ("164/6 : 120/10") is far wider than "2 : 1" */
+.rc-match-bigscore.long { font-size: 17px; letter-spacing: -0.02em; }
+.rc-match-bigscore.long i { font-size: 14px; }
+.rc-match-line {
+  margin-top: 10px; padding: 0 6px; text-align: center; font-size: 12px; font-weight: 600;
+  line-height: 1.35; opacity: 0.78; overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
+}
 
 .rc-match-pill {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -268,7 +281,7 @@
   .rc-match { width: 278px; padding: 18px 16px 14px; }
   .rc-match-side { width: 72px; }
   .rc-match-badge { width: 40px; height: 40px; }
-  .rc-match-bigscore { font-size: 23px; }
+  .rc-match-bigscore { font-size: 23px; height: 28px; }
   .rc-img { margin: 0 -16px 12px; }
   .rail-ctl button { display: none; }
 }

@@ -47,6 +47,7 @@
 .tc-badge.ok { background: rgba(0,98,65,0.14); color: #006241; }
 .tc-badge.warn { background: rgba(217,119,6,0.14); color: #d97706; }
 .tc-badge.danger { background: rgba(239,68,68,0.14); color: #ef4444; }
+.tc-badge.live { background: rgba(229,72,77,0.9); color: #fff; }
 .tc-badge.neutral { background: rgba(128,128,128,0.14); color: inherit; opacity: 0.75; }
 
 .tc-btn {

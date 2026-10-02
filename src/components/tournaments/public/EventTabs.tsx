@@ -10,6 +10,8 @@ import { getTeamRosterPublic, getRaceResults } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { getSportKind } from "@/lib/sports";
+import type { MatchIntel } from "@/lib/intelligence/matchIntel";
+import { signed, standingsScheme } from "@/lib/tournaments/standings";
 import {
   FORMAT_LABELS, compareStageRound,
   type Tournament, type TournamentTeam, type TournamentMatch,
@@ -19,6 +21,7 @@ import TournamentRegisterTab from "./TournamentRegisterTab";
 import DayFixturesShareButton from "./DayFixturesShareButton";
 import BracketBoard from "../BracketBoard";
 import FormattedText from "./FormattedText";
+import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 import "./event-tabs.css";
 
 const KTM = "Asia/Kathmandu";
@@ -48,8 +51,11 @@ function statusInfo(status: Tournament["status"]): { label: string; cls: string 
 }
 
 export default function EventTabs({
-  tournament, teams, matches, standingsByGroup, playerStats, awards, myTeam, loggedIn, initialTab,
+  tournament, teams, matches, standingsByGroup, playerStats, awards, myTeam, loggedIn, initialTab, intel = {},
 }: {
+  // match id -> its score in that sport's own terms, for matches scored
+  // event by event. Empty for football.
+  intel?: Record<string, MatchIntel>;
   tournament: Tournament;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -62,6 +68,7 @@ export default function EventTabs({
   // resolved server-side and passed down so the first paint is right.
   initialTab?: string;
 }) {
+  useLiveRefresh(matches.some((m) => m.status === "live"));
   const confirmedTeams = teams.filter((t) => t.status === "confirmed");
   const hasKnockout = matches.some((m) => m.stage === "knockout");
   const hasStandings = tournament.format === "league" || tournament.format === "group_knockout";
@@ -195,9 +202,9 @@ export default function EventTabs({
         />
       )}
       {activeTab === "Table" && <TableTab tournament={tournament} standingsByGroup={standingsByGroup} teams={teams} />}
-      {activeTab === "Knockout" && <KnockoutTab matches={matches} teams={teams} />}
+      {activeTab === "Knockout" && <KnockoutTab matches={matches} teams={teams} intel={intel} tournamentId={tournament.id} />}
       {activeTab === "Fixtures" && (
-        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} />
+        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} />
       )}
       {activeTab === "Player Stats" && (
         authLoading ? null : user ? <PlayerStatsTab rows={playerStats} teams={teams} /> : <SignInGate what="the player stats" pathname={pathname} />
@@ -332,6 +339,7 @@ function TableTab({
     return <div className="ev2-empty">No results yet.</div>;
   }
   const teamLogo = (id: string) => teams.find((t) => t.id === id)?.logo_url ?? null;
+  const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
   return (
     <div>
       {groups.map((g) => {
@@ -356,7 +364,9 @@ function TableTab({
                     <div className="ev2-schip"><span className="l">Points</span><span className="v">{r.points}</span></div>
                     <div className="ev2-schip"><span className="l">Won</span><span className="v">{r.won}</span></div>
                     <div className="ev2-schip"><span className="l">Lost</span><span className="v">{r.lost}</span></div>
-                    <div className="ev2-schip"><span className="l">Drawn</span><span className="v">{r.drawn}</span></div>
+                    {scheme.draws
+                      ? <div className="ev2-schip"><span className="l">Drawn</span><span className="v">{r.drawn}</span></div>
+                      : <div className="ev2-schip" title={scheme.diffName}><span className="l">{scheme.diffLabel}</span><span className="v">{signed(r.goal_diff)}</span></div>}
                   </div>
                 </div>
               );
@@ -384,14 +394,14 @@ function matchWhen(m: TournamentMatch): string {
   return m.court_label ? `${when} · ${m.court_label}` : when;
 }
 
-function KnockoutTab({ matches, teams }: { matches: TournamentMatch[]; teams: TournamentTeam[] }) {
+function KnockoutTab({ matches, teams, intel, tournamentId }: { matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>; tournamentId: string }) {
   const [selected, setSelected] = useState<TournamentMatch | null>(null);
   const team = (id: string | null) => (id ? teams.find((t) => t.id === id) : undefined);
 
   return (
     <div>
       <BracketBoard matches={matches} team={team} onMatchClick={setSelected} emptyLabel="No knockout matches added yet." />
-      {selected && <MatchDetailModal match={selected} team={team} onClose={() => setSelected(null)} />}
+      {selected && <MatchDetailModal match={selected} team={team} onClose={() => setSelected(null)} intel={intel[selected.id]} tournamentId={tournamentId} />}
     </div>
   );
 }
@@ -418,8 +428,9 @@ function BracketSlot({ team, fallback, winner, decided, score }: {
   );
 }
 
-function MatchDetailModal({ match: m, team, onClose }: {
+function MatchDetailModal({ match: m, team, onClose, intel: si, tournamentId }: {
   match: TournamentMatch; team: (id: string | null) => TournamentTeam | undefined; onClose: () => void;
+  intel?: MatchIntel; tournamentId?: string;
 }) {
   const pill = matchStatusPill(m);
   const decided = m.winner_team_id != null;
@@ -443,6 +454,14 @@ function MatchDetailModal({ match: m, team, onClose }: {
 
         {m.status === "walkover" && (
           <div className="ev2-empty" style={{ padding: "10px 0 0", textAlign: "left" }}>Walkover: {team(m.winner_team_id)?.name ?? "Unknown"}</div>
+        )}
+        {si && (
+          <div style={{ fontSize: 13, marginTop: 10 }}>
+            <div style={{ fontWeight: 700 }}>{si.a || "0"} – {si.b || "0"}{si.status === "live" ? ` · ${si.period}` : ""}</div>
+            {si.brief && <div style={{ opacity: 0.7, marginTop: 2 }}>{si.brief}</div>}
+            {si.result && <div style={{ opacity: 0.7, marginTop: 2 }}>{si.result}</div>}
+            {tournamentId && <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "#00875a", fontWeight: 700, display: "inline-block", marginTop: 6 }}>Open match centre ›</Link>}
+          </div>
         )}
         {(m.score_a_et != null && m.score_b_et != null) && (
           <div style={{ opacity: 0.65, fontSize: 12.5, marginTop: 8 }}>Extra time: {m.score_a_et} – {m.score_b_et}</div>
@@ -470,8 +489,8 @@ function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: str
   );
 }
 
-function FixturesPublicTab({ tournamentId, matches, teams }: {
-  tournamentId: string; matches: TournamentMatch[]; teams: TournamentTeam[];
+function FixturesPublicTab({ tournamentId, matches, teams, intel }: {
+  tournamentId: string; matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>;
 }) {
   if (matches.length === 0) return <div className="ev2-empty">Fixtures haven&apos;t been generated yet.</div>;
   const team = (id: string | null) => (id ? teams.find((t) => t.id === id) : undefined);
@@ -513,6 +532,7 @@ function FixturesPublicTab({ tournamentId, matches, teams }: {
             const teamAName = m.team_a_id ? teamName(m.team_a_id) : "TBD";
             const teamBName = m.team_b_id ? teamName(m.team_b_id) : m.status === "completed" ? "Bye" : "TBD";
             const live = m.status === "live";
+            const si = intel[m.id];
             return (
               <div key={m.id} className="ev2-fixture">
                 <div className="ev2-fixture-time">
@@ -525,17 +545,32 @@ function FixturesPublicTab({ tournamentId, matches, teams }: {
                 <span className="ev2-fixture-mid">
                   {m.status === "walkover" ? (
                     <span className="score wo">W/O</span>
+                  ) : si && (live || m.status === "completed") ? (
+                    // scored event by event: the score as that sport writes it
+                    <span className={live ? "live" : "score"} title={si.brief || undefined}>
+                      {live && <i className="ev2-live-dot" />}
+                      {si.a || "0"} – {si.b || "0"}
+                    </span>
                   ) : m.status === "completed" && m.score_a !== null && m.score_b !== null ? (
                     <span className="score">{m.score_a} – {m.score_b}</span>
                   ) : live ? (
-                    <span className="live"><i className="ev2-live-dot" />Live</span>
+                    <span className="live">
+                      <i className="ev2-live-dot" />
+                      {m.score_a !== null && m.score_b !== null ? `${m.score_a} – ${m.score_b}` : "Live"}
+                    </span>
                   ) : <span className="vs">vs</span>}
                 </span>
                 <span className="ev2-fixture-team ev2-fixture-team-right">
                   <span className="ev2-fixture-name">{teamBName}</span>
                   <TeamCrest name={teamBName} logoUrl={team(m.team_b_id)?.logo_url} size="sm" />
                 </span>
-                <div className="ev2-fixture-round">{m.round_label}</div>
+                <div className="ev2-fixture-round">
+                  {si ? (
+                    <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "inherit", fontWeight: 700 }}>
+                      {live ? si.period : si.brief || "Match centre"} ›
+                    </Link>
+                  ) : m.round_label}
+                </div>
               </div>
             );
           })}
