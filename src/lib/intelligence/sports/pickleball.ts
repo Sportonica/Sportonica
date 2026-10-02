@@ -123,6 +123,7 @@ export const pickleballEngine: SportIntelligenceEngine<PickleballRules, Pickleba
 
   answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, PICKLEBALL_KNOWLEDGE); },
   rulesGuide: (rules) => PICKLEBALL_KNOWLEDGE.guide(rules),
+  insights: (s, ctx, rules) => PICKLEBALL_KNOWLEDGE.insights!(s, ctx, rules),
 
   resolveRules(input) {
     const r = mergeRules(DEFAULTS, input);

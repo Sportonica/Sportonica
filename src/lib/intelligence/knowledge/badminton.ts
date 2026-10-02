@@ -3,7 +3,7 @@
 import type { SportKnowledge } from "../core/ask";
 import { plural } from "../core/ask";
 import type { BadmintonRules, BadmintonState } from "../sports/badminton";
-import { RALLY_STATS, rallyExplanations } from "./rally";
+import { RALLY_STATS, rallyExplanations, rallyInsights } from "./rally";
 
 const winGames = (r: BadmintonRules) => Math.ceil(r.bestOf / 2);
 const gameRule = (r: BadmintonRules) =>
@@ -53,5 +53,9 @@ export const BADMINTON_KNOWLEDGE: SportKnowledge<BadmintonRules, BadmintonState>
     { title: "Serving", lines: ["The side that won the last rally serves next.", "Serve from the right court on an even score, from the left on an odd score, diagonally to the receiver."] },
     { title: "What the scorer records", lines: ["Who won each rally, and optionally how: ace, service error, winner, smash, net winner, unforced error, defensive point.", "Shot count per rally if you want rally-length statistics."] },
   ],
+  insights: (s, ctx) => rallyInsights(s.rallies, ctx, {
+    unit: "game", games: s.games, won: s.gamesWon, decided: s.decided, team: s.team,
+    counts: [["smashWinners", "hit more smash winners"], ["aces", "served more aces"], ["unforcedErrors", "made more unforced errors"], ["serviceErrors", "made more service errors"]],
+  }),
   suggestions: ["What is the score?", "How many points win a game?", "Who has the most smash winners?", "Why did the score change?", "What is setting?"],
 };

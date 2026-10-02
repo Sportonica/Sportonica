@@ -3,7 +3,7 @@
 import type { SportKnowledge } from "../core/ask";
 import { plural } from "../core/ask";
 import type { PickleballRules, PickleballState } from "../sports/pickleball";
-import { RALLY_STATS, rallyExplanations } from "./rally";
+import { RALLY_STATS, rallyExplanations, rallyInsights } from "./rally";
 
 const gameRule = (r: PickleballRules) =>
   `A game goes to ${r.pointsToWin} points with a ${r.winBy}-point lead${r.pointCap !== null ? ` (capped at ${r.pointCap})` : ""}.`;
@@ -54,5 +54,11 @@ export const PICKLEBALL_KNOWLEDGE: SportKnowledge<PickleballRules, PickleballSta
       : ["The server keeps serving while their side wins rallies."] },
     { title: "What the scorer records", lines: ["Who won each rally, and optionally how: ace, winner, unforced error, service fault.", "The engine works out points, side outs and server numbers."] },
   ],
+  insights: (s, ctx) => rallyInsights(s.rallies, ctx, {
+    unit: "game", games: s.sets.flatMap((st) => st.games),
+    won: { a: s.sets.reduce((t, st) => t + st.gamesWon.a, 0), b: s.sets.reduce((t, st) => t + st.gamesWon.b, 0) },
+    decided: s.decided, team: s.team,
+    counts: [["aces", "served more aces"], ["winners", "hit more winners"], ["unforcedErrors", "made more unforced errors"], ["serviceFaults", "made more service faults"]],
+  }),
   suggestions: ["What is the score?", "What is a side out?", "Why didn't the score change?", "Who has the most aces?", "What is the kitchen?"],
 };

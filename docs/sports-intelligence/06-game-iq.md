@@ -12,6 +12,7 @@ Basketball has its own Game IQ (see [05-basketball.md](05-basketball.md)). This 
 | Glossary ("What is a free hit?") | Ask card | per-sport glossary |
 | Why the score changed | Ask card | the latest recorded rallies, points or balls |
 | Statistics ("Who has the most kills?") | Ask card | the stat tables the engine already produces |
+| **What the data says** (insights) | Match centre, Live and Analytics tabs | `engine.insights()`: rally sports (runs of points, comebacks within a game, serve %, momentum, how points were won), cricket (the chase in words, top scorers, fifties, best bowling, expensive overs, partnerships, collapses), swimming (winner and margin, close finishes, negative splits, reactions, disqualifications) |
 
 Answers come only from the match's recorded events and the competition's rules. A figure that was never recorded is answered as not recorded; a question it cannot place lists what it can answer.
 
