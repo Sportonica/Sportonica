@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import ProfileLink from "@/components/ProfileLink";
 import { UserPlus, UserMinus, Search, X } from "lucide-react";
-import { removeMember, addMember, searchPlayers } from "@/lib/squads/actions";
+import { removeMember, inviteMember, searchPlayers } from "@/lib/squads/actions";
 import { isActionError } from "@/lib/actionError";
 import type { SquadMember } from "@/lib/squads/queries";
 
@@ -85,6 +85,12 @@ function Avatar({ name, url }: { name: string; url: string | null }) {
   );
 }
 
+const INVITE_ERRORS: Record<string, string> = {
+  SQUAD_ALREADY_MEMBER: "They're already in this squad.",
+  SQUAD_INVITE_DECLINED: "They declined an earlier invite. They can still join from the squad's page.",
+  SQUAD_INVITE_NOT_ALLOWED: "This player can't be invited.",
+};
+
 function InviteModal({ squadId, onClose }: { squadId: string; onClose: () => void }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<{ id: string; name: string; username: string | null; avatar_url: string | null }[]>([]);
@@ -108,13 +114,9 @@ function InviteModal({ squadId, onClose }: { squadId: string; onClose: () => voi
     startTransition(async () => {
       setErr(null);
       try {
-        const res = await addMember(squadId, userId);
+        const res = await inviteMember(squadId, userId);
         if (isActionError(res)) {
-          // The database only lets an owner add their own friends directly
-          // (supabase/access_control_low_items.sql).
-          setErr(res.message === "SQUAD_ADD_FRIENDS_ONLY"
-            ? "You can only add your friends directly. Anyone else can join from the group's page."
-            : res.message);
+          setErr(INVITE_ERRORS[res.message] ?? res.message);
           return;
         }
         added.add(userId);
@@ -154,7 +156,7 @@ function InviteModal({ squadId, onClose }: { squadId: string; onClose: () => voi
               </div>
               <button onClick={() => invite(p.id)} disabled={pending || added.has(p.id)}
                 style={{ background: added.has(p.id) ? "transparent" : "#006241", color: added.has(p.id) ? "#2E7D5B" : "#ffffff", border: added.has(p.id) ? "1px solid rgba(46,125,91,0.4)" : "none", borderRadius: 8, padding: "10px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                {added.has(p.id) ? "Added ✓" : "Add"}
+                {added.has(p.id) ? "Invited ✓" : "Invite"}
               </button>
             </div>
           ))}
