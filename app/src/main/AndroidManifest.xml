@@ -53,4 +53,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- "Near me" distance sorting on Discover / Create. The web page asks
+         via navigator.geolocation; Capacitor's WebChromeClient turns that
+         into the runtime prompt, which needs these declared. Foreground only,
+         and the coordinates never leave the device. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 </manifest>
