@@ -9,6 +9,7 @@ import BasketballPad from "./BasketballPad";
 import CricketPad from "./CricketPad";
 import SwimmingPad from "./SwimmingPad";
 import TennisPad from "./TennisPad";
+import FootballPad from "./FootballPad";
 import RallyPad, { type RallyPadConfig } from "./RallyPad";
 import type { PadProps } from "./shared";
 
@@ -45,6 +46,7 @@ export const PADS: Record<SportKey, ComponentType<PadProps>> = {
   cricket: CricketPad,
   swimming: SwimmingPad,
   tennis: TennisPad,
+  football: FootballPad,
   badminton: rally(BADMINTON),
   pickleball: rally(PICKLEBALL),
   volleyball: rally(VOLLEYBALL),
