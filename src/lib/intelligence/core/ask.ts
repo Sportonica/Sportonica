@@ -44,6 +44,8 @@ export interface SportKnowledge<R = unknown, S = unknown> {
   /** "How scoring works", in the competition's own terms */
   guide: (r: R) => GuideSection[];
   suggestions: string[];
+  /** "What the data says": observations worked out from the match's recorded state */
+  insights?: (s: S, ctx: MatchContext, r: R) => string[];
   /** questions the shared answerer cannot place for this sport (null: not handled) */
   custom?: (q: string, s: S, ctx: MatchContext, r: R) => string | null;
 }
@@ -97,6 +99,21 @@ function findSides(q: string, ctx: MatchContext): Side[] {
 
 const show = (v: StatValue, t: StatTerm): string => formatStat(v, t.format ?? (typeof v === "number" && !Number.isInteger(v) ? "dec2" : undefined));
 
+/** "1 aces" -> "1 ace": the first word of a count's label, made singular for one. */
+function unit(v: StatValue, t: StatTerm): string {
+  if (v !== 1 || t.format) return t.label;
+  // the first plural word: "shots on target", "smash winners", "yellow cards", "matches"
+  const words = t.label.split(" ");
+  const i = words.findIndex((w) => /^[a-z]+[^s]s$/.test(w));
+  if (i < 0) return t.label;
+  words[i] = /(ch|sh|x)es$/.test(words[i]) ? words[i].slice(0, -2) : words[i].slice(0, -1);
+  return words.join(" ");
+}
+const figure = (v: StatValue, t: StatTerm): string => `${show(v, t)} ${unit(v, t)}`;
+
+// digits only, to spot a summary line that repeats the brief ("3.0 ov" / "3.0 overs")
+const digits = (t: string): string => t.replace(/\D/g, "");
+
 /** Every (table, row) holding this figure for these row ids. */
 function cells(tables: StatTable[], term: StatTerm, ids?: Set<string>): { table: StatTable; row: StatRow; v: StatValue }[] {
   const out: { table: StatTable; row: StatRow; v: StatValue }[] = [];
@@ -136,17 +153,21 @@ export function askMatch<R, S>(
 
   const term = findTerm(q, k.glossary);
   const asksMeaning = /^(what is|what's|whats|what are|what does|what do|define|explain|meaning of|tell me about)\b/.test(q);
+  // "what is a free hit", "what does deuce mean": a definition, whatever the match holds
+  const definitional = /^(what is|what's|whats|what are) (a|an)\b|^what does .* mean|^define\b|^meaning of\b/.test(q) || (!!term && q === norm(term.term));
   const stats = engine.calculateStatistics(s, ctx, r);
   const sides = findSides(q, ctx);
   const persons = findPeople(q, ctx, stats.players);
+  const stat = k.stats.find((t) => t.re.test(q)) ?? null;
+  const aboutMatch = persons.length > 0 || sides.length > 0 || /\bwho\b|\bhow many\b/.test(q);
+  const glossary = (): MatchAnswer => ({ kind: "glossary", answer: `${term!.term}: ${term!.meaning}` });
 
+  if (term && definitional && !aboutMatch) return glossary();
   // the competition's rules, in its own numbers (a question naming a player or team is about the match)
   if (!persons.length && !sides.length) for (const rule of k.rules(r)) if (rule.re.test(q)) return { kind: "glossary", answer: rule.answer };
-  if (term && (asksMeaning || q === norm(term.term)) && !persons.length && !sides.length && !/\bwho\b|\bhow many\b/.test(q)) {
-    return { kind: "glossary", answer: `${term.term}: ${term.meaning}` };
-  }
-
-  const stat = k.stats.find((t) => t.re.test(q)) ?? null;
+  // "what is the possession" asks for this match's figure, not a definition
+  if (term && asksMeaning && !stat && !aboutMatch) return glossary();
+  const nameOf = (row: StatRow): string => people(ctx, stats.players).find((x) => x.id === row.id)?.name ?? row.name;
 
   // one player
   if (persons.length > 1 && !/most|top|best|leader|highest/.test(q)) return data(`Which player? ${persons.map((p) => p.name).join(", ")} all match.`);
@@ -155,8 +176,8 @@ export function askMatch<R, S>(
     if (stat) {
       const hits = cells(stats.players, stat, new Set([p.id]));
       if (!hits.length) return data(`${p.name} has no ${stat.label} recorded in this match.`);
-      if (hits.length === 1) return data(hits[0].v === null ? `${p.name}'s ${stat.label} is not available from the recorded data.` : `${p.name}: ${show(hits[0].v, stat)} ${stat.label}.`);
-      return data(`${p.name}: ${hits.map((h) => `${show(h.v, stat)} ${stat.label} (${h.table.title})`).join("; ")}.`);
+      if (hits.length === 1) return data(hits[0].v === null ? `${p.name}'s ${stat.label} is not available from the recorded data.` : `${p.name}: ${figure(hits[0].v, stat)}.`);
+      return data(`${p.name}: ${hits.map((h) => `${figure(h.v, stat)} (${h.table.title})`).join("; ")}.`);
     }
     const lines = stats.players.flatMap((t) => t.rows.filter((row) => row.id === p.id).map((row) =>
       `${t.title}: ${t.columns.slice(0, 8).filter((c) => row.values[c.key] !== undefined && row.values[c.key] !== null).map((c) => `${c.label} ${formatStat(row.values[c.key], c.format)}`).join(", ")}`));
@@ -173,19 +194,20 @@ export function askMatch<R, S>(
     if (!pool.length) return data(`No ${stat.label} recorded yet.`);
     const best = wantLow ? Math.min(...pool.map((h) => h.v as number)) : Math.max(...pool.map((h) => h.v as number));
     if (!wantLow && best <= 0) return data(`Nobody has any ${stat.label} yet.`);
-    const top = [...new Set(pool.filter((h) => h.v === best).map((h) => h.row.name))];
-    return data(`${top.join(" and ")} ${top.length === 1 ? "leads" : "lead"} with ${show(best, stat)} ${stat.label}.`);
+    const top = [...new Set(pool.filter((h) => h.v === best).map((h) => nameOf(h.row)))];
+    return data(`${top.join(" and ")} ${top.length === 1 ? "leads" : "lead"} with ${figure(best, stat)}.`);
   }
 
   // a team's figure, or both teams'
   if (stat && !SCORE_Q.test(q)) {
     const wanted = sides.length ? sides : (["a", "b"] as Side[]);
     const hits = cells(stats.teams, stat).filter((h) => h.row.side && wanted.includes(h.row.side));
-    if (hits.length) return data(`${hits.map((h) => `${h.row.name}: ${show(h.v, stat)} ${stat.label}`).join("; ")}.`);
+    if (hits.length) return data(`${hits.map((h) => (h.v === null ? `${h.row.name}: ${stat.label} not recorded` : `${h.row.name}: ${figure(h.v, stat)}`)).join("; ")}.`);
     // no team table holds it: add the players' figures up, where they are counts
     const sums = wanted.map((side) => {
       const own = cells(stats.players, stat).filter((h) => h.row.side === side && typeof h.v === "number");
-      return own.length ? `${sideName(ctx, side)}: ${own.reduce((t, h) => t + (h.v as number), 0)} ${stat.label}` : null;
+      const total = own.reduce((t, h) => t + (h.v as number), 0);
+      return own.length ? `${sideName(ctx, side)}: ${figure(total, stat)}` : null;
     }).filter(Boolean);
     if (sums.length && !stat.format) return data(`${sums.join("; ")}.`);
     return data(`No ${stat.label} recorded for ${wanted.map((x) => sideName(ctx, x)).join(" or ")}.`);
@@ -197,7 +219,10 @@ export function askMatch<R, S>(
     const lines = engine.getMatchSummary(s, ctx, r);
     if (v.kind === "versus" && v.score && ctx.sides) {
       const by = v.periods && v.periods.length > 1 && !v.brief ? ` ${v.periods.map((p) => `${p.label} ${p.a}-${p.b}`).join(", ")}.` : "";
-      return data(`${ctx.sides.a.name} ${v.score.a}, ${ctx.sides.b.name} ${v.score.b} (${v.periodLabel}).${v.brief ? ` ${v.brief}.` : ""}${by}${lines.length > 1 ? ` ${lines.slice(1).join(". ")}.` : ""}`.replace(/\.\./g, "."));
+      const sc = (x: string) => x.trim() || "no score yet";
+      // summary lines that only repeat the period or the brief are left out
+      const more = lines.slice(1).filter((l) => l !== v.periodLabel && !(v.brief && (v.brief.includes(l) || l.includes(v.brief) || (digits(l) !== "" && digits(l) === digits(v.brief)))));
+      return data(`${ctx.sides.a.name} ${sc(v.score.a)}, ${ctx.sides.b.name} ${sc(v.score.b)} (${v.periodLabel}).${v.brief ? ` ${v.brief}.` : ""}${by}${more.length ? ` ${more.join(". ")}.` : ""}`.replace(/\.\./g, "."));
     }
     return data(lines.join(". "));
   }

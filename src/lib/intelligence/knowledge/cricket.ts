@@ -115,5 +115,62 @@ export const CRICKET_KNOWLEDGE: SportKnowledge<CricketRules, CricketState> = {
     { title: "Result", lines: [winRule(r)] },
     { title: "What the scorer records", lines: ["Each delivery: runs off the bat, any extra, and any wicket with how and who.", "The engine works out overs, strike, partnerships, run rates and the target."] },
   ],
+  insights: (s, ctx, r) => cricketInsights(s, ctx, r),
   suggestions: ["What is the score?", "Who has the most wickets?", "What is the best economy?", "Why did the score change?", "What is a free hit?"],
 };
+
+const overs = (balls: number, per: number) => `${Math.floor(balls / per)}.${balls % per}`;
+const rate = (runs: number, balls: number, per: number) => (balls ? (runs * per) / balls : null);
+
+/** "What the data says" for cricket, from the innings as recorded. */
+export function cricketInsights(s: CricketState, ctx: import("../core/types").MatchContext, r: CricketRules): string[] {
+  const out: string[] = [];
+  const name = (side: "a" | "b") => sideName(ctx, side);
+  const pl = (id: string) => ctx.sides ? [...ctx.sides.a.players, ...ctx.sides.b.players].find((p) => p.id === id)?.name ?? "Unknown" : "Unknown";
+  const per = r.ballsPerOver;
+  const cur = s.innings[s.innings.length - 1];
+  if (!cur) return out;
+
+  // where the match stands, and the chase in words
+  if (s.result) {
+    out.push(s.result.winner ? `${name(s.result.winner)} won ${s.result.margin ?? ""}.`.replace(" .", ".") : s.result.outcome === "tie" ? "The match was tied." : "The match ended without a winner.");
+  } else if (cur.target !== null && !cur.closed) {
+    const need = cur.target - cur.runs;
+    const left = cur.maxBalls !== null ? cur.maxBalls - cur.balls : null;
+    const req = left ? rate(need, left, per) : null;
+    const now = rate(cur.runs, cur.balls, per);
+    out.push(`${name(cur.batting)} need ${need} run${need === 1 ? "" : "s"}${left !== null ? ` from ${left} ball${left === 1 ? "" : "s"}` : ""} with ${r.wicketsPerInnings - cur.wickets} wicket${r.wicketsPerInnings - cur.wickets === 1 ? "" : "s"} in hand.${req !== null && now !== null ? ` Required rate ${req.toFixed(2)}, current rate ${now.toFixed(2)}.` : ""}`);
+  } else if (cur.closed && s.innings.length === 1 && r.inningsPerSide === 1) {
+    // innings break in a one-innings match: what the chase needs
+    const chasing = cur.batting === "a" ? "b" : "a";
+    out.push(`${name(cur.batting)} made ${cur.runs}/${cur.wickets} in ${overs(cur.balls, per)} overs. ${name(chasing)} need ${cur.runs + 1} to win${r.oversPerInnings !== null ? ` from ${r.oversPerInnings} overs (${((cur.runs + 1) / r.oversPerInnings).toFixed(2)} an over)` : ""}.`);
+  } else {
+    out.push(`${name(cur.batting)} ${cur.runs}/${cur.wickets} in ${overs(cur.balls, per)} overs${cur.closed ? " (innings over)" : ""}.`);
+  }
+
+  for (const inn of s.innings) {
+    const bat = name(inn.batting);
+    // top scorer, fifties and hundreds
+    const batters = Object.entries(inn.batters).sort((x, y) => y[1].runs - x[1].runs);
+    const top = batters[0];
+    if (top && top[1].runs >= 10) out.push(`${pl(top[0])} top-scored for ${bat} with ${top[1].runs}${top[1].out ? "" : "*"} off ${top[1].balls} balls.`);
+    for (const [id, b] of batters) if (b.runs >= 50) out.push(`${pl(id)} made ${b.runs >= 100 ? "a hundred" : "a fifty"} (${b.runs}).`);
+    // best bowling
+    const bowl = Object.entries(inn.bowlers).filter(([, b]) => b.balls > 0).sort((x, y) => y[1].wickets - x[1].wickets || x[1].runs - y[1].runs)[0];
+    if (bowl && bowl[1].wickets >= 2) out.push(`${pl(bowl[0])} took ${bowl[1].wickets}/${bowl[1].runs} in ${overs(bowl[1].balls, per)} overs.`);
+    // the most expensive over
+    const big = [...inn.overs].sort((x, y) => y.runs - x.runs)[0];
+    if (big && big.runs >= 15) out.push(`Over ${big.n} of ${bat}'s innings went for ${big.runs} (${big.balls.join(" ")}).`);
+    // extras and boundaries
+    const extras = inn.extras.wides + inn.extras.noBalls + inn.extras.byes + inn.extras.legByes + inn.extras.penalty;
+    if (extras >= 10) out.push(`${bat} were given ${extras} extras (${inn.extras.wides} in wides).`);
+    // the best partnership, and a collapse (3 or more wickets for 15 runs or fewer)
+    const stands = [...inn.partnerships, ...(inn.closed ? [] : [inn.stand])].filter((x) => x.batters.length === 2).sort((x, y) => y.runs - x.runs);
+    if (stands[0] && stands[0].runs >= 40) out.push(`The best ${bat} partnership was ${stands[0].runs} between ${stands[0].batters.map(pl).join(" and ")}.`);
+    for (let i = 0; i + 2 < inn.fow.length; i++) {
+      const runs = inn.fow[i + 2].runs - (i ? inn.fow[i - 1].runs : 0);
+      if (runs <= 15) { out.push(`${bat} lost ${3} wickets for ${runs} runs (from ${i ? inn.fow[i - 1].runs : 0}/${i} to ${inn.fow[i + 2].runs}/${i + 3}).`); break; }
+    }
+  }
+  return out;
+}

@@ -121,6 +121,7 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
 
   answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, VOLLEYBALL_KNOWLEDGE); },
   rulesGuide: (rules) => VOLLEYBALL_KNOWLEDGE.guide(rules),
+  insights: (s, ctx, rules) => VOLLEYBALL_KNOWLEDGE.insights!(s, ctx, rules),
 
   resolveRules(input) {
     const r = mergeRules(DEFAULTS, input);
