@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Plus, Trash2, X, Users, UserPlus, Pencil, Download, Star } from "lucide-react";
+import { Check, Plus, Trash2, X, Users, UserPlus, Pencil, Download, Star, Search } from "lucide-react";
 import {
   openTournamentRegistration, closeTournamentRegistration, reopenTournamentRegistration, cancelTournament, approveTournament, completeTournament,
   startSingleEvent, createWalkinTeam, markWalkinTeamPaid,
@@ -90,6 +90,7 @@ export default function TournamentControlCenter({
   const [selected, setSelected] = useState<Set<string>>(new Set());   // Registrations table selection
   const [bulkProgress, setBulkProgress] = useState<string | null>(null);
   const [bulkNote, setBulkNote] = useState<BulkNote | null>(null);
+  const [teamQuery, setTeamQuery] = useState("");
 
   const confirmedTeams = teams.filter((t) => t.status === "confirmed").length;
   const finesByTeam = new Map((teamFines ?? []).map((f) => [f.team_id, f.total_fine]));
@@ -114,17 +115,26 @@ export default function TournamentControlCenter({
   }
 
   // Registrations table: alphabetical by team name, with bulk selection. `selected` can still hold
-  // ids of teams that have since been deleted, so only teams still in the list count.
+  // ids of teams that have since been deleted, so only teams still in the list count. Selection and
+  // bulk actions only ever cover teams the search leaves visible, so nothing hidden gets deleted.
   const sortedTeams = useMemo(() => sortTeamsByName(teams), [teams]);
-  const selectedTeams = sortedTeams.filter((t) => selected.has(t.id));
+  const visibleTeams = useMemo(() => {
+    const q = teamQuery.trim().toLowerCase();
+    if (!q) return sortedTeams;
+    return sortedTeams.filter((t) =>
+      [t.name, t.manager_name, t.manager_phone, t.manager_email, t.club_name, t.contact_person_name, t.contact_phone, t.contact_email, TEAM_STATUS_LABELS[t.status]]
+        .some((v) => v?.toLowerCase().includes(q)),
+    );
+  }, [sortedTeams, teamQuery]);
+  const selectedTeams = visibleTeams.filter((t) => selected.has(t.id));
   const markableTeams = selectedTeams.filter(canMarkWalkinPaid);
-  const allSelected = sortedTeams.length > 0 && selectedTeams.length === sortedTeams.length;
+  const allSelected = visibleTeams.length > 0 && selectedTeams.length === visibleTeams.length;
 
   function toggleTeam(id: string) {
     setSelected((prev) => { const next = new Set(prev); if (!next.delete(id)) next.add(id); return next; });
   }
   function toggleAllTeams() {
-    setSelected(allSelected ? new Set() : new Set(sortedTeams.map((t) => t.id)));
+    setSelected(allSelected ? new Set() : new Set(visibleTeams.map((t) => t.id)));
   }
 
   // Bulk "Mark paid" / "Delete": the same actions as the row buttons, run one team at a time
@@ -288,6 +298,16 @@ export default function TournamentControlCenter({
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {teams.length > 0 && (
+                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <Search size={14} style={{ position: "absolute", left: 9, opacity: 0.5, pointerEvents: "none" }} />
+                  <input
+                    type="search" value={teamQuery} onChange={(e) => setTeamQuery(e.target.value)}
+                    placeholder="Search teams…" aria-label="Search teams by name, manager, club, contact, or status"
+                    style={{ padding: "8px 10px 8px 28px", borderRadius: 8, border: "1px solid rgba(242,237,230,0.15)", background: "transparent", color: "inherit", fontFamily: "inherit", fontSize: 13, width: 200 }}
+                  />
+                </div>
+              )}
+              {teams.length > 0 && (
                 <a
                   className="tc-btn" style={{ padding: "8px 12px", whiteSpace: "nowrap" }}
                   href={teamSheetHref(tournament.id)} target="_blank" rel="noopener noreferrer"
@@ -302,7 +322,7 @@ export default function TournamentControlCenter({
           </div>
           {teams.length > 0 && (
             <TeamBulkBar
-              total={sortedTeams.length} selectedCount={selectedTeams.length} markableCount={markableTeams.length}
+              total={visibleTeams.length} selectedCount={selectedTeams.length} markableCount={markableTeams.length}
               allSelected={allSelected} busy={pending} progress={bulkProgress} note={bulkNote}
               onToggleAll={toggleAllTeams} onMarkPaid={() => runBulk("paid")} onDelete={() => runBulk("delete")}
               onDismissNote={() => setBulkNote(null)}
@@ -310,11 +330,13 @@ export default function TournamentControlCenter({
           )}
           {teams.length === 0 ? (
             <div className="tc-empty">No teams have registered yet.</div>
+          ) : visibleTeams.length === 0 ? (
+            <div className="tc-empty">No teams match &ldquo;{teamQuery.trim()}&rdquo;.</div>
           ) : (
             <table className="tc-table stk">
               <thead><tr><th>Team</th><th>Roster</th><th>Status</th>{trackingFines && <th>Fines</th>}<th></th></tr></thead>
               <tbody>
-                {sortedTeams.map((t) => (
+                {visibleTeams.map((t) => (
                   <tr key={t.id} className={selected.has(t.id) ? "tc-sel" : undefined}>
                     <td style={{ fontWeight: 600 }}>
                       <label className="tc-pick">
