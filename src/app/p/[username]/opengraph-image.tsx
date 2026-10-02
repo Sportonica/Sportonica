@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { getProfileByUsernameAnon, getPlayerStatsAnon, trustLabel } from "@/lib/profile/queries";
 import { storageImageUrl } from "@/lib/security/storageImage";
+import { drawableImage } from "@/lib/og/image";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -45,7 +46,9 @@ export default async function OG({ params }: { params: Promise<{ username: strin
   // If the avatar isn't a safe format, fall back to the initial block.
   // Only our own storage: this route fetches the image server-side, and
   // avatar_url is user-editable (SSRF).
-  const safeAvatar = storageImageUrl(profile.avatar_url, "avatars");
+  const safeAvatarUrl = storageImageUrl(profile.avatar_url, "avatars");
+  // only a picture the renderer can draw: a WebP is allowed by the check above but would 500 the route
+  const safeAvatar = await drawableImage(safeAvatarUrl);
 
   return new ImageResponse(
     (

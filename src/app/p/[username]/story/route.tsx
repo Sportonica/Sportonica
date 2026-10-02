@@ -6,6 +6,7 @@ import {
 } from "@/lib/profile/queries";
 import { sportColor, normalizeSport } from "@/lib/sports";
 import { storageImageUrl } from "@/lib/security/storageImage";
+import { drawableImage } from "@/lib/og/image";
 
 export const runtime = "nodejs";
 
@@ -45,7 +46,9 @@ export async function GET(
 
   // Only our own storage: this route fetches the image server-side, and
   // avatar_url is user-editable (SSRF).
-  const safeAvatar = storageImageUrl(profile.avatar_url, "avatars");
+  const safeAvatarUrl = storageImageUrl(profile.avatar_url, "avatars");
+  // only a picture the renderer can draw: a WebP is allowed by the check above but would 500 the route
+  const safeAvatar = await drawableImage(safeAvatarUrl);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   // Always dark-on-white regardless of card theme — a QR needs reliable
