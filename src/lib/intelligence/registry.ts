@@ -10,6 +10,7 @@ import { volleyballEngine } from "./sports/volleyball";
 import { badmintonEngine } from "./sports/badminton";
 import { swimmingEngine } from "./sports/swimming";
 import { tennisEngine } from "./sports/tennis";
+import { footballEngine } from "./sports/football";
 
 export const ENGINES: Record<SportKey, SportIntelligenceEngine> = {
   basketball: basketballEngine,
@@ -19,6 +20,7 @@ export const ENGINES: Record<SportKey, SportIntelligenceEngine> = {
   badminton: badmintonEngine,
   swimming: swimmingEngine,
   tennis: tennisEngine,
+  football: footballEngine,
 };
 
 export const isSportKey = (v: unknown): v is SportKey => typeof v === "string" && (SPORT_KEYS as readonly string[]).includes(v);
@@ -29,11 +31,12 @@ export function getEngine(sport: SportKey): SportIntelligenceEngine {
 
 /**
  * A tournament's sport name ("Basketball") -> engine key, or null when the
- * sport has no engine. Futsal deliberately has none: football keeps its
- * existing score entry.
+ * sport has no engine. Futsal (and old data that says "Football") is
+ * scored by the football engine; its quick score entry stays available.
  */
 export function sportKeyFor(sportName: string | null | undefined): SportKey | null {
   const key = (sportName ?? "").trim().toLowerCase();
+  if (key === "futsal") return "football";
   return isSportKey(key) ? key : null;
 }
 
