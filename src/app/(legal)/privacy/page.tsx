@@ -89,10 +89,12 @@ export default function PrivacyPolicyPage() {
               prevent abuse, protect users&apos; rights, and help settle disputes.
             </p>
             <p>
-              <b>Payments.</b>{" "}Payments are made directly through third-party providers such as eSewa
-              and Khalti, or to the venue. We never see or store your bank or card details. We keep the
-              payment record (amount, method, status, date, transaction ID) and any screenshot you upload
-              so the payment can be verified and for accounting.
+              <b>Payments.</b>{" "}When you book a court, you pay Sportonica through eSewa, Khalti,
+              FonePay, or bank transfer, and we pass the payment on to the venue after the game. When you
+              join a Play Together game or a tournament, you pay the host or organiser directly. Payments
+              are processed by those providers: we never see or store your bank or card details. We keep
+              the payment record (amount, method, status, date, transaction ID) and any screenshot you
+              upload so the payment can be verified and for accounting.
             </p>
             <p>
               We adopt reasonable security measures and procedures to protect the personal data you supply,
