@@ -108,6 +108,7 @@ export const badmintonEngine: SportIntelligenceEngine<BadmintonRules, BadmintonS
 
   answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, BADMINTON_KNOWLEDGE); },
   rulesGuide: (rules) => BADMINTON_KNOWLEDGE.guide(rules),
+  insights: (s, ctx, rules) => BADMINTON_KNOWLEDGE.insights!(s, ctx, rules),
 
   resolveRules(input) {
     const r = mergeRules(DEFAULTS, input);

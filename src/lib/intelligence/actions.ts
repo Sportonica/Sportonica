@@ -157,8 +157,10 @@ export async function getContestIntelligence(contestId: string): Promise<Contest
   try {
     const rules = engine.resolveRules(row.rules);
     const stats = engine.calculateStatistics(row.state.sport, row.context, rules);
+    const analytics = engine.calculateAdvancedAnalytics(row.state.sport, row.context, rules);
+    if (!analytics.insights?.length && engine.insights) analytics.insights = engine.insights(row.state.sport, row.context, rules);
     return {
-      players: stats.players, teams: stats.teams, analytics: engine.calculateAdvancedAnalytics(row.state.sport, row.context, rules),
+      players: stats.players, teams: stats.teams, analytics,
       ...(engine.rulesGuide ? { guide: engine.rulesGuide(rules) } : {}),
     };
   } catch (e) {

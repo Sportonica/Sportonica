@@ -477,7 +477,8 @@ export const footballEngine: SportIntelligenceEngine<FootballRules, FootballStat
       score: { a: String(s.score.a), b: String(s.score.b) },
       subScore: sh ? { a: `(${sh.score.a} pens)`, b: `(${sh.score.b} pens)` } : null,
       periodLabel: label,
-      brief: [s.goals.length ? s.goals.map((g) => `${g.minute !== null ? `${g.minute}' ` : ""}${g.ownGoal ? "OG " : ""}${g.player ? playerName(ctx, g.player) : sideName(ctx, g.side)}`).join(", ") : "", sh ? `pens ${sh.score.a}-${sh.score.b}` : ""].filter(Boolean).join("; "),
+      // short enough for a score card: the half-time score once it is known, and penalties
+      brief: [s.period >= 2 || (s.period === 1 && !s.periodOpen) ? `HT ${s.byPeriod.a[0] ?? 0}-${s.byPeriod.b[0] ?? 0}` : "", sh ? `pens ${sh.score.a}-${sh.score.b}` : ""].filter(Boolean).join(", "),
       serving: null,
       facts,
       periods: Array.from({ length: s.period }, (_, i) => ({ label: periodName(i + 1, r), a: String(s.byPeriod.a[i] ?? 0), b: String(s.byPeriod.b[i] ?? 0) })),

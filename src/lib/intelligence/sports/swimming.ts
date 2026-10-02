@@ -164,6 +164,7 @@ export const swimmingEngine: SportIntelligenceEngine<SwimmingRules, SwimmingStat
 
   answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, SWIMMING_KNOWLEDGE); },
   rulesGuide: (rules) => SWIMMING_KNOWLEDGE.guide(rules),
+  insights: (s, ctx, rules) => SWIMMING_KNOWLEDGE.insights!(s, ctx, rules),
 
   resolveRules(input) {
     const r = mergeRules(DEFAULTS, input);

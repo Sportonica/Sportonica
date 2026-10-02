@@ -236,6 +236,8 @@ export interface SportIntelligenceEngine<R = any, S = any> {
   eventLabel?(state: S, ev: EngineEvent, rules: R): string | null;
   /** A one-line description of an event for the timeline. */
   describeEvent(ev: EngineEvent, ctx: MatchContext, rules: R): string;
+  /** Plain-language observations from the match, for sports whose analytics do not include them. */
+  insights?(state: S, ctx: MatchContext, rules: R): string[];
   /** "How scoring works": the competition's rules in plain words. */
   rulesGuide?(rules: R): GuideSection[];
   /** Answer a plain-language question about the match from its state; never invents a figure. */

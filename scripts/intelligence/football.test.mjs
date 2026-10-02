@@ -173,9 +173,9 @@ section("football: Game IQ from the match and the competition's rules", () => {
   m.push("GOAL", { side: "a", player: "a1", minute: 7 });
   m.push("SHOT", { side: "b", player: "b2", outcome: "on_target", minute: 9 });
   assert.match(ask(m, "What is the score?"), /^Alpha 1, Bravo 0/);
-  assert.equal(ask(m, "Who has the most goals?"), "1 Alpha 1 leads with 1 goals.");
+  assert.equal(ask(m, "Who has the most goals?"), "Alpha 1 leads with 1 goal.");
   assert.equal(ask(m, "Why didn't the score change?"), "No goal: Bravo 2's shot was saved (9'). The score stays 1-0.");
-  assert.match(ask(m, "How many shots on target?"), /Alpha: 1 shots on target; Bravo: 1 shots on target/);
+  assert.match(ask(m, "How many shots on target?"), /Alpha: 1 shot on target; Bravo: 1 shot on target/);
   assert.match(ask(m, "What happens if it is a draw?"), /5-minute halves of extra time, then a penalty shootout/);
   assert.match(ask(m, "Is there offside?"), /no offside/);
   assert.match(ask(m, "What are accumulated fouls?"), /6th foul/);
