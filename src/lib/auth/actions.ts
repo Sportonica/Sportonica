@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { actionError, type ActionError } from "@/lib/actionError";
+import { CONSENT_VERSION, type ConsentRecord } from "@/lib/auth/consent";
 import { isValidLocalPhone, normalizePhone } from "@/lib/validation/identity";
 import { captchaPassed, clientIp, underRateLimit } from "@/lib/security/abuse";
 import { smsEnabled } from "@/lib/phone/sms";
@@ -92,9 +93,13 @@ export async function signUpWithPhone(input: {
   role: "player" | "venue_owner";
   captchaToken?: string;
   code?: string;
+  consented?: boolean;
 }): Promise<{ email: string } | { codeSent: true } | ActionError> {
   const name = input.name.trim();
   if (!name) return actionError("Enter your name.");
+  if (input.consented !== true) {
+    return actionError("Please confirm you're 18 or older and agree to the Terms and conditions and Privacy policy to continue.");
+  }
   if (!isValidLocalPhone(input.phone)) {
     return actionError("Phone number must contain exactly 10 digits.");
   }
@@ -165,6 +170,9 @@ export async function signUpWithPhone(input: {
     password: input.password,
     email_confirm: true,
     user_metadata: { full_name: name, phone: digits, role },
+    app_metadata: {
+      consent: { version: CONSENT_VERSION, accepted_at: new Date().toISOString(), age_confirmed: true, source: "signup" } satisfies ConsentRecord,
+    },
   });
   if (error) {
     const m = error.message.toLowerCase();

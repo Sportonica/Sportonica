@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { SUPABASE_COOKIE_OPTIONS } from '@/lib/supabase/cookieOptions'
 import { buildCsp } from '@/lib/security/csp'
+import { consentExempt, hasConsent } from '@/lib/auth/consent'
 
 // Only these prefixes gate on auth/role, with a full getUser() check
 // against the auth server. Every other route is public browsing (home,
@@ -13,6 +14,20 @@ const AUTH_PREFIXES = ['/profile', '/admin', '/welcome', '/platform', '/my-games
 // .0/.1 chunks when large.
 const hasSessionCookie = (request: NextRequest) =>
   request.cookies.getAll().some((c) => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+
+// Real accounts with no "18+ and I agree" record (src/lib/auth/consent.ts)
+// are sent to /consent once, whatever page they open. Only page loads:
+// server actions (POST with a Next-Action header) and API calls go through,
+// so a form mid-submit never gets a redirect back.
+function consentRedirect(request: NextRequest, appMetadata: unknown, isAnonymous: boolean | undefined) {
+  if (isAnonymous || hasConsent(appMetadata)) return null
+  if (request.method !== 'GET' || request.headers.has('next-action')) return null
+  const { pathname, search } = request.nextUrl
+  if (consentExempt(pathname)) return null
+  const url = new URL('/consent', request.url)
+  url.searchParams.set('next', pathname + search)
+  return NextResponse.redirect(url)
+}
 
 export async function proxy(request: NextRequest) {
   // A fresh nonce per request: Next reads it from the request's CSP header
@@ -66,7 +81,12 @@ async function gate(request: NextRequest) {
     // verifies the ES256 token locally against cached JWKS, so this only
     // costs a network call when the token has actually expired — and
     // then the new cookies are written here, where that's allowed.
-    await supabase.auth.getClaims()
+    const { data } = await supabase.auth.getClaims()
+    const claims = data?.claims
+    if (claims?.sub) {
+      const toConsent = consentRedirect(request, claims.app_metadata, claims.is_anonymous)
+      if (toConsent) return withCookies(toConsent, response)
+    }
     return response
   }
 
@@ -86,6 +106,11 @@ async function gate(request: NextRequest) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', path)
     return NextResponse.redirect(loginUrl)
+  }
+
+  if (isRealUser) {
+    const toConsent = consentRedirect(request, user.app_metadata, false)
+    if (toConsent) return withCookies(toConsent, response)
   }
 
   // Admin gate — must be logged in AND have an owner/admin role. Checked
@@ -132,6 +157,13 @@ async function gate(request: NextRequest) {
   }
 
   return response
+}
+
+// A redirect built after a token refresh must still carry the refreshed
+// session cookies, or the browser keeps the used refresh token (see P-01).
+function withCookies(redirect: NextResponse, from: NextResponse) {
+  from.cookies.getAll().forEach((c) => redirect.cookies.set(c))
+  return redirect
 }
 
 export const config = {
