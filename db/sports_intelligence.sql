@@ -1,7 +1,7 @@
 -- ────────────────────────────────────────────────────────────────
 -- Sports Intelligence: event-based scoring for basketball,
 -- pickleball, cricket, volleyball, badminton, swimming and tennis.
--- (An existing database adds tennis with sports_intelligence_tennis.sql.)
+-- (An existing database adds tennis and football with sports_intelligence_football.sql.)
 --
 -- Three tables and four functions. The source of truth is the
 -- append-only event log (si_events). si_contests.state is a cache of
@@ -13,8 +13,9 @@
 -- The database enforces what it can on its own: who may score,
 -- ordering, idempotency and that history is never rewritten.
 --
--- Football is untouched: update_live_score(), record_match_result()
--- and the player-stats tables keep working exactly as before.
+-- Football keeps its quick score entry: update_live_score(),
+-- record_match_result() and the player-stats tables work as before, and
+-- event-scored football writes its result through them.
 --
 -- Plan: docs/sports-intelligence/03-database-plan.md
 -- Apply once in the Supabase SQL editor. Idempotent.
@@ -31,7 +32,7 @@ create table if not exists public.si_contests (
   -- set for a match between two sides; null for a swimming race
   match_id         uuid references public.tournament_matches(id) on delete cascade,
   race_category_id uuid,
-  sport            text not null check (sport in ('basketball','pickleball','cricket','volleyball','badminton','swimming','tennis')),
+  sport            text not null check (sport in ('basketball','pickleball','cricket','volleyball','badminton','swimming','tennis','football')),
   label            text,
   rules            jsonb not null default '{}'::jsonb,
   context          jsonb not null default '{}'::jsonb,

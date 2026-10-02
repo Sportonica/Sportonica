@@ -13,7 +13,7 @@ export const SIDES: readonly Side[] = ["a", "b"];
 export const otherSide = (s: Side): Side => (s === "a" ? "b" : "a");
 export const isSide = (v: unknown): v is Side => v === "a" || v === "b";
 
-export const SPORT_KEYS = ["basketball", "pickleball", "cricket", "volleyball", "badminton", "swimming", "tennis"] as const;
+export const SPORT_KEYS = ["basketball", "pickleball", "cricket", "volleyball", "badminton", "swimming", "tennis", "football"] as const;
 export type SportKey = (typeof SPORT_KEYS)[number];
 
 export const CONTEST_STATUS = ["scheduled", "live", "paused", "completed", "abandoned", "postponed", "cancelled"] as const;
@@ -194,6 +194,8 @@ export interface MirrorScore {
   scoreA: number;
   scoreB: number;
   cricket?: { wicketsA: number | null; wicketsB: number | null; oversA: number | null; oversB: number | null; target: number | null };
+  // football: the fixture keeps regular time, extra-time goals and the shootout apart
+  football?: { regularA: number; regularB: number; extraA: number | null; extraB: number | null; pensA: number | null; pensB: number | null };
 }
 
 export class RulesError extends Error {}

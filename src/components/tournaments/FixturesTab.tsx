@@ -13,6 +13,7 @@ import {
 import { isActionError } from "@/lib/actionError";
 import { getSportKind, type SportKind } from "@/lib/sports";
 import { sportKeyFor } from "@/lib/intelligence/registry";
+import { listTournamentContests } from "@/lib/intelligence/actions";
 import { standingsScheme } from "@/lib/tournaments/standings";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry } from "@/lib/tournaments/types";
 
@@ -308,6 +309,19 @@ export default function FixturesTab({
   // sports with an event scorer (basketball …) are scored live from
   // /score, not with the football +1 buttons; their stats come from it too
   const liveScoringHref = sportKeyFor(tournament.sport) ? `/tournaments/${tournament.id}/score` : null;
+  // football keeps its quick score entry next to event scoring: a match is
+  // scored one way or the other, so once a match is opened in the live
+  // scorer its quick entry is replaced by the link (the two would overwrite each other)
+  const quickEntryToo = sportKeyFor(tournament.sport) === "football";
+  const [eventScored, setEventScored] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (!quickEntryToo) return;
+    let stale = false;
+    listTournamentContests(tournament.id).then((res) => {
+      if (!stale && !isActionError(res)) setEventScored(new Set(res.map((c) => c.matchId).filter((x): x is string => !!x)));
+    }).catch(() => { /* no live scoring tables yet: quick entry only */ });
+    return () => { stale = true; };
+  }, [quickEntryToo, tournament.id, matches]);
   const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
   const drawless = !scheme.draws;
   // what a drawless sport's final score is: basketball plays overtime, set and game sports count sets or games
@@ -641,7 +655,8 @@ export default function FixturesTab({
                     // saved elsewhere (another admin, or the +1 buttons) after refresh.
                     key={`${m.id}:${m.status}:${m.score_a}:${m.score_b}`} match={m} teams={teams} matches={matches} teamName={teamName} pending={pending}
                     sportKind={sportKind}
-                    liveScoringHref={liveScoringHref}
+                    liveScoringHref={quickEntryToo && !eventScored.has(m.id) ? null : liveScoringHref}
+                    alsoLiveHref={quickEntryToo && !eventScored.has(m.id) ? liveScoringHref : null}
                     drawless={drawless}
                     drawlessHint={drawlessHint}
                     selected={selected.has(m.id)}
@@ -918,13 +933,15 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, alsoLiveHref, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
   teamName: (id: string | null) => string;
   sportKind: SportKind;
   liveScoringHref: string | null;
+  // football: event scoring offered alongside the quick entry
+  alsoLiveHref: string | null;
   // no draws in this sport (basketball): a level score is never a result
   drawless: boolean;
   drawlessHint: string;
@@ -1216,6 +1233,11 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                 +1 pushes the new score straight to the public pages. The
                 inputs below correct it ("Update live score") or finish it
                 ("Full-time", which records the result and advances the winner). */}
+            {!done && alsoLiveHref ? (
+              <Link className="tc-btn" href={alsoLiveHref} style={{ padding: "6px 10px", fontSize: 11.5, textDecoration: "none" }}>
+                Score live with events (goals, shots, cards)
+              </Link>
+            ) : null}
             {!done && liveScoringHref ? (
               <Link className="tc-btn primary" href={liveScoringHref} style={{ padding: "6px 10px", fontSize: 11.5, textDecoration: "none" }}>
                 Score live
