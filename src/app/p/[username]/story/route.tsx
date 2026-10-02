@@ -5,6 +5,7 @@ import {
   computeBadges, trustLabel,
 } from "@/lib/profile/queries";
 import { sportColor, normalizeSport } from "@/lib/sports";
+import { drawableImage } from "@/lib/og/image";
 
 export const runtime = "nodejs";
 
@@ -42,10 +43,12 @@ export async function GET(
     ? { bg: "#F2EDE6", text: "#1e3932", dim: "#5f756d", faint: "#5f756d", hair: "#D6CEC0", accent: "#006241" }
     : { bg: "#0B0D11", text: "#F2EDE6", dim: "#5f756d", faint: "#5f756d", hair: "#22262E", accent: "#006241" };
 
-  const safeAvatar =
+  const safeAvatarUrl =
     profile.avatar_url && /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(profile.avatar_url)
       ? profile.avatar_url
       : null;
+  // only a picture the renderer can draw (a WebP would 500 the route)
+  const safeAvatar = await drawableImage(safeAvatarUrl);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   // Always dark-on-white regardless of card theme — a QR needs reliable

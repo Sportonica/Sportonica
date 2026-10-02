@@ -3,6 +3,7 @@ import { getTournament, getDisplayVenueName } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS } from "@/lib/tournaments/types";
 import { sportColor } from "@/lib/sports";
+import { drawableImage } from "@/lib/og/image";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -37,10 +38,12 @@ export default async function OG({ params }: { params: Promise<{ id: string }> }
   // used to be a freeform text field (pre file-upload), so old rows can
   // hold a bare filename like "logo.png" that Satori's <img> then rejects
   // outright ("Image source must be an absolute URL") and 500s the route.
-  const safeBanner =
+  const safeBannerUrl =
     tournament.banner_url && /^https?:\/\/.+\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(tournament.banner_url)
       ? tournament.banner_url
       : null;
+  // only a picture the renderer can draw (a WebP would 500 the route)
+  const safeBanner = await drawableImage(safeBannerUrl);
 
   return new ImageResponse(
     (

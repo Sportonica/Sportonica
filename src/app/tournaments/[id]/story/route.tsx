@@ -4,6 +4,7 @@ import { getTournament, getDisplayVenueName } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS } from "@/lib/tournaments/types";
 import { sportColor } from "@/lib/sports";
+import { drawableImage } from "@/lib/og/image";
 
 export const runtime = "nodejs";
 
@@ -53,10 +54,12 @@ export async function GET(
   // existed, which this same check correctly rejects (Satori's <img>
   // requires an absolute URL and 500s the route otherwise).
   const bannerPrefix = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/tournament-banners/`;
-  const safeBanner =
+  const safeBannerUrl =
     tournament.banner_url && tournament.banner_url.startsWith(bannerPrefix)
       ? tournament.banner_url
       : null;
+  // only a picture the renderer can draw (a WebP would 500 the route)
+  const safeBanner = await drawableImage(safeBannerUrl);
 
   const isSingleEvent = tournament.format === "single_event";
 

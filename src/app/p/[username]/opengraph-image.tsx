@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getProfileByUsernameAnon, getPlayerStatsAnon, trustLabel } from "@/lib/profile/queries";
+import { drawableImage } from "@/lib/og/image";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -42,10 +43,12 @@ export default async function OG({ params }: { params: Promise<{ username: strin
 
   // Satori can only decode jpeg/png/gif/webp — never avif/svg/heic.
   // If the avatar isn't a safe format, fall back to the initial block.
-  const safeAvatar =
+  const safeAvatarUrl =
     profile.avatar_url && /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(profile.avatar_url)
       ? profile.avatar_url
       : null;
+  // only a picture the renderer can draw (a WebP would 500 the route)
+  const safeAvatar = await drawableImage(safeAvatarUrl);
 
   return new ImageResponse(
     (
