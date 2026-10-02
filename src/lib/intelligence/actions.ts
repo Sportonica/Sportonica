@@ -157,8 +157,10 @@ export async function getContestIntelligence(contestId: string): Promise<Contest
   try {
     const rules = engine.resolveRules(row.rules);
     const stats = engine.calculateStatistics(row.state.sport, row.context, rules);
+    const analytics = engine.calculateAdvancedAnalytics(row.state.sport, row.context, rules);
+    if (!analytics.insights?.length && engine.insights) analytics.insights = engine.insights(row.state.sport, row.context, rules);
     return {
-      players: stats.players, teams: stats.teams, analytics: engine.calculateAdvancedAnalytics(row.state.sport, row.context, rules),
+      players: stats.players, teams: stats.teams, analytics,
       ...(engine.rulesGuide ? { guide: engine.rulesGuide(rules) } : {}),
     };
   } catch (e) {
@@ -348,7 +350,7 @@ export async function openMatchContest(matchId: string, rulesOverride?: Record<s
   const m = match as TournamentMatch;
   if (!m.team_a_id || !m.team_b_id) return fail("TEAMS_NOT_SET");
 
-  const { data: t, error: tErr } = await sb.from("tournaments").select("id, sport, scoring_rules").eq("id", m.tournament_id).maybeSingle();
+  const { data: t, error: tErr } = await sb.from("tournaments").select("id, sport, format, scoring_rules").eq("id", m.tournament_id).maybeSingle();
   if (tErr) return fail(tErr.message);
   if (!t) return fail("TOURNAMENT_NOT_FOUND");
   const sport = sportKeyFor(t.sport);
@@ -356,7 +358,10 @@ export async function openMatchContest(matchId: string, rulesOverride?: Record<s
 
   const engine = getEngine(sport);
   let rules: unknown;
-  try { rules = engine.resolveRules({ ...(t.scoring_rules ?? {}), ...(rulesOverride ?? {}) }); }
+  // a knockout match cannot end level (the same test record_match_result() applies);
+  // a sport whose rules have no "knockout" setting ignores it
+  const knockout = t.format !== "league" && m.stage !== "group";
+  try { rules = engine.resolveRules({ ...(t.scoring_rules ?? {}), knockout, ...(rulesOverride ?? {}) }); }
   catch (e) { return actionError(e instanceof RulesError ? `Scoring rules: ${e.message}` : "The tournament's scoring rules are invalid."); }
 
   const [a, b] = await Promise.all([sideContext(sb, m.team_a_id), sideContext(sb, m.team_b_id)]);
@@ -433,8 +438,36 @@ async function syncFixture(sb: Sb, row: ContestRow, env: MatchEnvelope, mirror: 
     });
     return error ? warn(error.message) : null;
   }
+  if (mirror.football) {
+    const f = mirror.football;
+    const { error } = await sb.rpc("record_match_result", {
+      ...base, p_score_a: f.regularA, p_score_b: f.regularB,
+      p_score_a_et: f.extraA, p_score_b_et: f.extraB, p_score_a_pens: f.pensA, p_score_b_pens: f.pensB,
+    });
+    if (error) return warn(error.message);
+    return syncFootballPlayerStats(sb, row, env);
+  }
   const { error } = await sb.rpc("record_match_result", { ...base, p_score_a: mirror.scoreA, p_score_b: mirror.scoreB });
   return error ? warn(error.message) : null;
+}
+
+// Football: each player's goals, assists and cards from the events go to
+// the existing per-match player stats, so top scorers and card fines keep
+// adding up. A Man of the Match already chosen by hand is kept.
+async function syncFootballPlayerStats(sb: Sb, row: ContestRow, env: MatchEnvelope): Promise<string | null> {
+  if (!row.match_id || !row.context.sides) return null;
+  const state = env.sport as { players?: Record<string, Record<string, number>> };
+  const { data: existing } = await sb.from("tournament_match_player_stats").select("team_player_id, is_mom").eq("match_id", row.match_id);
+  const mom = new Set(((existing ?? []) as { team_player_id: string; is_mom: boolean }[]).filter((x) => x.is_mom).map((x) => x.team_player_id));
+  const stats = [...row.context.sides.a.players, ...row.context.sides.b.players]
+    .map((p) => {
+      const raw = state.players?.[p.id] ?? {};
+      return { team_player_id: p.id, goals: raw.goals ?? 0, assists: raw.assists ?? 0, yellow_cards: raw.yellowCards ?? 0, red_card: (raw.redCards ?? 0) > 0, is_mom: mom.has(p.id) };
+    })
+    .filter((x) => x.goals || x.assists || x.yellow_cards || x.red_card || x.is_mom);
+  if (!stats.length) return null;
+  const { error } = await sb.rpc("record_match_player_stats", { p_match_id: row.match_id, p_stats: stats });
+  return error ? `The result was saved, but the player stats could not be: ${friendlyTournamentError(error.message)}` : null;
 }
 
 // ── POST /matches/:id/events (and start, pause, resume, complete) ──

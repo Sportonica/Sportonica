@@ -13,7 +13,7 @@ export const SIDES: readonly Side[] = ["a", "b"];
 export const otherSide = (s: Side): Side => (s === "a" ? "b" : "a");
 export const isSide = (v: unknown): v is Side => v === "a" || v === "b";
 
-export const SPORT_KEYS = ["basketball", "pickleball", "cricket", "volleyball", "badminton", "swimming", "tennis"] as const;
+export const SPORT_KEYS = ["basketball", "pickleball", "cricket", "volleyball", "badminton", "swimming", "tennis", "football"] as const;
 export type SportKey = (typeof SPORT_KEYS)[number];
 
 export const CONTEST_STATUS = ["scheduled", "live", "paused", "completed", "abandoned", "postponed", "cancelled"] as const;
@@ -194,6 +194,8 @@ export interface MirrorScore {
   scoreA: number;
   scoreB: number;
   cricket?: { wicketsA: number | null; wicketsB: number | null; oversA: number | null; oversB: number | null; target: number | null };
+  // football: the fixture keeps regular time, extra-time goals and the shootout apart
+  football?: { regularA: number; regularB: number; extraA: number | null; extraB: number | null; pensA: number | null; pensB: number | null };
 }
 
 export class RulesError extends Error {}
@@ -234,6 +236,8 @@ export interface SportIntelligenceEngine<R = any, S = any> {
   eventLabel?(state: S, ev: EngineEvent, rules: R): string | null;
   /** A one-line description of an event for the timeline. */
   describeEvent(ev: EngineEvent, ctx: MatchContext, rules: R): string;
+  /** Plain-language observations from the match, for sports whose analytics do not include them. */
+  insights?(state: S, ctx: MatchContext, rules: R): string[];
   /** "How scoring works": the competition's rules in plain words. */
   rulesGuide?(rules: R): GuideSection[];
   /** Answer a plain-language question about the match from its state; never invents a figure. */
