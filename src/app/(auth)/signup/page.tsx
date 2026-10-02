@@ -116,7 +116,7 @@ function SignupInner() {
     if (password !== confirm) { setErr("Those passwords don't match."); return; }
     if (!agreed) {
       setConsentErr(true);
-      setErr("Please agree to the Terms and conditions and Privacy policy to continue.");
+      setErr("Please confirm you're 18 or older and agree to the Terms and conditions and Privacy policy to continue.");
       return;
     }
 
@@ -259,7 +259,7 @@ function SignupInner() {
             guard={() => {
               if (!agreed) {
                 setConsentErr(true);
-                setErr("Please agree to the Terms and conditions and Privacy policy to continue.");
+                setErr("Please confirm you're 18 or older and agree to the Terms and conditions and Privacy policy to continue.");
                 return false;
               }
               return true;
@@ -272,7 +272,7 @@ function SignupInner() {
             guard={() => {
               if (!agreed) {
                 setConsentErr(true);
-                setErr("Please agree to the Terms and conditions and Privacy policy to continue.");
+                setErr("Please confirm you're 18 or older and agree to the Terms and conditions and Privacy policy to continue.");
                 return false;
               }
               return true;
