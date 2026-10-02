@@ -3,9 +3,8 @@
 -- AUTH_MIDDLEWARE §6, 2026-09-30)
 --
 --  1. squad_members — a group creator could add ANY user to their group
---     without that user agreeing. Now a creator can only add someone
---     directly if the two are already friends; anyone else joins by
---     themselves, through an invite link, or by a join request.
+--     without that user agreeing. Fixed separately by squad_invites.sql:
+--     the owner sends an invite and the player joins only by accepting it.
 --
 --  2. squad_polls — a poll's creator could move their poll into another
 --     group (rewrite squad_id). The group and creator are now fixed.
@@ -34,32 +33,9 @@
 --
 -- Like the earlier write guards, the triggers only restrict direct API
 -- writes (current_user = authenticated / anon). SECURITY DEFINER functions
--- and triggers (game groups, join-request approval, invite links) run as
+-- and triggers (game groups, join-request approval, invites) run as
 -- the owner and are unaffected. Safe to re-run.
 -- ================================================================
-
--- ── 1. group members: no adding strangers ───────────────────────
-create or replace function public.guard_squad_member_insert()
-returns trigger language plpgsql set search_path = public as $$
-begin
-  if current_user in ('authenticated', 'anon')
-     and new.user_id is distinct from auth.uid() then
-    if not exists (
-      select 1 from public.friend_requests f
-      where f.status = 'accepted'
-        and ((f.requester_id = auth.uid() and f.addressee_id = new.user_id)
-          or (f.requester_id = new.user_id and f.addressee_id = auth.uid()))
-    ) then
-      raise exception 'SQUAD_ADD_FRIENDS_ONLY';
-    end if;
-  end if;
-  return new;
-end;
-$$;
-drop trigger if exists guard_squad_member_insert on public.squad_members;
-create trigger guard_squad_member_insert
-  before insert on public.squad_members
-  for each row execute function public.guard_squad_member_insert();
 
 -- ── 2. polls: can't be moved to another group ───────────────────
 create or replace function public.guard_squad_poll_update()
