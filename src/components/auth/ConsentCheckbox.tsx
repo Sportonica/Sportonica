@@ -10,7 +10,7 @@ export default function ConsentCheckbox({
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span className="auth-consent-box" aria-hidden />
       <span className="auth-consent-text">
-        By signing up you agree to our{" "}
+        I&apos;m 18 or older and I agree to the{" "}
         <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms and conditions</Link>{" "}
         and{" "}
         <Link href="/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</Link>.
