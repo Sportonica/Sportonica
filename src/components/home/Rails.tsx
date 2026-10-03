@@ -288,7 +288,7 @@ export function LiveMatchToast({ m }: { m: RailMatch }) {
         </span>
         <small>{m.tournamentName} · {m.roundLabel}</small>
       </span>
-      <ChevronRight size={16} className="rc-toast-go" />
+      <ChevronRight size={14} className="rc-toast-go" />
     </Link>
   );
 }

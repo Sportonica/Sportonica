@@ -264,8 +264,8 @@
 
 /* Hero live-match notification (LiveMatchToast). */
 .rc-toast {
-  display: flex; align-items: center; gap: 12px; max-width: min(100%, 380px);
-  padding: 10px 12px 10px 10px; border-radius: 16px; text-decoration: none;
+  display: flex; align-items: center; gap: 10px; max-width: min(100%, 320px);
+  padding: 7px 10px 7px 7px; border-radius: 13px; text-decoration: none;
   font-family: 'Inter', sans-serif; color: #fff;
   background: rgba(20,23,30,0.72); border: 1px solid rgba(255,255,255,0.14);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
@@ -280,15 +280,15 @@
 }
 .rc-toast-live {
   display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-  font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-  color: #fff; background: rgba(229,72,77,0.92); padding: 5px 8px; border-radius: 999px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #fff; background: rgba(229,72,77,0.92); padding: 4px 7px; border-radius: 999px;
 }
 .rc-toast-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.rc-toast-score { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: 13.5px; font-weight: 700; }
-.rc-toast-score b { flex-shrink: 0; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rc-toast-score { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 12px; font-weight: 700; }
+.rc-toast-score b { flex-shrink: 0; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .rc-toast-team { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rc-toast-body small {
-  font-size: 11px; font-weight: 600; opacity: 0.6;
+  font-size: 10px; font-weight: 600; opacity: 0.6;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .rc-toast-go { flex-shrink: 0; opacity: 0.55; }
