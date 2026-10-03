@@ -292,13 +292,14 @@
 }
 
 .auth-alt { margin-top: 22px; font-size: 13.5px; color: var(--dim); text-align: center; }
-.auth-alt a {
+.auth-alt a, .auth-alt .auth-link-btn {
   color: var(--sodium-2); text-decoration: none; font-weight: 700;
   background-image: linear-gradient(currentColor, currentColor);
   background-size: 0% 1px; background-repeat: no-repeat; background-position: 0 100%;
   transition: background-size 0.3s ease;
 }
-.auth-alt a:hover { background-size: 100% 1px; }
+.auth-alt a:hover, .auth-alt .auth-link-btn:hover { background-size: 100% 1px; }
+.auth-alt .auth-link-btn { border: 0; padding: 0; background-color: transparent; font: inherit; font-weight: 700; cursor: pointer; }
 
 .auth-consent {
   display: flex; align-items: flex-start; gap: 10px;
