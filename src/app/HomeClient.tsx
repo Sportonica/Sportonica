@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import { MapPin, ArrowRight, ChevronDown } from "lucide-react";
-import { EventsRail, VenuesRail, GamesRail, MatchesRail, MatchCard } from "@/components/home/Rails";
+import { EventsRail, VenuesRail, GamesRail, MatchesRail, LiveMatchToast } from "@/components/home/Rails";
 import "@/components/home/rails.css";
 import type { getHomeRails } from "@/lib/play/homeRails";
 import { useCity, inCity } from "@/lib/city";
@@ -332,9 +332,6 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
               </div>
 
               <div className="p-hero-aside">
-                {/* The ongoing match, only while one is live (the most
-                    recently started if several are). Nothing otherwise. */}
-                {liveMatch && <MatchCard m={liveMatch} />}
                 <button className="p-book"
                   onClick={() => window.dispatchEvent(new Event("open-nearby"))}>
                   <span className="p-book-in">
@@ -346,6 +343,9 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
                     <span className="p-book-go"><ArrowRight size={16} /></span>
                   </span>
                 </button>
+                {/* The ongoing match as a live notification, only while one is live (the most
+                    recently started if several are). Nothing otherwise. */}
+                {liveMatch && <LiveMatchToast m={liveMatch} />}
               </div>
             </div>
 
