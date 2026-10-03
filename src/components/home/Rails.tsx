@@ -266,6 +266,33 @@ export function MatchCard({ m }: { m: RailMatch }) {
   );
 }
 
+// The hero's live match as a slim notification rather than a full card:
+// live dot, both teams and the running score on one line, tap through to
+// the match. MatchCard stays the rail's card further down the page.
+export function LiveMatchToast({ m }: { m: RailMatch }) {
+  const intel = m.intel;
+  const a = intel ? intel.a || "0" : m.scoreA ?? 0;
+  const b = intel ? intel.b || "0" : m.scoreB ?? 0;
+  return (
+    <Link
+      href={intel ? `/tournaments/${m.tournamentId}/live/${intel.contestId}` : `/tournaments/${m.tournamentId}`}
+      className="rc-toast"
+      aria-label={`Live: ${m.teamA.name} ${a}, ${m.teamB.name} ${b}. ${m.tournamentName}`}
+    >
+      <span className="rc-toast-live"><i className="rc-live-dot" />Live</span>
+      <span className="rc-toast-body">
+        <span className="rc-toast-score">
+          <span className="rc-toast-team">{m.teamA.name}</span>
+          <b>{a} – {b}</b>
+          <span className="rc-toast-team">{m.teamB.name}</span>
+        </span>
+        <small>{m.tournamentName} · {m.roundLabel}</small>
+      </span>
+      <ChevronRight size={16} className="rc-toast-go" />
+    </Link>
+  );
+}
+
 export function MatchesRail({ matches }: { matches: RailMatch[] }) {
   if (matches.length === 0) return null;
   return (

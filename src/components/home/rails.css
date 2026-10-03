@@ -262,6 +262,42 @@
   50% { opacity: 0.4; transform: scale(0.7); }
 }
 
+/* Hero live-match notification (LiveMatchToast). */
+.rc-toast {
+  display: flex; align-items: center; gap: 12px; max-width: min(100%, 380px);
+  padding: 10px 12px 10px 10px; border-radius: 16px; text-decoration: none;
+  font-family: 'Inter', sans-serif; color: #fff;
+  background: rgba(20,23,30,0.72); border: 1px solid rgba(255,255,255,0.14);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 30px -14px rgba(0,0,0,0.55);
+  animation: rcToastIn .45s cubic-bezier(.22,1,.36,1) both;
+  transition: transform .25s cubic-bezier(.22,1,.36,1);
+}
+.rc-toast:hover { transform: translateY(-2px); }
+[data-theme="paper"] .rc-toast {
+  color: #14171E; background: rgba(255,255,255,0.78); border-color: rgba(20,23,30,0.1);
+  box-shadow: 0 12px 30px -16px rgba(20,23,30,0.35);
+}
+.rc-toast-live {
+  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
+  font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  color: #fff; background: rgba(229,72,77,0.92); padding: 5px 8px; border-radius: 999px;
+}
+.rc-toast-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rc-toast-score { display: flex; align-items: baseline; gap: 7px; min-width: 0; font-size: 13.5px; font-weight: 700; }
+.rc-toast-score b { flex-shrink: 0; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rc-toast-team { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rc-toast-body small {
+  font-size: 11px; font-weight: 600; opacity: 0.6;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rc-toast-go { flex-shrink: 0; opacity: 0.55; }
+@keyframes rcToastIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .rc-toast { animation: none; } }
+
 .rc-match-foot {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
   margin-top: 18px; padding-top: 13px; border-top: 1px solid rgba(255,255,255,0.12);
