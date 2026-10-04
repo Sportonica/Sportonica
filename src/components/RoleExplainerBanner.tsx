@@ -6,7 +6,7 @@ import { X } from "lucide-react";
 // One-time, dismissible orientation banner for a role's dashboard —
 // localStorage-only (per device/browser, not synced). Reads the initial
 // dismissed state via useSyncExternalStore rather than a setState-in-effect
-// (same pattern as PageTransition.tsx): the stored value never changes
+// (a no-op subscribe): the stored value never changes
 // externally while mounted, so subscribe is a no-op — this purely reads a
 // value that legitimately differs between server (always "not dismissed",
 // no window) and client, without a hydration-mismatch flash. The dismiss

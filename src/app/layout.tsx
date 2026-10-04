@@ -4,7 +4,6 @@ import NavWrapper from '@/components/NavWrapper'
 import PWARegister from '@/components/PWARegister'
 import CapacitorBridge from '@/components/CapacitorBridge'
 import PushBridge from '@/components/PushBridge'
-import PageTransition from '@/components/PageTransition'
 import Onboarding from '@/components/onboarding/Onboarding'
 
 // Every page is rendered per request, never prerendered: the
@@ -69,9 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         <a href="#main-content" className="skip-link">Skip to content</a>
         <NavWrapper />
-        <PageTransition>
-          <main id="main-content" tabIndex={-1}>{children}</main>
-        </PageTransition>
+        <main id="main-content" tabIndex={-1}>{children}</main>
         <PWARegister />
         <CapacitorBridge />
         <PushBridge />
