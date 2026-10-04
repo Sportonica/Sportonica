@@ -50,6 +50,22 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "*.basemaps.cartocdn.com" },
     ],
   },
+  // sportonica.com -> www, except /.well-known/: Android App Links (and
+  // Apple's association file) must be fetched from the exact host with
+  // no redirect, or verification fails, and on Android 11 and older one
+  // failing host means the app never opens sportonica.com links at all.
+  // Needs the apex domain in Vercel set to serve this deployment, not to
+  // redirect at the domain level (that redirect runs before this does).
+  async redirects() {
+    return [
+      {
+        source: "/:path((?!\\.well-known/).*)",
+        has: [{ type: "host", value: "sportonica.com" }],
+        destination: "https://www.sportonica.com/:path",
+        permanent: true,
+      },
+    ];
+  },
   // apple-app-site-association has no file extension, so Next's static
   // file serving guesses application/octet-stream — iOS is lenient about
   // this over HTTPS, but serving the right content type removes any doubt
