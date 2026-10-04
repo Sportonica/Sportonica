@@ -5,8 +5,9 @@
       "namespace": "android_app",
       "package_name": "com.sportonica.app",
       "sha256_cert_fingerprints": [
-        "4B:DA:AA:AD:63:31:57:DF:97:89:3B:44:56:0E:9D:E1:4C:C5:21:4A:92:EB:57:2A:E4:B3:03:C1:EC:1F:E5:66",
-        "REPLACE_WITH_YOUR_PRODUCTION_SIGNING_CERT_SHA256_FINGERPRINT"
+        "C8:05:B0:C2:E9:96:87:A2:79:8C:4B:9C:6C:64:9E:EA:D0:54:F0:42:CF:C8:3B:6E:E6:85:2F:02:66:45:1B:E5",
+        "98:D2:B9:E6:7B:8E:3C:17:7F:5E:4C:83:35:6B:C7:E5:7D:D7:95:13:11:88:48:C3:AD:F8:BE:8A:51:63:77:37",
+        "4B:DA:AA:AD:63:31:57:DF:97:89:3B:44:56:0E:9D:E1:4C:C5:21:4A:92:EB:57:2A:E4:B3:03:C1:EC:1F:E5:66"
       ]
     }
   }
