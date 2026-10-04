@@ -22,6 +22,7 @@ import { safeRedirect } from "@/lib/validation/redirect";
 import { signUpWithPhone } from "@/lib/auth/actions";
 import { isActionError } from "@/lib/actionError";
 import { useCaptcha, CAPTCHA_FAILED } from "@/lib/captcha/useCaptcha";
+import { CONSENT_VERSION, SIGNUP_CONSENT_COOKIE } from "@/lib/auth/consent";
 
 type Role = "player" | "venue_owner";
 
@@ -90,7 +91,7 @@ function SignupInner() {
     const signupToken = await captchaToken();
     if (signupToken === null) { setErr(CAPTCHA_FAILED); setLoading(false); return; }
     const res = await signUpWithPhone({
-      name: name.trim(), phone: id, password, role, captchaToken: signupToken, code: withCode,
+      name: name.trim(), phone: id, password, role, captchaToken: signupToken, code: withCode, consented: agreed,
     });
     if (isActionError(res)) { setErr(res.message); setLoading(false); return; }
     if ("codeSent" in res) {
@@ -134,7 +135,7 @@ function SignupInner() {
     const { data, error } = await sb.auth.signUp({
       email: normalizeEmail(id),
       password,
-      options: { data: { full_name: name.trim(), role }, captchaToken: token },
+      options: { data: { full_name: name.trim(), role, signup_consent: CONSENT_VERSION }, captchaToken: token },
     });
     if (error) { setErr(friendlySignupError(error.message)); setLoading(false); return; }
     if (!data.session) {
@@ -143,6 +144,18 @@ function SignupInner() {
       return;
     }
     afterAuth();
+  }
+
+  // Google/Apple can't carry the ticked box through the OAuth round trip,
+  // so leave a short-lived note for /consent to save it without asking again.
+  function oauthGuard() {
+    if (!agreed) {
+      setConsentErr(true);
+      setErr("Please confirm you're 18 or older and agree to the Terms and conditions and Privacy policy to continue.");
+      return false;
+    }
+    document.cookie = `${SIGNUP_CONSENT_COOKIE}=${CONSENT_VERSION}; Max-Age=900; Path=/; SameSite=Lax; Secure`;
+    return true;
   }
 
   return (
@@ -256,27 +269,13 @@ function SignupInner() {
           <GoogleButton
             next={safeRedirect(redirect)}
             label="Sign up with Google"
-            guard={() => {
-              if (!agreed) {
-                setConsentErr(true);
-                setErr("Please confirm you're 18 or older and agree to the Terms and conditions and Privacy policy to continue.");
-                return false;
-              }
-              return true;
-            }}
+            guard={oauthGuard}
           />
           <div style={{ height: 10 }} />
           <AppleButton
             next={safeRedirect(redirect)}
             label="Sign up with Apple"
-            guard={() => {
-              if (!agreed) {
-                setConsentErr(true);
-                setErr("Please confirm you're 18 or older and agree to the Terms and conditions and Privacy policy to continue.");
-                return false;
-              }
-              return true;
-            }}
+            guard={oauthGuard}
           />
 
           <div className="auth-alt">
