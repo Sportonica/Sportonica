@@ -40,11 +40,9 @@ html { scroll-behavior: smooth; }
 /* ── Native app only (class set by CapacitorBridge.tsx) — kill every
    tell that this is a wrapped website, not a "real" app. Left off the
    plain website so normal browser behavior (text selection, copy on
-   long-press, momentum bounce) is untouched there. ── */
-html.capacitor-native,
-html.capacitor-native body {
-  overscroll-behavior: none;
-}
+   long-press) is untouched there. No overscroll-behavior on html/body:
+   on real Android devices (Samsung A22, Redmi Note 9) it left the app's
+   WebView unable to scroll at all, while Chrome was fine. ── */
 html.capacitor-native * {
   -webkit-tap-highlight-color: transparent;
 }
