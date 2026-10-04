@@ -486,6 +486,10 @@ export default function AppHeader() {
         .ah-sheet {
           width:100%; max-width:440px; border-radius:24px; padding:28px;
           background:#12151b; border:1px solid rgba(242,237,230,.12);
+          /* The city grid is taller than short phone screens — scroll inside
+             the sheet so the heading and "Skip for now" stay reachable. */
+          max-height:100%; overflow-y:auto; overscroll-behavior:contain;
+          -webkit-overflow-scrolling:touch;
         }
         [data-theme="paper"] .ah-sheet { background:#F8F5F0; border-color:rgba(20,23,30,.12); }
         .ah-namaste { font-size:22px; color:#006241; margin:0 0 8px; font-weight:600; }
