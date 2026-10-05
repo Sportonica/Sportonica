@@ -56,12 +56,14 @@ const nextConfig: NextConfig = {
   // failing host means the app never opens sportonica.com links at all.
   // Needs the apex domain in Vercel set to serve this deployment, not to
   // redirect at the domain level (that redirect runs before this does).
-  // The Android tester invite (a static page in /public) at a clean URL.
+  // The Android early-access invite (a static page in /public) at a clean URL.
   async rewrites() {
-    return [{ source: "/testers", destination: "/testers.html" }];
+    return [{ source: "/early-access", destination: "/early-access.html" }];
   },
   async redirects() {
     return [
+      // Its first address — already shared on WhatsApp.
+      { source: "/testers", destination: "/early-access", permanent: true },
       {
         source: "/:path((?!\\.well-known/).*)",
         has: [{ type: "host", value: "sportonica.com" }],
