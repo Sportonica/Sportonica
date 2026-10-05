@@ -3,7 +3,7 @@ import { getTournament, getDisplayVenueName } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS } from "@/lib/tournaments/types";
 import { sportColor } from "@/lib/sports";
-import { storageImageUrl } from "@/lib/security/storageImage";
+import { satoriImageSrc } from "@/lib/og/satoriImage";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -39,7 +39,7 @@ export default async function OG({ params }: { params: Promise<{ id: string }> }
   // hold a bare filename like "logo.png" that Satori's <img> then rejects
   // outright ("Image source must be an absolute URL") and 500s the route.
   // Only our own storage: this route fetches the image server-side (SSRF).
-  const safeBanner = storageImageUrl(tournament.banner_url, "tournament-banners");
+  const safeBanner = await satoriImageSrc(tournament.banner_url, "tournament-banners");
 
   return new ImageResponse(
     (

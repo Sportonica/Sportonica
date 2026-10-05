@@ -3,7 +3,8 @@
 // server, and avatar_url / banner_url are user-editable, so anything
 // outside our own public storage would let a user point the server at an
 // internal address (SSRF) — e.g. the Lambda runtime API on 127.0.0.1.
-// Also restricted to formats Satori can decode.
+// Also restricted to image formats satoriImageSrc() (src/lib/og) can
+// hand to Satori — webp is converted to PNG there, Satori can't decode it.
 const DECODABLE = /\.(jpe?g|png|gif|webp)(\?.*)?$/i;
 
 export function storageImageUrl(
