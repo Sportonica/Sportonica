@@ -147,15 +147,19 @@ export async function allBookingsForPlatform() {
 export async function allUsersForPlatform() {
   const auth = await requireSuperAdmin();
   if (auth.error) return auth.error;
-  const { sb } = auth;
-  const [{ data }, anonIds] = await Promise.all([
-    sb
+  // profiles.city is column-hidden from `authenticated` (SEC-02b), so the
+  // user-scoped client errors on this select. Read through the service
+  // client — safe only because requireSuperAdmin() passed above.
+  const admin = createServiceClient();
+  const [{ data, error }, anonIds] = await Promise.all([
+    admin
       .from("profiles")
       .select("id, full_name, name, username, role, trust_score, city, is_public")
       .order("trust_score", { ascending: false })
       .limit(500),
     anonymousProfileIds(),
   ]);
+  if (error) return dbActionError(error);
   return (data ?? [])
     .filter((u) => !anonIds.has(u.id))
     .map((u) => ({
