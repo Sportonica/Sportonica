@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getProfileByUsernameAnon, getPlayerStatsAnon, trustLabel } from "@/lib/profile/queries";
-import { storageImageUrl } from "@/lib/security/storageImage";
+import { satoriImageSrc } from "@/lib/og/satoriImage";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -41,11 +41,11 @@ export default async function OG({ params }: { params: Promise<{ username: strin
   const trust = trustLabel(profile.trust_score ?? 50);
   const handle = `@${profile.username} · ${profile.city ?? "Kathmandu"}`;
 
-  // Satori can only decode jpeg/png/gif/webp — never avif/svg/heic.
-  // If the avatar isn't a safe format, fall back to the initial block.
+  // satoriImageSrc converts webp etc. to PNG; null (unsafe URL or
+  // undecodable image) falls back to the initial block.
   // Only our own storage: this route fetches the image server-side, and
   // avatar_url is user-editable (SSRF).
-  const safeAvatar = storageImageUrl(profile.avatar_url, "avatars");
+  const safeAvatar = await satoriImageSrc(profile.avatar_url, "avatars");
 
   return new ImageResponse(
     (

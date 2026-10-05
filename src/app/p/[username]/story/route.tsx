@@ -5,7 +5,7 @@ import {
   computeBadges, trustLabel,
 } from "@/lib/profile/queries";
 import { sportColor, normalizeSport } from "@/lib/sports";
-import { storageImageUrl } from "@/lib/security/storageImage";
+import { satoriImageSrc } from "@/lib/og/satoriImage";
 
 export const runtime = "nodejs";
 
@@ -45,7 +45,7 @@ export async function GET(
 
   // Only our own storage: this route fetches the image server-side, and
   // avatar_url is user-editable (SSRF).
-  const safeAvatar = storageImageUrl(profile.avatar_url, "avatars");
+  const safeAvatar = await satoriImageSrc(profile.avatar_url, "avatars");
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
   // Always dark-on-white regardless of card theme — a QR needs reliable
