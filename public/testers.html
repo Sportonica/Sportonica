@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Help test the Sportonica Android app before it launches on Google Play. Join the tester group, opt in, and install.">
+<meta property="og:title" content="Test the Sportonica Android app">
+<meta property="og:description" content="Join the tester group, opt in, and install it from Google Play. About 2 minutes.">
+<meta property="og:image" content="https://www.sportonica.com/icons/icon-512.png">
+<meta property="og:url" content="https://www.sportonica.com/testers">
+<meta name="theme-color" content="#004D2C">
+<link rel="icon" href="/icons/favicon-32.png">
+<title>Test the Sportonica app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;1,800;1,900&family=Noto+Sans+Devanagari:wght@700&display=swap">
+<style>
+/* Layout: a flat club poster in the brand's own two colours — white
+   sheet, logo on top, one solid green block for the ask. One typeface
+   (the logo's Montserrat). Motion, all CSS (the site CSP blocks inline
+   scripts): the runner sprints in with speed lines, the headline rises
+   line by line, steps follow in order, the green block wipes up and the
+   14 counts up like a scoreboard. Reduced motion = everything static. */
+:root{
+  --green:#004D2C;      /* logo green */
+  --green-2:#006241;
+  --green-tint:#EEF4F0;
+  --paper:#FFFFFF;
+  --ground:#E8EDE9;     /* page behind the poster */
+  --ink:#0E1A13;
+  --ink-2:#4A5A50;
+  --rule:#D6DED8;
+  --f:'Montserrat','Helvetica Neue',Arial,sans-serif;
+  --f-np:'Noto Sans Devanagari','Kohinoor Devanagari',sans-serif;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  color-scheme:light;
+}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;margin:0}
+body{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding-block:24px;padding-inline:16px;background:var(--ground);color:var(--ink);font-family:var(--f)}
+.poster{width:100%;max-width:420px;min-width:0;background:var(--paper);border-radius:6px;overflow:hidden}
+
+/* ── header: runner + wordmark ── */
+.head{padding:30px 26px 0;display:flex;align-items:center;gap:12px}
+.runner{position:relative;width:52px;height:52px;flex:none}
+.mark{position:relative;z-index:1;width:52px;height:52px;display:block}
+.speed{position:absolute;right:62%;top:50%;display:grid;gap:5px;transform:translateY(-55%)}
+.speed i{display:block;height:3px;border-radius:2px;background:var(--green-2);transform-origin:right center;opacity:0}
+.speed i:nth-child(1){width:22px;margin-left:8px}
+.speed i:nth-child(2){width:30px}
+.speed i:nth-child(3){width:16px;margin-left:14px}
+.word{display:flex;flex-direction:column;gap:3px}
+.word b{font-style:italic;font-weight:900;font-size:26px;line-height:1;letter-spacing:.005em;color:var(--green);text-transform:uppercase}
+.word span{font-style:italic;font-weight:800;font-size:10.5px;letter-spacing:.14em;color:var(--green);text-transform:uppercase}
+
+/* ── headline ── */
+.intro{padding:30px 26px 6px}
+/* Nepal's double-pennant flag in brand green — the one shape no other
+   app's page would have. */
+.origin{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.flag{width:19px;height:24px;flex:none;transform-origin:0 50%}
+.flag path{fill:var(--green-2)}
+.origin b{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--green-2)}
+.origin span{font-family:var(--f-np);font-size:14px;font-weight:700;color:var(--ink-2);padding-left:10px;border-left:1px solid var(--rule)}
+h1{font-style:italic;font-weight:900;font-size:clamp(30px,9.4vw,42px);line-height:1.04;letter-spacing:-.01em;color:var(--ink)}
+h1 .ln{display:block;overflow:hidden;padding-right:.12em}  /* italic overhang */
+h1 .ln>span{display:block}
+h1 em{color:var(--green-2);font-style:italic}
+.intro p{margin-top:12px;font-weight:500;font-size:15px;line-height:1.55;color:var(--ink-2);max-width:34ch}
+
+/* ── steps ── */
+.steps{list-style:none;padding:12px 14px 22px;margin:0}
+.steps li{position:relative}
+.steps li+li::before{content:"";position:absolute;left:12px;right:12px;top:0;border-top:1px solid var(--rule)}
+.steps a{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:16px 12px;border-radius:10px;
+  color:inherit;text-decoration:none;transition:background .2s var(--ease)}
+.steps a:hover,.steps a:active{background:var(--green-tint)}
+.steps a:focus-visible{outline:2px solid var(--green-2);outline-offset:2px}
+.n{font-style:italic;font-weight:900;font-size:34px;line-height:1;color:var(--green-2);transition:transform .25s var(--ease)}
+.steps a:hover .n{transform:scale(1.12) rotate(-4deg)}
+.t{min-width:0}
+.t strong{display:block;font-weight:700;font-size:16px}
+.t span{display:block;margin-top:3px;font-weight:500;font-size:13px;color:var(--ink-2)}
+.go{display:inline-flex;align-items:center;gap:5px;font-weight:700;font-size:13px;color:var(--green-2);white-space:nowrap}
+.go b{display:inline-block;font-weight:700;transition:transform .25s var(--ease)}
+.steps a:hover .go b{transform:translateX(4px)}
+
+/* ── the ask ── */
+.ask-wrap{position:relative;background:var(--green);color:var(--paper);overflow:hidden}
+.lanes{position:absolute;inset:0;pointer-events:none;opacity:.09;
+  background:repeating-linear-gradient(105deg,var(--paper) 0 2px,transparent 2px 38px)}
+.ask{position:relative;padding:22px 26px 24px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+.days{font-style:italic;font-weight:900;font-size:58px;line-height:.9;min-width:2.1ch}
+.days .num{counter-reset:d var(--d)}
+.days .num::after{content:counter(d)}
+.days small{display:block;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.ask p{min-width:0;font-weight:500;font-size:14px;line-height:1.5}
+.ask p strong{font-weight:700}
+.foot{position:relative;padding:0 26px 20px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 12px;font-size:12px;font-weight:600;color:rgba(255,255,255,.75)}
+.foot .mail{color:var(--paper);user-select:all}
+
+/* 14 as a registered integer so it can count up; browsers without
+   @property just show 14. */
+@property --d{syntax:'<integer>';inherits:false;initial-value:14}
+.days .num{--d:14}
+
+/* ── motion ── */
+@media (prefers-reduced-motion:no-preference){
+  .mark{animation:sprint .7s var(--ease) .1s both}
+  .speed i{animation:streak .9s var(--ease) both}
+  .speed i:nth-child(1){animation-delay:.25s}
+  .speed i:nth-child(2){animation-delay:.32s}
+  .speed i:nth-child(3){animation-delay:.4s}
+  .word{animation:fadeR .6s var(--ease) .35s both}
+
+  .origin{animation:fadeUp .5s var(--ease) .45s both}
+  .flag{animation:wave 3.2s ease-in-out 1s infinite}
+  h1 .ln>span{animation:rise .75s var(--ease) both}
+  h1 .ln:nth-child(1)>span{animation-delay:.5s}
+  h1 .ln:nth-child(2)>span{animation-delay:.6s}
+  h1 .ln:nth-child(3)>span{animation-delay:.7s}
+  .intro p{animation:fadeUp .6s var(--ease) .85s both}
+
+  .steps li{animation:fadeUp .55s var(--ease) both}
+  .steps li:nth-child(1){animation-delay:.95s}
+  .steps li:nth-child(2){animation-delay:1.05s}
+  .steps li:nth-child(3){animation-delay:1.15s}
+
+  .ask-wrap{animation:wipe .8s var(--ease) 1.2s both}
+  .lanes{animation:lanes 6s linear infinite}
+  .days .num{animation:count 1.1s steps(14,end) 1.6s both}
+  .ask p,.foot{animation:fadeUp .6s var(--ease) 1.7s both}
+}
+@keyframes sprint{from{transform:translateX(-46px) skewX(-14deg);opacity:0}60%{transform:translateX(4px) skewX(4deg);opacity:1}to{transform:none}}
+@keyframes streak{0%{opacity:0;transform:scaleX(0)}35%{opacity:.9;transform:scaleX(1)}100%{opacity:0;transform:scaleX(.2) translateX(-10px)}}
+@keyframes fadeR{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes rise{from{transform:translateY(105%)}to{transform:none}}
+@keyframes wipe{from{clip-path:inset(100% 0 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes lanes{to{background-position:39px 0}}
+@keyframes count{from{--d:0}to{--d:14}}
+@keyframes wave{0%,100%{transform:none}50%{transform:skewY(-6deg) scaleX(.94)}}
+</style>
+</head>
+<body>
+
+<main class="poster" aria-label="Sportonica Android tester invite">
+  <header class="head">
+    <div class="runner">
+      <span class="speed" aria-hidden="true"><i></i><i></i><i></i></span>
+      <img class="mark" src="/icons/mark.png" width="52" height="52" alt="Sportonica logo">
+    </div>
+    <div class="word"><b>Sportonica</b><span>Find · Book · Play</span></div>
+  </header>
+
+  <section class="intro">
+    <div class="origin">
+      <svg class="flag" viewBox="0 0 19 24" aria-hidden="true"><path d="M0 0 L17 11 H6 L17 24 H0 Z"/></svg>
+      <b>Made in Nepal</b>
+      <span lang="ne">सँगै खेलौं</span>
+    </div>
+    <h1>
+      <span class="ln"><span>Try our Android</span></span>
+      <span class="ln"><span>app <em>before</em></span></span>
+      <span class="ln"><span><em>anyone else.</em></span></span>
+    </h1>
+    <p>We're getting Sportonica ready for Google Play and need testers in Nepal. It takes about 2 minutes.</p>
+  </section>
+
+  <ol class="steps">
+    <li>
+      <a href="https://groups.google.com/g/sportonica-testers" target="_blank" rel="noopener">
+        <span class="n">1</span>
+        <span class="t"><strong>Join the tester group</strong><span>Use the Gmail account on your phone</span></span>
+        <span class="go">Join <b>→</b></span>
+      </a>
+    </li>
+    <li>
+      <a href="https://play.google.com/apps/testing/com.sportonica.app" target="_blank" rel="noopener">
+        <span class="n">2</span>
+        <span class="t"><strong>Become a tester</strong><span>Tap “Become a tester” on the page</span></span>
+        <span class="go">Open <b>→</b></span>
+      </a>
+    </li>
+    <li>
+      <a href="https://play.google.com/store/apps/details?id=com.sportonica.app" target="_blank" rel="noopener">
+        <span class="n">3</span>
+        <span class="t"><strong>Install the app</strong><span>From the Google Play Store</span></span>
+        <span class="go">Install <b>→</b></span>
+      </a>
+    </li>
+  </ol>
+
+  <div class="ask-wrap">
+    <div class="lanes" aria-hidden="true"></div>
+    <section class="ask">
+      <div class="days" role="img" aria-label="14 days"><span class="num" aria-hidden="true"></span><small aria-hidden="true">days</small></div>
+      <p><strong>Please keep it installed for 14 days</strong> and open it now and then. Google asks for this before an app can go public.</p>
+    </section>
+    <footer class="foot"><span>Questions or bugs?</span><span class="mail">info@sportonica.com</span></footer>
+  </div>
+</main>
+</body>
+</html>
