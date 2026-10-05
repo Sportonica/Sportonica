@@ -3,6 +3,7 @@ import { getTeamRoster, getTournament, getTournamentMatches, listTournamentTeams
 import { canScoreTournament, getScoringRules, listTournamentContests } from "@/lib/intelligence/actions";
 import { getEngine, sportKeyFor } from "@/lib/intelligence/registry";
 import { isActionError } from "@/lib/actionError";
+import { tournamentPath } from "@/lib/tournaments/types";
 import type { SportKey } from "@/lib/intelligence/core/types";
 import ScorerHub, { type HubTeam } from "@/components/intelligence/ScorerHub";
 
@@ -16,15 +17,17 @@ function guideFor(sport: SportKey, rules: Record<string, unknown> | null) {
 }
 
 export default async function ScorerHubPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const tournament = await getTournament(id);
+  const { id: segment } = await params;
+  const tournament = await getTournament(segment);
   if (isActionError(tournament) || !tournament) notFound();
+  if (tournament.slug && segment !== tournament.slug) redirect(`${tournamentPath(tournament)}/score`);
+  const id = tournament.id;
   // If the tables are missing, say so rather than bouncing the organizer away.
   const probe = await listTournamentContests(id);
   if (isActionError(probe) && probe.message.includes("db/sports_intelligence.sql")) {
     return <div className="play"><div className="play-wrap" style={{ maxWidth: 720, padding: 24 }}><h1>Live scoring</h1><p>{probe.message}</p></div></div>;
   }
-  if (!(await canScoreTournament(id))) redirect(`/tournaments/${id}`);
+  if (!(await canScoreTournament(id))) redirect(tournamentPath(tournament));
 
   const sport = sportKeyFor(tournament.sport);
   const [matches, teamsRes, contests, rules] = await Promise.all([

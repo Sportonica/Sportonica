@@ -43,11 +43,19 @@ export async function getMyVendorTournaments(): Promise<Tournament[] | ActionErr
 // export purely so /platform call sites read clearly.
 export const listAllTournaments = getMyVendorTournaments;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 // cache()-wrapped so generateMetadata() and the page body can both call
 // this for the same request without doubling the DB round trip.
-export const getTournament = cache(async function getTournament(id: string): Promise<Tournament | null | ActionError> {
+// Accepts the ID or the public slug (/tournaments/<segment>). Same
+// RLS-scoped client either way, so a slug never exposes a draft that the
+// ID wouldn't.
+export const getTournament = cache(async function getTournament(idOrSlug: string): Promise<Tournament | null | ActionError> {
+  const column = UUID_RE.test(idOrSlug) ? "id" : SLUG_RE.test(idOrSlug) && idOrSlug.length <= 120 ? "slug" : null;
+  if (!column) return null;
   const sb = await createClient();
-  const { data, error } = await sb.from("tournaments").select("*").eq("id", id).maybeSingle();
+  const { data, error } = await sb.from("tournaments").select("*").eq(column, idOrSlug).maybeSingle();
   if (error) return dbActionError(error);
   return data as Tournament | null;
 });

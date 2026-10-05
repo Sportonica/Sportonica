@@ -3,7 +3,7 @@ import QRCode from "qrcode";
 import { getTournament, getTournamentMatches, getTeamNames, getDisplayVenueName } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { sportColor } from "@/lib/sports";
-import { compareStageRound, type TournamentMatch } from "@/lib/tournaments/types";
+import { compareStageRound, tournamentPath, type TournamentMatch } from "@/lib/tournaments/types";
 
 export const runtime = "nodejs";
 
@@ -54,7 +54,7 @@ export async function GET(
   const tournament = await getTournament(id).catch(() => null);
   if (!date || !tournament || isActionError(tournament)) return errorCard();
 
-  const matchesRes = await getTournamentMatches(id);
+  const matchesRes = await getTournamentMatches(tournament.id);
   const allMatches = isActionError(matchesRes) ? [] : matchesRes;
   const dayMatches = allMatches
     .filter((m) => m.starts_at && dayKey(m.starts_at) === date)
@@ -111,7 +111,7 @@ export async function GET(
   };
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.sportonica.com";
-  const qrTarget = `${siteUrl}/tournaments/${tournament.id}?tab=fixtures`;
+  const qrTarget = `${siteUrl}${tournamentPath(tournament)}?tab=fixtures`;
   const qrDataUrl = await QRCode.toDataURL(qrTarget, {
     margin: 2, width: 400, errorCorrectionLevel: "M", color: { dark: "#0B0D11", light: "#FFFFFF" },
   });
