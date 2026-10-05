@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import QRCode from "qrcode";
 import { getTournament, getDisplayVenueName } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
-import { FORMAT_LABELS } from "@/lib/tournaments/types";
+import { FORMAT_LABELS, tournamentPath } from "@/lib/tournaments/types";
 import { sportColor } from "@/lib/sports";
 import { storageImageUrl } from "@/lib/security/storageImage";
 
@@ -62,7 +62,7 @@ export async function GET(
   // straight onto the Register tab (?tab=register) rather than the
   // Overview — the card literally says "scan to register".
   const canRegister = ["published", "registration_open", "registration_closed"].includes(tournament.status);
-  const qrTarget = `${siteUrl}/tournaments/${tournament.id}${canRegister ? "?tab=register" : ""}`;
+  const qrTarget = `${siteUrl}${tournamentPath(tournament)}${canRegister ? "?tab=register" : ""}`;
   // Always dark-on-white regardless of card theme — a QR needs reliable
   // contrast to scan, which the "glass" (dark) theme's own palette can't
   // guarantee, so it gets its own fixed-white tile instead of following C.

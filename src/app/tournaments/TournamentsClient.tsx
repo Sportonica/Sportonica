@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { MapPin, Star, Check, Trophy, Users } from "lucide-react";
 import type { TournamentBrowseItem } from "@/lib/play/tournaments";
+import { tournamentPath } from "@/lib/tournaments/types";
 import CardShareButton from "@/components/tournaments/CardShareButton";
 import "./tournament-cards.css";
 
@@ -83,7 +84,7 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
         ) : (
           <div className="tourn-grid">
             {shown.map((item) => {
-              const href = item.kind === "tournament" ? `/tournaments/${item.id}` : `/game/${item.id}`;
+              const href = item.kind === "tournament" ? tournamentPath(item) : `/game/${item.id}`;
               const completed = item.kind === "tournament" && item.completed;
               const live = item.kind === "tournament" && item.live;
               const day = live ? liveDay(item.when) : null;

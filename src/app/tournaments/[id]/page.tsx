@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ChevronLeft, Trophy } from "lucide-react";
@@ -8,7 +8,7 @@ import {
   getTournamentStandings, getTournamentPlayerStats, getTournamentAwards,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
-import { FORMAT_LABELS } from "@/lib/tournaments/types";
+import { FORMAT_LABELS, tournamentPath } from "@/lib/tournaments/types";
 import type { TournamentStanding } from "@/lib/tournaments/types";
 import { telHref } from "@/lib/playTogether/types";
 import { sportColor } from "@/lib/sports";
@@ -46,10 +46,15 @@ export default async function TournamentDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ tab?: string }>;
 }) {
-  const { id } = await params;
+  const { id: segment } = await params;
   const { tab: initialTab } = await searchParams;
-  const tournament = await getTournament(id);
+  const tournament = await getTournament(segment);
   if (isActionError(tournament) || !tournament) notFound();
+  // Old /tournaments/<uuid> links land on the name-based URL.
+  if (tournament.slug && segment !== tournament.slug) {
+    redirect(tournamentPath(tournament) + (initialTab ? `?tab=${encodeURIComponent(initialTab)}` : ""));
+  }
+  const id = tournament.id;
   const hasBanner = !!tournament.banner_url && /^https?:\/\//i.test(tournament.banner_url);
   // Draft/pending_approval tournaments are only visible to their vendor
   // or a super_admin (RLS) — getTournament() already enforces that, so
@@ -168,7 +173,7 @@ export default async function TournamentDetailPage({
           </div>
 
           <TournamentShareBar
-            id={tournament.id}
+            id={tournament.slug ?? tournament.id}
             name={tournament.name}
             accent={accent}
             canRegister={["published", "registration_open", "registration_closed"].includes(tournament.status)}
