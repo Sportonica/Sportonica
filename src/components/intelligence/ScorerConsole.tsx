@@ -24,7 +24,7 @@ import "./intelligence.css";
 interface Queued { type: string; payload: Record<string, unknown>; clientId: string; occurredAt: string }
 
 const newId = (): string => crypto.randomUUID();
-const LIFECYCLE = new Set(["MATCH_START", "MATCH_PAUSE", "MATCH_RESUME", "MATCH_POSTPONE", "MATCH_CANCEL", "MATCH_ABANDON", "MATCH_FORFEIT", "MATCH_RESTART", "MATCH_COMPLETE"]);
+const LIFECYCLE = new Set(["MATCH_START", "MATCH_PAUSE", "MATCH_RESUME", "MATCH_POSTPONE", "MATCH_CANCEL", "MATCH_ABANDON", "MATCH_FORFEIT", "MATCH_RESTART", "MATCH_COMPLETE", "MATCH_REOPEN"]);
 
 export default function ScorerConsole({ initial, tournamentName }: { initial: ContestView; tournamentName: string }) {
   const [contest, setContest] = useLiveContest(initial);
@@ -131,9 +131,9 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
     setQueue((q) => [...q, { type, payload, clientId: newId(), occurredAt: new Date().toISOString() }]);
   };
 
-  const withReason = (type: string, question: string, extra: Record<string, unknown> = {}) => {
+  const withReason = (type: string, question: string, extra: Record<string, unknown> = {}, required = false) => {
     const reason = window.prompt(question);
-    if (reason === null) return;
+    if (reason === null || (required && !reason.trim())) return;
     send(type, { ...extra, ...(reason.trim() ? { reason: reason.trim() } : {}) });
   };
 
@@ -218,7 +218,16 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
               : st === "paused" ? <div className="si-info">The match is paused. Resume it to keep scoring.</div>
               : st === "scheduled" ? <div className="si-info">Start the match to begin scoring.</div>
               : st === "postponed" ? <div className="si-info">This match is postponed. Start it when it is played.</div>
-              : <div className="si-info">This match is over. Events can still be corrected below; every correction is recorded.</div>}
+              : (
+                <div className="si-grid" style={{ gap: 8 }}>
+                  <div className="si-info">This match is over. Events can still be corrected below; every correction is recorded. To add something that was missed, reopen it.</div>
+                  {st === "completed" ? (
+                    <div className="si-row">
+                      <button type="button" className="si-btn" onClick={() => withReason("MATCH_REOPEN", "Why is the match being reopened? Its result stays on the fixture until you complete it again.", {}, true)}>Reopen to edit</button>
+                    </div>
+                  ) : null}
+                </div>
+              )}
 
             <details className="si-more">
               <summary>Postpone, cancel, abandon, forfeit, restart</summary>

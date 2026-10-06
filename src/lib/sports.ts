@@ -16,13 +16,19 @@ export interface Sport {
   tagline: string;
   /** a tournament team's default size: players on court plus bench substitutes */
   team?: { onCourt: number; substitutes: number };
+  /** roster positions offered as suggestions (free text is still accepted) */
+  positions?: { code: string; name: string }[];
 }
 
 export const SPORTS: Sport[] = [
   { name: "Futsal",     color: "#2E7D5B", squad: 5,  tagline: "Floodlit nights, fast feet" },
   { name: "Cricket",    color: "#f97316", squad: 8,  tagline: "Box cages after dark" },
   // a game roster is 12: five on court, seven substitutes on the bench
-  { name: "Basketball", color: "#A78BFA", squad: 5,  tagline: "Five a side, full court, all week", team: { onCourt: 5, substitutes: 7 } },
+  { name: "Basketball", color: "#A78BFA", squad: 5,  tagline: "Five a side, full court, all week", team: { onCourt: 5, substitutes: 7 },
+    positions: [
+      { code: "PG", name: "Point Guard" }, { code: "SG", name: "Shooting Guard" }, { code: "SF", name: "Small Forward" },
+      { code: "PF", name: "Power Forward" }, { code: "C", name: "Center" },
+    ] },
   { name: "Volleyball", color: "#3b82f6", squad: 6,  tagline: "Sand, net, sunset" },
   { name: "Badminton",  color: "#a855f7", squad: 2,  tagline: "Dawn doubles, indoor courts" },
   { name: "Tennis",     color: "#ec4899", squad: 2,  tagline: "Baseline rallies" },
@@ -46,6 +52,11 @@ export function sportColor(name: string | null | undefined): string {
 /** Default tournament team size for a sport, or null to keep the form's generic defaults. */
 export function sportTeamSize(name: string | null | undefined): { onCourt: number; substitutes: number } | null {
   return SPORTS.find((s) => s.name === name)?.team ?? null;
+}
+
+/** Roster position suggestions for a sport, or an empty list. */
+export function sportPositions(name: string | null | undefined): { code: string; name: string }[] {
+  return SPORTS.find((s) => s.name === name)?.positions ?? [];
 }
 
 export function sportSquad(name: string | null | undefined): number {

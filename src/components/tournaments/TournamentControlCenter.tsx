@@ -17,7 +17,7 @@ import {
   type Tournament, type TournamentTeam, type TournamentMatch, type TournamentAnnouncement, type WalkinMember,
   type TournamentManager, type TournamentTeamPlayer,
 } from "@/lib/tournaments/types";
-import { getSportKind } from "@/lib/sports";
+import { getSportKind, sportPositions } from "@/lib/sports";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import type { Payment } from "@/lib/payments/types";
 import TournamentForm from "./TournamentForm";
@@ -195,6 +195,12 @@ export default function TournamentControlCenter({
           {/* Event-based live scoring (basketball, cricket, volleyball ...). Futsal keeps the score entry in the Fixtures tab. */}
           {sportKeyFor(tournament.sport) && (
             <Link href={`/tournaments/${tournament.id}/score`} className="tc-btn primary" style={{ textDecoration: "none" }}>Live scoring</Link>
+          )}
+          {/* position suggestions for the roster inputs below (list="tc-positions"); any text is still accepted */}
+          {sportPositions(tournament.sport).length > 0 && (
+            <datalist id="tc-positions">
+              {sportPositions(tournament.sport).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}
+            </datalist>
           )}
           <span className={`tc-badge ${badgeClass(tournament.status)}`}>{STATUS_LABELS[tournament.status]}</span>
         </div>
@@ -721,7 +727,7 @@ function WalkinTeamModal({
               type="number" min={0} value={m.jerseyNumber ?? ""}
               onChange={(e) => updateMember(i, "jerseyNumber", e.target.value)} placeholder="Jersey #"
             />
-            <input value={m.position ?? ""} onChange={(e) => updateMember(i, "position", e.target.value)} placeholder="Position (optional)" />
+            <input list="tc-positions" value={m.position ?? ""} onChange={(e) => updateMember(i, "position", e.target.value)} placeholder="Position (optional)" />
             <button
               type="button" onClick={() => toggleCaptain(i)}
               aria-pressed={!!m.captain} aria-label={m.captain ? `Member ${i + 1} is captain` : `Make member ${i + 1} captain`}
@@ -1021,7 +1027,7 @@ function TeamRosterModal({ team, onClose, onChanged }: {
                       placeholder="Jersey #" style={{ ...modalInputStyle, width: 80 }}
                     />
                     <input
-                      value={editPosition} onChange={(e) => setEditPosition(e.target.value)}
+                      list="tc-positions" value={editPosition} onChange={(e) => setEditPosition(e.target.value)}
                       placeholder="Position (optional)" style={{ ...modalInputStyle, flex: 1, minWidth: 120 }}
                     />
                   </div>
@@ -1045,7 +1051,7 @@ function TeamRosterModal({ team, onClose, onChanged }: {
                     placeholder="#" style={{ ...modalInputStyle, width: 52, padding: "6px 7px", fontSize: 12.5 }}
                   />
                   <input
-                    aria-label={`${p.name}'s position`}
+                    aria-label={`${p.name}'s position`} list="tc-positions"
                     value={positionDrafts[p.id] ?? (p.position ?? "")}
                     onChange={(e) => setPositionDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))}
                     onBlur={(e) => savePosition(p.id, e.target.value, p.position)}

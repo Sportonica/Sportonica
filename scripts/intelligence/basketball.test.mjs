@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { basketballEngine as E, leadStats, scoringRunsOf, possessions, bonusFor, timeoutsLeft, comebacks, benchOf, eligibleOf } from "../../src/lib/intelligence/sports/basketball.ts";
+import { basketballEngine as E, leadStats, scoringRunsOf, possessions, bonusFor, timeoutsLeft, comebacks, benchOf, eligibleOf, substitutionsLeft } from "../../src/lib/intelligence/sports/basketball.ts";
+import { breakAfter } from "../../src/lib/intelligence/sports/basketball/rules.ts";
+import { clockReadings, clockText, parseClock, shotClockAfter } from "../../src/lib/intelligence/sports/basketball/clock.ts";
 import { GLOSSARY } from "../../src/lib/intelligence/sports/basketball/knowledge.ts";
 import { aggregate } from "../../src/lib/intelligence/aggregate.ts";
 import { reconstruct, effectiveEvents } from "../../src/lib/intelligence/core/engine.ts";
@@ -972,4 +974,172 @@ section("basketball: historical averages come from summed raw counters", () => {
   assert.equal(team.values.ppg, 11);
   assert.equal(team.values.defRating, 137.5);
   assert.equal(team.values.offRating, 157.1);
+});
+
+// ── the scorer's running clocks ────────────────────────────────────
+
+section("basketball: substitutions are unlimited unless the competition sets a limit", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START"); lineups(m); m.push("PERIOD_START");
+  assert.equal(substitutionsLeft(m.env.sport, "a", m.rules), null, "unlimited by default");
+  for (let i = 0; i < 6; i++) m.push("SUBSTITUTION", { side: "a", in: i % 2 ? "a5" : "a6", out: i % 2 ? "a6" : "a5" });
+
+  const capped = openMatch(E, ctx, { preset: "custom", substitutionsPerGame: 2 });
+  capped.push("MATCH_START"); lineups(capped); capped.push("PERIOD_START");
+  capped.push("SUBSTITUTION", { side: "a", in: "a6", out: "a1" });
+  capped.push("SUBSTITUTION", { side: "a", in: "a1", out: "a2" });
+  assert.equal(substitutionsLeft(capped.env.sport, "a", capped.rules), 0);
+  assert.equal(substitutionsLeft(capped.env.sport, "b", capped.rules), 2, "each team has its own allowance");
+  capped.refuses("SUBSTITUTION", { side: "a", in: "a2", out: "a3" }, /used all 2 substitutions/, "a third substitution");
+  capped.push("SUBSTITUTION", { side: "b", in: "b6", out: "b1" });
+  capped.assertReconstructs("substitution limit");
+  assert.throws(() => E.resolveRules({ substitutionsPerGame: -1 }), RulesError);
+});
+
+section("basketball: quarter breaks and half-time come from the competition", () => {
+  const fiba = E.resolveRules({});
+  assert.deepEqual(breakAfter(1, fiba), { minutes: 2, halftime: false });
+  assert.deepEqual(breakAfter(2, fiba), { minutes: 15, halftime: true });
+  assert.deepEqual(breakAfter(4, fiba), { minutes: 2, halftime: false }, "before overtime");
+  const ncaa = E.resolveRules({ preset: "ncaa" });
+  assert.equal(breakAfter(1, ncaa).halftime, true, "two halves: the first break is half-time");
+  const custom = E.resolveRules({ preset: "custom", halftimeMinutes: 10, quarterBreakMinutes: 1 });
+  assert.equal(breakAfter(2, custom).minutes, 10);
+  assert.equal(breakAfter(3, custom).minutes, 1);
+  // rules saved before these settings existed
+  const old = { ...fiba }; delete old.halftimeMinutes; delete old.quarterBreakMinutes;
+  assert.equal(breakAfter(2, old).minutes, 15);
+});
+
+section("basketball: the shot clock resets by rule after each event", () => {
+  const r = E.resolveRules({});
+  assert.equal(shotClockAfter("STEAL", { side: "a" }, 9, r), 24, "a steal starts a new possession");
+  assert.equal(shotClockAfter("REBOUND", { side: "a", offensive: false }, 3, r), 24);
+  assert.equal(shotClockAfter("REBOUND", { side: "a", offensive: true }, 3, r), 14, "offensive rebound: 14");
+  assert.equal(shotClockAfter("FOUL", { side: "b", kind: "personal" }, 9, r), 14, "defensive foul under 14: up to 14");
+  assert.equal(shotClockAfter("FOUL", { side: "b", kind: "personal" }, 20, r), 20, "defensive foul over 14: keeps running");
+  assert.equal(shotClockAfter("FOUL", { side: "a", kind: "offensive" }, 9, r), 24, "an offensive foul is a turnover");
+  assert.equal(shotClockAfter("FOUL", { side: "a", kind: "technical" }, 9, r), 9);
+  assert.equal(shotClockAfter("SHOT_MISSED", { side: "a", points: 2 }, 9, r), 9, "a miss runs on until the rebound");
+  assert.equal(shotClockAfter("SHOT_MADE", { side: "a", points: 2 }, 9, r), 24);
+  assert.equal(shotClockAfter("VIOLATION", { side: "b", kind: "kicked_ball" }, 5, r), 14);
+  assert.equal(shotClockAfter("VIOLATION", { side: "a", kind: "traveling" }, 5, r), 24);
+  assert.equal(shotClockAfter("TIMEOUT", { side: "a" }, 5, r), 5);
+  const ncaa = E.resolveRules({ preset: "ncaa" });
+  assert.equal(shotClockAfter("REBOUND", { side: "a", offensive: true }, 3, ncaa), 20);
+});
+
+section("basketball: clock readings the engine would refuse are left off", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START"); m.push("PERIOD_START");
+  const s = () => m.env.sport;
+  assert.deepEqual(clockReadings(s(), m.rules, "SHOT_MADE", { side: "a" }, 581.2, 17.4), { clock: 582, shotClock: 18 }, "rounded up, as a scoreboard shows");
+  m.push("SHOT_MADE", { side: "a", player: "a1", points: 2, clock: 582, shotClock: 18 });
+  assert.deepEqual(clockReadings(s(), m.rules, "SHOT_MADE", { side: "b" }, 590, 20), {}, "a clock set back past what was recorded");
+  assert.deepEqual(clockReadings(s(), m.rules, "SHOT_MADE", { side: "b" }, 15, 20), { clock: 15 }, "less game time than shot clock: the shot clock is off");
+  assert.deepEqual(clockReadings(s(), m.rules, "SHOT_MADE", { side: "b" }, null, 20), {}, "no clock running");
+  assert.deepEqual(clockReadings(s(), m.rules, "PERIOD_START", {}, 300, 20), {});
+  m.push("SHOT_MISSED", { side: "b", player: "b1", points: 2, clock: 570, shotClock: 14 });
+  // the scorer reset the shot clock by hand where the rules do not: the reading is dropped, not refused
+  assert.deepEqual(clockReadings(s(), m.rules, "TURNOVER", { side: "b", player: "b1" }, 565, 24), { clock: 565 });
+  const none = openMatch(E, ctx, { preset: "custom", shotClockSeconds: null });
+  none.push("MATCH_START"); none.push("PERIOD_START");
+  assert.deepEqual(clockReadings(none.env.sport, none.rules, "SHOT_MADE", { side: "a" }, 500, 20), { clock: 500 });
+});
+
+section("basketball: a game scored on the running clocks is never refused for a reading", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START"); lineups(m);
+  let game = 600, shot = 24;
+  const fire = (type, payload = {}) => {
+    m.push(type, { ...payload, ...clockReadings(m.env.sport, m.rules, type, payload, game, game < shot ? null : shot) });
+    shot = shotClockAfter(type, payload, shot, m.rules);
+  };
+  const run = (seconds) => { game = Math.max(0, game - seconds); shot = Math.max(0, shot - seconds); };
+  fire("PERIOD_START");
+  run(7.3); fire("SHOT_MADE", { side: "a", player: "a1", points: 2 });
+  run(11.8); fire("SHOT_MISSED", { side: "b", player: "b1", points: 3 });
+  run(1.1); fire("REBOUND", { side: "b", player: "b2", offensive: true });
+  run(4.6); fire("FOUL", { side: "a", player: "a2", kind: "personal" });
+  run(9.9); fire("TURNOVER", { side: "b", player: "b1" });
+  run(3); fire("STEAL", { side: "a", player: "a3" });
+  shot = 24; // the scorer pressed "Shot clock 24" on a kicked ball
+  run(2); fire("SHOT_MADE", { side: "a", player: "a3", points: 3 });
+  game = 590; // and set the game clock back up past what was already recorded
+  run(5); fire("SHOT_MADE", { side: "b", player: "b3", points: 2 });
+  run(30); fire("TIMEOUT", { side: "a" });
+  run(23.9); fire("SHOT_MADE", { side: "a", player: "a4", points: 2 });
+  run(520); fire("SHOT_MISSED", { side: "b", player: "b4", points: 2 });
+  run(6); fire("REBOUND", { side: "a", player: "a5", offensive: false });
+  run(20); fire("PERIOD_END");
+  assert.equal(m.env.sport.score.a, 7);
+  assert.ok(m.events.filter((e) => e.payload.clock !== undefined).length >= 10, "most events carry the clock");
+  m.assertReconstructs("running clocks");
+});
+
+section("basketball: clock text and typing a time", () => {
+  assert.equal(clockText(402), "6:42");
+  assert.equal(clockText(401.2), "6:42", "rounded up");
+  assert.equal(clockText(60), "1:00");
+  assert.equal(clockText(8.46), "8.4", "tenths in the last minute");
+  assert.equal(clockText(0), "0.0");
+  assert.equal(parseClock("6:42"), 402);
+  assert.equal(parseClock("42"), 42);
+  assert.equal(parseClock("8.4"), 8.4);
+  assert.equal(parseClock("6:75"), null);
+  assert.equal(parseClock("soon"), null);
+});
+
+
+// ── a game entered after the fact, and reopening a finished one ─────
+
+section("basketball: a box score entered after the game feeds the score, stats and result", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START");
+  m.push("BOX_SCORE", { side: "a", lines: [
+    { player: "a1", twos: 5, threes: 2, ftm: 3, fga: 14, tpa: 5, fta: 4, oreb: 2, dreb: 5, ast: 4, stl: 1, blk: 0, tov: 2, pf: 3 },
+    { player: "a2", twos: 3, ftm: 1, fga: 8, fta: 2, dreb: 6, pf: 5 },
+    { twos: 1 }, // points nobody was credited with
+  ], periods: [8, 7, 7, 6] });
+  m.refuses("BOX_SCORE", { side: "a", lines: [{ player: "a3", twos: 1 }] }, /already in. Correct it/, "a second box score for a side");
+  m.refuses("MATCH_COMPLETE", {}, /Enter Bravo's box score too/, "one side missing");
+  m.refuses("BOX_SCORE", { side: "b", lines: [{ player: "a3", twos: 1 }] }, /belong to that team/, "a player from the other team");
+  m.refuses("BOX_SCORE", { side: "b", lines: [{ player: "b1", twos: 2, fga: 1 }] }, /more field goals made than attempted/, "made more than attempted");
+  m.refuses("BOX_SCORE", { side: "b", lines: [{ player: "b1", twos: 2 }], periods: [1, 1, 1, 0] }, /add up to 3, but the players' points add up to 4/, "period scores that do not add up");
+  m.push("BOX_SCORE", { side: "b", lines: [{ player: "b1", twos: 7, threes: 4, ftm: 2 }] });
+  m.refuses("PERIOD_START", {}, /entered as a box score/, "play by play after a box score");
+  assert.deepEqual(m.env.sport.score, { a: 28, b: 28 });
+  m.refuses("MATCH_COMPLETE", {}, /cannot end level/, "a level box score");
+  const b = m.events.find((e) => e.type === "BOX_SCORE" && e.payload.side === "b");
+  m.correct("replace", b.id, "Missed a three on the sheet", "BOX_SCORE", { side: "b", lines: [{ player: "b1", twos: 7, threes: 5, ftm: 2 }] });
+  m.push("MATCH_COMPLETE");
+  assert.equal(m.env.result.winner, "b");
+  assert.equal(m.summary().view.periodLabel, "Box score");
+  const box = m.stats().players;
+  assert.equal(cell(box, "box", "a1", "pts"), 19);
+  assert.equal(cell(box, "box", "a1", "reb"), 7);
+  assert.equal(m.env.sport.out.a2, "fouled_out", "5 fouls in FIBA");
+  assert.ok(m.env.sport.attemptsUnknown, "b1's line left out attempts");
+  m.assertReconstructs("box score");
+});
+
+section("basketball: a finished match can be reopened to add what was missed", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START");
+  m.refuses("MATCH_REOPEN", {}, /Only a completed match/, "reopening a match in progress");
+  periods(m, 1);
+  m.push("PERIOD_START"); m.push(...made("a", "a1", 2)); m.push("PERIOD_END");
+  periods(m, 2);
+  m.push("MATCH_COMPLETE");
+  assert.equal(m.env.status, "completed");
+  m.refuses("SHOT_MADE", { side: "b", player: "b1", points: 3 }, /over/, "scoring a finished match");
+  m.push("MATCH_REOPEN", { reason: "A late three was not recorded" });
+  assert.equal(m.env.status, "live");
+  assert.equal(m.env.result, null);
+  m.refuses("PERIOD_START", {}, /only played when the score is level/, "no overtime at 2-0");
+  m.push("PERIOD_REOPEN");
+  m.push(...made("b", "b1", 3)); m.push("PERIOD_END");
+  m.push("MATCH_COMPLETE");
+  assert.equal(m.env.result.winner, "b");
+  m.assertReconstructs("reopened match");
 });

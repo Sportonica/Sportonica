@@ -31,6 +31,12 @@ export interface BasketballRules {
   shotClockSeconds: number | null;
   /** FIBA alternating-possession arrow for held balls (NBA uses a jump ball) */
   alternatingPossession: boolean;
+  /** the interval between quarters and before each overtime, for the scorer's break timer */
+  quarterBreakMinutes: number;
+  /** the interval at half-time */
+  halftimeMinutes: number;
+  /** substitutions each team may make in a game; null: unlimited (every standard rulebook) */
+  substitutionsPerGame: number | null;
 
   // ── scoring ──
   twoPointValue: number;
@@ -97,6 +103,7 @@ const FIBA: BasketballRules = {
   preset: "fiba",
   periods: 4, periodMinutes: 10, overtimeMinutes: 5, allowTie: false, playersOnCourt: 5, gameRosterSize: 12,
   shotClockSeconds: 24, alternatingPossession: true,
+  quarterBreakMinutes: 2, halftimeMinutes: 15, substitutionsPerGame: null,
   twoPointValue: 2, threePointValue: 3, freeThrowValue: 1, trackShotAttempts: true,
   foulLimit: 5, technicalsCountTowardFoulLimit: true,
   technicalEjectAt: 2, unsportsmanlikeEjectAt: 2, combinedEjectAt: 2,
@@ -153,12 +160,13 @@ export function resolveBasketballRules(input: unknown): BasketballRules {
   for (const k of ["periods", "periodMinutes", "overtimeMinutes", "twoPointValue", "threePointValue", "freeThrowValue", "foulLimit", "playersOnCourt", "gameRosterSize", "clutchMinutes"] as const) {
     if (!isPosInt(r[k])) throw new RulesError(`${k} must be a positive whole number`);
   }
-  for (const k of ["bonusFreeThrows", "technicalFreeThrows", "unsportsmanlikeFreeThrows", "bonusAfterFouls", "timeoutsFirstHalf", "timeoutsSecondHalf", "timeoutsPerOvertime", "clutchMargin", "standingsWinPoints", "standingsLossPoints", "standingsForfeitLossPoints"] as const) {
+  for (const k of ["quarterBreakMinutes", "halftimeMinutes", "bonusFreeThrows", "technicalFreeThrows", "unsportsmanlikeFreeThrows", "bonusAfterFouls", "timeoutsFirstHalf", "timeoutsSecondHalf", "timeoutsPerOvertime", "clutchMargin", "standingsWinPoints", "standingsLossPoints", "standingsForfeitLossPoints"] as const) {
     if (!isNonNegInt(r[k])) throw new RulesError(`${k} must be a whole number, 0 or more`);
   }
   for (const k of ["shotClockSeconds", "shotClockReset", "technicalEjectAt", "unsportsmanlikeEjectAt", "combinedEjectAt", "doubleBonusAfterFouls", "bonusAfterFoulsOvertime"] as const) {
     if (!nullableInt(r[k])) throw new RulesError(`${k} must be a positive whole number, or empty for none`);
   }
+  if (r.substitutionsPerGame !== null && !isNonNegInt(r.substitutionsPerGame)) throw new RulesError("substitutionsPerGame must be a whole number, or empty for unlimited");
   if (r.timeoutsPerGame !== null && !isNonNegInt(r.timeoutsPerGame)) throw new RulesError("timeoutsPerGame must be a whole number, or empty to allot timeouts by half");
   for (const k of ["allowTie", "alternatingPossession", "oneAndOne", "trackShotAttempts", "technicalsCountTowardFoulLimit", "offensiveFoulsAreTeamFouls", "technicalsAreTeamFouls"] as const) {
     if (typeof r[k] !== "boolean") throw new RulesError(`${k} must be yes or no`);
@@ -190,6 +198,15 @@ export const periodSeconds = (period: number, rules: BasketballRules): number =>
 export function periodName(period: number, rules: BasketballRules): string {
   if (period <= rules.periods) return rules.periods === 4 ? `Q${period}` : rules.periods === 2 ? `H${period}` : `P${period}`;
   return period - rules.periods === 1 ? "OT" : `OT${period - rules.periods}`;
+}
+
+/** Minutes of interval after `period` ends: half-time after the first half, a short break otherwise. */
+export function breakAfter(period: number, rules: BasketballRules): { minutes: number; halftime: boolean } {
+  const halftime = rules.periods > 1 && period === Math.ceil(rules.periods / 2) && !isOvertime(period, rules);
+  // rules saved before the break settings existed fall back to FIBA's
+  return halftime
+    ? { minutes: rules.halftimeMinutes ?? 15, halftime }
+    : { minutes: rules.quarterBreakMinutes ?? 2, halftime };
 }
 
 /** 1 or 2: which half of regulation a period belongs to (a single-period game is all first half). */

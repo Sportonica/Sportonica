@@ -292,7 +292,8 @@ No schema change was needed.
 ## Limitations
 
 - **Shot locations:** coordinates (`x`, `y`) are accepted and validated, but the scorer pad records zones by chip, not by tapping a court, and no coordinate shot chart is drawn yet. Zone distribution is charted.
-- **Shot clock:** values are recorded when the scorer sends them. There is no running shot clock on the device.
+- **Game and shot clocks:** they run on the scorer's device (kept in that browser, so a reload resumes them) and every event carries their readings. They stop on the whistle (timeout, foul, violation, out of bounds) and at zero; the shot clock resets by rule after each event (`basketball/clock.ts`). A reading the engine would refuse, such as a clock set back past what was already recorded, is left off the event instead of costing the scorer the tap. Viewers see the clock as of the last event, not a live countdown, and a second scoring device does not share the running clock.
+- **Breaks and substitutions:** `quarterBreakMinutes` and `halftimeMinutes` drive the scorer's break timer only. `substitutionsPerGame` (empty: unlimited) is enforced per team.
 - **Rules not modelled:** the NBA last-two-minutes bonus rule, FIBA's limit of two timeouts in the last two minutes, coach ejections, and per-foul free-throw counts beyond what the scorer records.
 - **Head-to-head tiebreak:** applied once to the whole tied group, not re-applied to each remaining subset as FIBA does for three or more teams.
 - **Tactics:** offensive and defensive schemes are explained in the glossary but never detected. There is no tracking or video data, so the engine does not claim them.

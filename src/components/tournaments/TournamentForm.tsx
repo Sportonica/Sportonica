@@ -669,7 +669,10 @@ export default function TournamentForm({
       <div className="ev-row">
         <div className="ev-field">
           <label>Gender rule (optional)</label>
-          <input value={genderRule} onChange={(e) => setGenderRule(e.target.value)} placeholder="Open, Men's, Women's…" />
+          <input list="tf-gender" value={genderRule} onChange={(e) => setGenderRule(e.target.value)} placeholder="Men, Women, Mixed, Open…" />
+          <datalist id="tf-gender">
+            <option value="Men" /><option value="Women" /><option value="Mixed" /><option value="Open" />
+          </datalist>
         </div>
         <div className="ev-field">
           <label>Skill category (optional)</label>
