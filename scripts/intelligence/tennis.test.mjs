@@ -170,7 +170,7 @@ section("tennis: Game IQ answers from the match and the competition's rules", ()
   point(m, "b", { how: "winner", player: "b1" });
   const ask = (q) => E.answerQuestion(m.env.sport, singles, m.rules, q);
   assert.match(ask("What is the score?").answer, /Alpha 0, Bravo 0 \(Set 1, Alpha serving\)/);
-  assert.match(ask("How many aces does Alpha 1 have?").answer, /Alpha 1: 1 aces/);
+  assert.match(ask("How many aces does Alpha 1 have?").answer, /Alpha 1: 1 ace\./);
   assert.equal(ask("Why did the score change?").answer, "Bravo won the point with a winner on return. 15-15.");
   assert.match(ask("What is a break point?").answer, /^Break point: /);
   assert.match(ask("How does a tiebreak work?").answer, /At 6-all a tiebreak to 7 points/);

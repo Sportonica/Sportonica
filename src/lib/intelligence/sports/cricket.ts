@@ -300,6 +300,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
 
   answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, CRICKET_KNOWLEDGE); },
   rulesGuide: (rules) => CRICKET_KNOWLEDGE.guide(rules),
+  insights: (s, ctx, rules) => CRICKET_KNOWLEDGE.insights!(s, ctx, rules),
 
   resolveRules(input) {
     const preset = (input && typeof input === "object" ? (input as { preset?: unknown }).preset : undefined) ?? "t20";

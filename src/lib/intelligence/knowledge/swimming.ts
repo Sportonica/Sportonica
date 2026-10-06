@@ -59,5 +59,40 @@ export const SWIMMING_KNOWLEDGE: SportKnowledge<SwimmingRules, SwimmingState> = 
     { title: "Starts", lines: [r.falseStartRule === "one_start" ? "One-start rule: a false start is a disqualification." : "Two-start rule: one warning to the field, then a false start is a disqualification."] },
     { title: "What the scorer records", lines: ["The start, each swimmer's reaction, splits and finish time.", "Disqualifications with the reason, and swimmers who did not start or finish."] },
   ],
+  insights: (s, _ctx, r) => swimmingInsights(s, r),
   suggestions: ["Who won?", "What was the fastest reaction?", "Who was disqualified?", "What is a split?", "How are places decided?"],
 };
+
+/** "What the data says" for one race, from the recorded times. */
+export function swimmingInsights(s: SwimmingState, r: SwimmingRules): string[] {
+  const out: string[] = [];
+  const lane = (n: number) => s.lanes[n];
+  const official = (ms: number) => Math.floor(ms / r.rankPrecisionMs) * r.rankPrecisionMs;
+  const finished = r.entries.filter((e) => lane(e.lane)?.status === "finished" && lane(e.lane).finalMs !== null)
+    .sort((x, y) => lane(x.lane).finalMs! - lane(y.lane).finalMs!);
+  if (finished[0]) {
+    const w = finished[0], wt = lane(w.lane).finalMs!;
+    const tied = finished.filter((e) => official(lane(e.lane).finalMs!) === official(wt));
+    if (tied.length > 1) out.push(`Dead heat for first: ${tied.map((e) => e.name).join(" and ")} in ${formatDuration(wt)}.`);
+    else {
+      out.push(`${w.name} won in ${formatDuration(wt)}.`);
+      const second = finished[1];
+      if (second) {
+        const gap = official(lane(second.lane).finalMs!) - official(wt);
+        out.push(gap <= 100 ? `A close finish: ${second.name} was ${formatDuration(gap)} behind.` : `${w.name} won by ${formatDuration(gap)} from ${second.name}.`);
+      }
+    }
+    // negative split: the second half faster than the first
+    const half = lane(w.lane).splits.find((x) => x.distance === r.distance / 2);
+    if (half && wt - half.timeMs < half.timeMs) out.push(`${w.name} swam a negative split: ${formatDuration(half.timeMs)} then ${formatDuration(wt - half.timeMs)}.`);
+  }
+  const reactions = r.entries.filter((e) => lane(e.lane)?.reactionMs != null).sort((x, y) => lane(x.lane).reactionMs! - lane(y.lane).reactionMs!);
+  if (reactions[0]) out.push(`Fastest reaction off the blocks: ${reactions[0].name} (${formatDuration(lane(reactions[0].lane).reactionMs!)}).`);
+  for (const e of r.entries) {
+    const l = lane(e.lane);
+    if (l?.status === "dq") out.push(`${e.name} was disqualified${l.dqReason ? `: ${l.dqReason}` : ""}.`);
+    if (l?.status === "dnf") out.push(`${e.name} did not finish.`);
+  }
+  if (s.falseStarts) out.push(`${s.falseStarts} false start${s.falseStarts === 1 ? "" : "s"} in this race.`);
+  return out;
+}

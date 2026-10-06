@@ -3,7 +3,7 @@
 import type { SportKnowledge } from "../core/ask";
 import { plural } from "../core/ask";
 import type { VolleyballRules, VolleyballState } from "../sports/volleyball";
-import { RALLY_STATS, rallyExplanations } from "./rally";
+import { RALLY_STATS, rallyExplanations, rallyInsights } from "./rally";
 
 const setRule = (r: VolleyballRules) =>
   `A set goes to the first team to ${r.setPoints} points with a ${r.winBy}-point lead${r.bestOf > 1 ? `; the deciding set ${r.bestOf} goes to ${r.decidingSetPoints}` : ""}${r.pointCap !== null ? `, capped at ${r.pointCap}` : ""}.`;
@@ -60,5 +60,9 @@ export const VOLLEYBALL_KNOWLEDGE: SportKnowledge<VolleyballRules, VolleyballSta
     { title: "Limits", lines: [`${r.playersOnCourt} players on court, ${plural(r.timeoutsPerSet, "timeout")} and ${plural(r.substitutionsPerSet, "substitution")} per team per set.`] },
     { title: "What the scorer records", lines: ["Who won each rally, and optionally how: ace, kill, block, service error, attack error, opponent error.", "Touches (attacks, digs, assists, receptions) for player statistics."] },
   ],
+  insights: (s, ctx) => rallyInsights(s.rallies, ctx, {
+    unit: "set", games: s.sets, won: s.setsWon, decided: s.decided, team: s.team,
+    counts: [["kills", "had more kills"], ["blocks", "won more points at the block"], ["aces", "served more aces"], ["serviceErrors", "made more service errors"], ["attackErrors", "made more attack errors"]],
+  }),
   suggestions: ["What is the score?", "Who has the most kills?", "How many points win a set?", "Why did the score change?", "What is a libero?"],
 };

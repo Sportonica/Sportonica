@@ -5,4 +5,4 @@
 import type { SportKey } from "./core/types";
 
 /** Sports whose engine answers questions about a match (answerQuestion). */
-export const SPORTS_WITH_QUESTIONS: readonly SportKey[] = ["basketball", "cricket", "volleyball", "badminton", "pickleball", "swimming", "tennis"];
+export const SPORTS_WITH_QUESTIONS: readonly SportKey[] = ["basketball", "cricket", "volleyball", "badminton", "pickleball", "swimming", "tennis", "football"];

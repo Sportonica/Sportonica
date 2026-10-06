@@ -72,7 +72,8 @@ export const TENNIS_KNOWLEDGE: SportKnowledge<TennisRules, TennisState> = {
     { re: /points? won|how many points/, key: "pointsWon", label: "points won" },
   ],
   explain: (s, ctx) => s.points.slice(-12).map((p): Explanation => {
-    const how = p.how && p.how !== "other" ? ` with ${HOW[p.how]}` : "";
+    const byLoser = p.how === "double_fault" || p.how === "forced_error" || p.how === "unforced_error";
+    const how = !p.how || p.how === "other" ? "" : byLoser ? ` from ${HOW[p.how]} by ${sideName(ctx, p.w === "a" ? "b" : "a")}` : ` with ${HOW[p.how]}`;
     const where = p.tiebreak ? "in the tiebreak" : p.breakPoint ? "on a break point" : "";
     return {
       kind: "score",
