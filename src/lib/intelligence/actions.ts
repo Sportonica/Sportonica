@@ -29,6 +29,8 @@ import { getEngine, isSportKey, listIntelligenceSportsSync, sportKeyFor } from "
 import { aggregate } from "./aggregate";
 import { toView, type ContestRow } from "./view";
 import { swimEventKey, swimEventName, swimPerformance, type SwimEntry, type SwimmingRules } from "./sports/swimming";
+import { isBoxScore, type BasketballState, type BoxScoreLine } from "./sports/basketball";
+import { checkBoxScoreSave } from "./boxScorePlan";
 import {
   friendlyIntelligenceError,
   type ContestIntelligence, type ContestView, type HistoryReport, type HistoryRow, type LeaderRow,
@@ -783,3 +785,173 @@ export async function saveScoringRules(tournamentId: string, input: Record<strin
   revalidatePath(`/tournaments/${tournamentId}/score`);
   return rules;
 }
+
+// ── basketball box scores from the fixtures tab ─────────────────
+// A basketball game nobody scored live is entered as a box score (one
+// BOX_SCORE event per team) on its own contest, so it feeds the same
+// standings, box score and career totals as live scoring, and editing it
+// later is an ordinary correction with a reason on the record.
+
+export interface BoxScoreSide { lines: BoxScoreLine[]; periods?: number[] | null }
+
+export interface BasketballBoxScoreView {
+  /** none: no scoring record yet; box: entered as a box score; live: scored play by play in the scorer */
+  mode: "none" | "box" | "live";
+  contestId: string | null;
+  sides: Record<Side, SideContext>;
+  box: Record<Side, BoxScoreSide | null>;
+  /** what the form needs to add up a score */
+  rules: { twoPointValue: number; threePointValue: number; freeThrowValue: number; periods: number; allowTie: boolean };
+}
+
+const formRules = (r: Record<string, unknown>): BasketballBoxScoreView["rules"] => {
+  const x = getEngine("basketball").resolveRules(r) as { twoPointValue: number; threePointValue: number; freeThrowValue: number; periods: number; allowTie: boolean };
+  return { twoPointValue: x.twoPointValue, threePointValue: x.threePointValue, freeThrowValue: x.freeThrowValue, periods: x.periods, allowTie: x.allowTie };
+};
+
+const DONE_MATCH = new Set(["completed", "walkover"]);
+
+async function basketballMatch(sb: Sb, matchId: string) {
+  const { data: match, error } = await sb.from("tournament_matches").select("*").eq("id", matchId).maybeSingle();
+  if (error) return fail(error.message);
+  if (!match) return fail("MATCH_NOT_FOUND");
+  const m = match as TournamentMatch;
+  if (!m.team_a_id || !m.team_b_id) return fail("TEAMS_NOT_SET");
+  const { data: t } = await sb.from("tournaments").select("sport, scoring_rules").eq("id", m.tournament_id).maybeSingle();
+  if (sportKeyFor(t?.sport) !== "basketball") return actionError("Box scores are for basketball matches.");
+  return Object.assign(m, { scoringRules: (t?.scoring_rules ?? {}) as Record<string, unknown> });
+}
+
+/** The box score lines currently in force for each side, from the event log. */
+async function currentBoxScore(sb: Sb, contestId: string) {
+  const loaded = await loadEvents(sb, contestId);
+  if (isActionError(loaded)) return loaded;
+  const list = effectiveEvents(loaded.map(toStored)).list;
+  const box: Record<Side, (BoxScoreSide & { eventId: string }) | null> = { a: null, b: null };
+  const complete = [...list].reverse().find((e) => e.type === "MATCH_COMPLETE") ?? null;
+  for (const e of list) {
+    if (e.type !== "BOX_SCORE" || (e.payload.side !== "a" && e.payload.side !== "b")) continue;
+    box[e.payload.side] = { eventId: e.id, lines: (e.payload.lines ?? []) as BoxScoreLine[], periods: (e.payload.periods as number[] | undefined) ?? null };
+  }
+  return { box, completeId: complete?.id ?? null, stored: loaded.map(toStored), playByPlay: list.some((e) => e.type === "PERIOD_START") };
+}
+
+export async function getBasketballBoxScore(matchId: string): Promise<BasketballBoxScoreView | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const m = await basketballMatch(sb, matchId);
+  if (isActionError(m)) return m;
+  const { data: existing } = await sb.from("si_contests").select("*").eq("match_id", matchId).maybeSingle();
+  if (!existing) {
+    const [a, b] = await Promise.all([sideContext(sb, m.team_a_id!), sideContext(sb, m.team_b_id!)]);
+    if (isActionError(a)) return a;
+    if (isActionError(b)) return b;
+    let rules: BasketballBoxScoreView["rules"];
+    try { rules = formRules(m.scoringRules); } catch { return actionError("The tournament's scoring rules are invalid."); }
+    return { mode: "none", contestId: null, sides: { a, b }, box: { a: null, b: null }, rules };
+  }
+  const row = existing as ContestRow;
+  const cur = await currentBoxScore(sb, row.id);
+  if (isActionError(cur)) return cur;
+  const strip = (x: (BoxScoreSide & { eventId: string }) | null) => (x ? { lines: x.lines, periods: x.periods } : null);
+  return {
+    mode: cur.playByPlay ? "live" : "box", contestId: row.id, sides: row.context.sides!,
+    box: { a: strip(cur.box.a), b: strip(cur.box.b) },
+    rules: formRules(row.rules),
+  };
+}
+
+const boxPayload = (side: Side, b: BoxScoreSide) => ({
+  side, lines: b.lines, ...(b.periods && b.periods.length ? { periods: b.periods } : {}),
+});
+const sameBox = (x: unknown, y: unknown) => JSON.stringify(sortKeys(x)) === JSON.stringify(sortKeys(y));
+
+/**
+ * Save both teams' box scores and finish the match: the result goes to
+ * the fixture, bracket and table like any other. Saving again corrects
+ * the lines that changed (`reason` required).
+ */
+export async function saveBasketballBoxScore(
+  matchId: string, input: Record<Side, BoxScoreSide>, reason?: string,
+): Promise<{ contestId: string; warning: string | null } | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const m = await basketballMatch(sb, matchId);
+  if (isActionError(m)) return m;
+  if (!(await canScoreTournament(m.tournament_id))) return fail("FORBIDDEN");
+
+  const { data: existing } = await sb.from("si_contests").select("id").eq("match_id", matchId).maybeSingle();
+  if (!existing && DONE_MATCH.has(m.status)) {
+    return actionError("This match already has a result entered without a box score, so one cannot be added now.");
+  }
+  const opened = existing ? null : await openMatchContest(matchId);
+  if (opened && isActionError(opened)) return opened;
+  const contestId = existing?.id ?? opened!.id;
+
+  const row = await loadContest(sb, contestId);
+  if (isActionError(row)) return row;
+  const cur = await currentBoxScore(sb, contestId);
+  if (isActionError(cur)) return cur;
+  if (cur.playByPlay) return actionError("This match was scored live, play by play. Correct it in the scorer instead.");
+
+  const engine = getEngine("basketball");
+  let rules: unknown;
+  try { rules = engine.resolveRules(row.rules); } catch { return actionError("The match's scoring rules are invalid."); }
+  const payload = { a: boxPayload("a", input.a), b: boxPayload("b", input.b) };
+  const warnings: string[] = [];
+  const record = async (type: string, p: Record<string, unknown> = {}) => {
+    const res = await recordContestEvent(contestId, { type, payload: p, clientId: randomUUID() });
+    if (isActionError(res)) return res;
+    if (res.warning) warnings.push(res.warning);
+    return null;
+  };
+
+  const changed = (["a", "b"] as Side[]).filter((side) => !cur.box[side] || !sameBox(boxPayload(side, cur.box[side]!), payload[side]));
+  // a reason is needed to change what was saved, not to finish an entry that stopped half way
+  if (changed.some((side) => cur.box[side]) && !reason?.trim()) return actionError("Say why the box score is changing.");
+  const why = reason?.trim() || "Box score completed";
+  // A finished game can never be level, and changing one side at a time can
+  // pass through a level score (totals swapped: 60-58 to 58-60), so the
+  // completion is reversed first, both sides corrected, then completed again.
+  const uncomplete = changed.length > 0 && row.status === "completed" && !!cur.completeId;
+  try {
+    checkBoxScoreSave(engine, row.context, rules, row.state, cur.stored, row.last_seq,
+      { a: cur.box.a?.eventId ?? null, b: cur.box.b?.eventId ?? null }, cur.completeId, changed, payload, why);
+  } catch (e) {
+    if (e instanceof EngineError) return actionError(e.message.replace(/^This correction is not possible: /, ""));
+    return safeActionError(e, "That box score could not be checked.");
+  }
+
+  if (row.status === "scheduled" || row.status === "postponed") { const err = await record("MATCH_START"); if (err) return err; }
+  if (uncomplete) {
+    const res = await correctContestEvent(contestId, cur.completeId!, why, randomUUID());
+    if (isActionError(res)) return res;
+  }
+  for (const side of changed) {
+    const was = cur.box[side];
+    if (!was) { const err = await record("BOX_SCORE", payload[side]); if (err) return err; continue; }
+    const res = await correctContestEvent(contestId, was.eventId, why, randomUUID(), { type: "BOX_SCORE", payload: payload[side] });
+    if (isActionError(res)) return res;
+    if (res.warning) warnings.push(res.warning);
+  }
+  const after = await loadContest(sb, contestId);
+  if (!isActionError(after) && after.status !== "completed") {
+    const done = await record("MATCH_COMPLETE");
+    if (done) return done;
+  }
+  return { contestId, warning: warnings[warnings.length - 1] ?? null };
+}
+
+/** Whether each of a tournament's matches was entered as a box score or scored live (basketball). */
+export async function basketballScoringModes(tournamentId: string): Promise<Record<string, { contestId: string; mode: "box" | "live" }> | ActionError> {
+  const contests = await listTournamentContests(tournamentId);
+  if (isActionError(contests)) return contests;
+  const out: Record<string, { contestId: string; mode: "box" | "live" }> = {};
+  for (const c of contests) {
+    if (c.sport !== "basketball" || !c.matchId) continue;
+    const st = c.state as BasketballState | null;
+    out[c.matchId] = { contestId: c.id, mode: st && isBoxScore(st) ? "box" : "live" };
+  }
+  return out;
+}
+

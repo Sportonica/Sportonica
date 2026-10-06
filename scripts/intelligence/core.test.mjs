@@ -91,7 +91,7 @@ section("core: an incomplete match cannot be completed", () => {
   m.push("MATCH_START"); m.push("PERIOD_START");
   m.refuses("MATCH_COMPLETE", {}, /still in progress/, "period open");
   m.push("PERIOD_END");
-  m.refuses("MATCH_COMPLETE", {}, /1 of 4 periods/, "periods remaining");
+  m.refuses("MATCH_COMPLETE", {}, /1 of 4 quarters/, "periods remaining");
 });
 
 section("core: a resubmitted event is applied once", () => {

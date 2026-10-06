@@ -7,7 +7,7 @@
 // The game clock and shot clock run on this device and every event
 // carries their readings (see useBasketballClock).
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Participant, Side } from "@/lib/intelligence/core/types";
 import { benchOf, bonusFor, eligibleOf, freeThrowLabel, gameRosterOf, periodName, substitutionsLeft, teamFoulsNow, timeoutsLeft, type BasketballRules, type BasketballState } from "@/lib/intelligence/sports/basketball";
 import { DEFENSIVE_VIOLATIONS, OFFENSIVE_VIOLATIONS, SHOT_TYPES, SHOT_ZONES, THREE_POINT_ZONES, foulKindName, label, periodSeconds, type ShotType, type ShotZone } from "@/lib/intelligence/sports/basketball/rules";
@@ -26,6 +26,16 @@ export default function BasketballPad({ contest, send }: PadProps) {
   // quick substitution: the side being changed, and who was tapped so far
   const [subbing, setSubbing] = useState<{ side: Side; out: string | null; in: string | null } | null>(null);
   const [officials, setOfficials] = useState("");
+  // simple mode (the default): big +1/+2/+3, then who did it. Full stats adds rebounds, assists, misses and the rest.
+  const [full, setFull] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => { try { setFull(localStorage.getItem("si-bb-full") === "1"); } catch { /* default: simple */ } }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  const toggleFull = () => { const v = !full; setFull(v); try { localStorage.setItem("si-bb-full", v ? "1" : "0"); } catch { /* not remembered */ } };
+  // simple mode: the key tapped, waiting for who did it
+  const [ask, setAsk] = useState<{ side: Side; what: "1" | "2" | "3" | "foul" } | null>(null);
+  const [foulKind, setFoulKind] = useState<"personal" | "andone" | "shooting2" | "shooting3" | "technical">("personal");
   const clk = useBasketballClock(contest.id, s, rules);
 
   // every event carries the clock readings the engine will accept, then the clocks react to it
@@ -43,7 +53,8 @@ export default function BasketballPad({ contest, send }: PadProps) {
     ev(type, side, { points, ...(zoneOk ? { zone: detail.zone } : {}), ...(detail.shotType ? { shotType: detail.shotType } : {}), ...(detail.fastBreak ? { fastBreak: true } : {}) });
     setDetail({ zone: null, shotType: null, fastBreak: false });
   };
-  const startPeriod = () => { send("PERIOD_START"); clk.periodStarted(s.period + 1); };
+  // starting a period starts its clock too: one tap
+  const startPeriod = () => { send("PERIOD_START"); clk.periodStarted(s.period + 1, true); };
   const endPeriod = () => { fire("PERIOD_END"); clk.periodEnded(); };
   // both players chosen: record it, and stay open for the next change
   const pickSub = (side: Side, role: "out" | "in", id: string) => {
@@ -73,6 +84,23 @@ export default function BasketballPad({ contest, send }: PadProps) {
   // the starting five, chosen once the game roster is settled and before tip-off
   const needsStarters = (side: Side) => s.period === 0 && !needsRoster(side) && !s.onCourt[side] && eligibleOf(s, ctx, side).length > 0;
   const subsLeft = (side: Side) => substitutionsLeft(s, side, rules);
+  const finishable = !s.periodOpen && s.period >= rules.periods && !canStartPeriod;
+
+  // simple mode: record what was tapped, for the player picked (or nobody)
+  const answer = (who: string | null) => {
+    if (!ask) return;
+    const { side, what } = ask;
+    const base = { side, ...(who ? { player: who } : {}) };
+    if (what === "1") fire("FREE_THROW_MADE", base);
+    else if (what === "2") fire("SHOT_MADE", { ...base, points: rules.twoPointValue });
+    else if (what === "3") fire("SHOT_MADE", { ...base, points: rules.threePointValue });
+    else if (foulKind === "technical") fire("FOUL", { ...base, kind: "technical" });
+    else if (foulKind === "personal") fire("FOUL", { ...base, kind: "personal" });
+    // on a basket that counted: the engine gives the one free throw
+    else if (foulKind === "andone") fire("FOUL", { ...base, kind: "shooting" });
+    else fire("FOUL", { ...base, kind: "shooting", freeThrows: foulKind === "shooting3" ? 3 : 2 });
+    setAsk(null); setFoulKind("personal");
+  };
 
   return (
     <div className="si-pad">
@@ -83,9 +111,13 @@ export default function BasketballPad({ contest, send }: PadProps) {
       ) : (
         <div className="si-row">
           {canStartPeriod
-            ? <button type="button" className="si-btn primary" onClick={startPeriod}>Start {periodName(next, rules)}</button>
-            : s.period > 0 ? <span className="si-info">All periods played. Complete the match.</span> : null}
-          {s.period > 0 ? (
+            ? <button type="button" className="si-btn primary si-big-btn" onClick={startPeriod}>Start {periodName(next, rules)}</button>
+            : finishable ? (
+              <button type="button" className="si-btn primary si-big-btn" onClick={() => { if (window.confirm("Finish the game? The result goes to the fixture.")) send("MATCH_COMPLETE"); }}>
+                Finish game
+              </button>
+            ) : null}
+          {finishable ? (
             <button type="button" className="si-btn small" title="To add something that was missed before it ended" onClick={() => send("PERIOD_REOPEN")}>
               Reopen {periodName(s.period, rules)}
             </button>
@@ -112,19 +144,20 @@ export default function BasketballPad({ contest, send }: PadProps) {
       ) : null}
 
       {SIDE_KEYS.some(needsStarters) ? (
-        <div className="si-card si-grid" style={{ gap: 12 }}>
-          <div className="si-info">
-            Choose each team&apos;s starting five. Optional, but minutes, plus/minus and on-court ratings need lineups.
+        <details className="si-card si-more" open={full}>
+          <summary>Starting five (optional)</summary>
+          <div className="si-info" style={{ marginBottom: 10 }}>
+            Skip this if you only want the score. Minutes and plus/minus need it.
           </div>
           {SIDE_KEYS.filter(needsStarters).map((side) => (
             <LineupPicker key={side} label={`${sides[side].name} starting five`} players={byIds(side, eligibleOf(s, ctx, side))}
               size={Math.min(rules.playersOnCourt, eligibleOf(s, ctx, side).length)} action="Save starting five"
               onSave={(ids) => send("LINEUP", { side, players: ids })} />
           ))}
-        </div>
+        </details>
       ) : null}
 
-      {s.period > 0 ? (
+      {s.period > 0 && full ? (
         <div className="si-status-strip" aria-label="Fouls and timeouts">
           {SIDE_KEYS.map((side) => {
             const b = bonusFor(s, side, rules);
@@ -150,7 +183,68 @@ export default function BasketballPad({ contest, send }: PadProps) {
         </div>
       ) : null}
 
-      {s.periodOpen ? (
+      {s.periodOpen && !full ? (
+        <div className="si-pad-sides">
+          {SIDE_KEYS.map((side) => (
+            <div key={side} className="si-pad-side">
+              <div className="si-pad-name">{sides[side].name}</div>
+              {subbing?.side === side && !s.onCourt[side] ? (
+                <div className="si-ask">
+                  <LineupPicker label={`Who is on court for ${sides[side].name}?`} players={byIds(side, eligibleOf(s, ctx, side))}
+                    size={Math.min(rules.playersOnCourt, eligibleOf(s, ctx, side).length)} action="Next: make the substitution"
+                    onSave={(ids) => fire("LINEUP", { side, players: ids })} />
+                  <button type="button" className="si-btn small" style={{ justifySelf: "start" }} onClick={() => setSubbing(null)}>Cancel</button>
+                </div>
+              ) : subbing?.side === side ? (
+                <SubPanel court={onCourt(side)} bench={byIds(side, benchOf(s, ctx, side) ?? [])} picked={subbing} badge={badge}
+                  left={subsLeft(side)} onPick={(role, id) => pickSub(side, role, id)} onDone={() => setSubbing(null)} />
+              ) : ask?.side === side ? (
+                <div className="si-ask" aria-live="polite">
+                  <div className="si-pad-name">
+                    {ask.what === "foul" ? "Who fouled?" : `Who scored +${ask.what === "1" ? rules.freeThrowValue : ask.what === "2" ? rules.twoPointValue : rules.threePointValue}?`}
+                  </div>
+                  {ask.what === "foul" ? (
+                    <div className="si-chips wrap">
+                      {([["personal", "Foul"], ["shooting2", "Shooting, 2 FT"], ["shooting3", "Shooting, 3 FT"], ["andone", "And-one, 1 FT"], ["technical", "Technical"]] as const).map(([k, l]) => (
+                        <button type="button" key={k} className={`si-chip${foulKind === k ? " on" : ""}`} onClick={() => setFoulKind(k)}>{l}</button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="si-ask-grid">
+                    {onCourt(side).map((p) => (
+                      <button type="button" key={p.id} className="si-ask-btn" onClick={() => answer(p.id)}>
+                        <b>{p.number != null ? `#${p.number}` : "–"}</b><span>{p.name}</span>{badge(p.id) ? <i>{badge(p.id)}</i> : null}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="si-row">
+                    <button type="button" className="si-btn small" onClick={() => answer(null)}>{ask.what === "foul" ? "Team / bench" : "Don't know"}</button>
+                    <button type="button" className="si-btn small" onClick={() => setAsk(null)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="si-keys three">
+                    {(["1", "2", "3"] as const).map((w) => (
+                      <button type="button" key={w} className="si-key-btn score big" onClick={() => setAsk({ side, what: w })}>
+                        +{w === "1" ? rules.freeThrowValue : w === "2" ? rules.twoPointValue : rules.threePointValue}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="si-keys three">
+                    <button type="button" className="si-key-btn warn" onClick={() => setAsk({ side, what: "foul" })}>Foul</button>
+                    <button type="button" className="si-key-btn" disabled={timeoutsLeft(s, side, rules) <= 0} onClick={() => fire("TIMEOUT", { side })}>Timeout</button>
+                    <button type="button" className="si-key-btn" disabled={subsLeft(side) === 0}
+                      onClick={() => setSubbing({ side, out: null, in: null })}>Sub</button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {s.periodOpen && full ? (
         <>
           <details className="si-more">
             <summary>Shot details for the next shot (optional){detail.zone || detail.shotType || detail.fastBreak ? `: ${[detail.zone && label(detail.zone), detail.shotType && label(detail.shotType), detail.fastBreak && "fast break"].filter(Boolean).join(", ")}` : ""}</summary>
@@ -261,6 +355,13 @@ export default function BasketballPad({ contest, send }: PadProps) {
         </>
       ) : null}
 
+      {s.period > 0 || full ? (
+        <button type="button" className="si-link-btn" onClick={toggleFull} style={{ justifySelf: "start" }}>
+          {full ? "Simple scoring (points, fouls, timeouts)" : "Full stats: rebounds, assists, steals, misses…"}
+        </button>
+      ) : null}
+
+      {full ? (<>
       <details className="si-more">
         <summary>Lineups (for minutes, plus/minus and on-court ratings)</summary>
         <div className="si-grid" style={{ gap: 12 }}>
@@ -287,6 +388,7 @@ export default function BasketballPad({ contest, send }: PadProps) {
           <button type="button" className="si-btn small" disabled={!officials.trim()} onClick={() => { send("OFFICIALS", { names: officials.split(",").map((x) => x.trim()).filter(Boolean).slice(0, 5) }); setOfficials(""); }}>Save</button>
         </div>
       </details>
+      </>) : null}
     </div>
   );
 }
@@ -297,14 +399,21 @@ function SubPanel({ court, bench, picked, badge, left, onPick, onDone }: {
   picked: { out: string | null; in: string | null }; badge: (id: string) => string | null; left: number | null;
   onPick: (role: "out" | "in", id: string) => void; onDone: () => void;
 }) {
+  const grid = (players: Participant[], role: "out" | "in") => (
+    <div className="si-ask-grid">
+      {players.map((p) => (
+        <button type="button" key={p.id} className={`si-ask-btn${picked[role] === p.id ? " on" : ""}`} onClick={() => onPick(role, p.id)}>
+          <b>{p.number != null ? `#${p.number}` : "–"}</b><span>{p.name}</span>{badge(p.id) ? <i>{badge(p.id)}</i> : null}
+        </button>
+      ))}
+    </div>
+  );
   return (
-    <div className="si-grid" style={{ gap: 8 }}>
-      <div className="si-muted" style={{ fontSize: 12.5 }}>Going off</div>
-      <PlayerChips players={court} value={picked.out} onChange={(id) => id && onPick("out", id)} none={null} badge={badge} />
-      <div className="si-muted" style={{ fontSize: 12.5 }}>Coming on</div>
-      {bench.length
-        ? <PlayerChips players={bench} value={picked.in} onChange={(id) => id && onPick("in", id)} none={null} badge={badge} />
-        : <span className="si-info">Nobody left on the bench.</span>}
+    <div className="si-ask">
+      <div className="si-pad-name">Going off</div>
+      {grid(court, "out")}
+      <div className="si-pad-name">Coming on</div>
+      {bench.length ? grid(bench, "in") : <span className="si-info">Nobody left on the bench.</span>}
       <div className="si-row">
         <button type="button" className="si-btn small" onClick={onDone}>Done</button>
         {left !== null ? <span className="si-muted" style={{ fontSize: 12.5 }}>{left} substitution{left === 1 ? "" : "s"} left</span> : null}

@@ -210,7 +210,8 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
               {st === "scheduled" || st === "postponed" ? <button type="button" className="si-btn primary" onClick={() => send("MATCH_START")}>Start match</button> : null}
               {st === "live" ? <button type="button" className="si-btn" onClick={() => withReason("MATCH_PAUSE", "Reason for the pause (optional)")}>Pause</button> : null}
               {st === "paused" ? <button type="button" className="si-btn primary" onClick={() => send("MATCH_RESUME")}>Resume</button> : null}
-              {inPlay ? <button type="button" className="si-btn primary" onClick={() => { if (window.confirm("Complete the match? The result becomes final.")) send("MATCH_COMPLETE"); }}>Complete match</button> : null}
+              {/* basketball finishes from its pad ("Finish game"), which appears once the last quarter is over */}
+              {inPlay && contest.sport !== "basketball" ? <button type="button" className="si-btn primary" onClick={() => { if (window.confirm("Complete the match? The result becomes final.")) send("MATCH_COMPLETE"); }}>Complete match</button> : null}
               <button type="button" className="si-btn" disabled={busy || queue.length > 0 || contest.lastSeq === 0} onClick={() => void undo()}>Undo last</button>
             </div>
 

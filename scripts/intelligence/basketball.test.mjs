@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { basketballEngine as E, leadStats, scoringRunsOf, possessions, bonusFor, timeoutsLeft, comebacks, benchOf, eligibleOf, substitutionsLeft } from "../../src/lib/intelligence/sports/basketball.ts";
 import { breakAfter } from "../../src/lib/intelligence/sports/basketball/rules.ts";
 import { clockReadings, clockText, parseClock, shotClockAfter } from "../../src/lib/intelligence/sports/basketball/clock.ts";
+import { checkBoxScoreSave } from "../../src/lib/intelligence/boxScorePlan.ts";
 import { GLOSSARY } from "../../src/lib/intelligence/sports/basketball/knowledge.ts";
 import { aggregate } from "../../src/lib/intelligence/aggregate.ts";
 import { reconstruct, effectiveEvents } from "../../src/lib/intelligence/core/engine.ts";
@@ -1142,4 +1143,88 @@ section("basketball: a finished match can be reopened to add what was missed", (
   m.push("MATCH_COMPLETE");
   assert.equal(m.env.result.winner, "b");
   m.assertReconstructs("reopened match");
+});
+
+section("basketball: a final score typed without the scorers is a box score of team points", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START");
+  m.refuses("BOX_SCORE", { side: "a", lines: [{ player: "a1", points: 10 }] }, /come from baskets/, "points on a player's line");
+  m.push("BOX_SCORE", { side: "a", lines: [{ points: 71 }] });
+  m.push("BOX_SCORE", { side: "b", lines: [{ player: "b1", twos: 4, threes: 1 }, { points: 55 }] });
+  m.push("MATCH_COMPLETE");
+  assert.deepEqual(m.env.sport.score, { a: 71, b: 66 });
+  assert.equal(m.env.result.winner, "a");
+  assert.equal(cell(m.stats().players, "box", "b1", "pts"), 11);
+  m.assertReconstructs("team points");
+});
+
+
+section("basketball: editing a finished box score never passes through a level score", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START");
+  const a = m.push("BOX_SCORE", { side: "a", lines: [{ points: 60 }] });
+  const b = m.push("BOX_SCORE", { side: "b", lines: [{ points: 58 }] });
+  m.push("MATCH_COMPLETE");
+  const done = m.events[m.events.length - 1];
+  // the sheet had the totals the wrong way round: 58-60. Either side changed first would leave a finished game level
+  assert.throws(() => m.correct("replace", a.id, "Totals swapped", "BOX_SCORE", { side: "a", lines: [{ points: 58 }] }), /level/);
+  assert.throws(() => m.correct("replace", b.id, "Totals swapped", "BOX_SCORE", { side: "b", lines: [{ points: 60 }] }), /level/);
+  // so the completion is reversed, both sides corrected, and the match completed again
+  m.correct("void", done.id, "Totals swapped");
+  m.correct("replace", a.id, "Totals swapped", "BOX_SCORE", { side: "a", lines: [{ points: 58 }] });
+  m.correct("replace", b.id, "Totals swapped", "BOX_SCORE", { side: "b", lines: [{ points: 60 }] });
+  m.push("MATCH_COMPLETE");
+  assert.deepEqual(m.env.sport.score, { a: 58, b: 60 });
+  assert.equal(m.env.result.winner, "b");
+  m.assertReconstructs("edited box score");
+});
+
+section("basketball: a box score save is checked whole before anything is written", () => {
+  const box = (side, points) => ({ side, lines: [{ points }] });
+  const check = (m, current, completeId, changed, payload) =>
+    checkBoxScoreSave(E, ctx, m.rules, m.env, m.events, m.events.length, current, completeId, changed, payload, "test");
+
+  // a new match: start, both sides, complete
+  const fresh = openMatch(E, ctx);
+  check(fresh, { a: null, b: null }, null, ["a", "b"], { a: box("a", 70), b: box("b", 64) });
+  assert.throws(() => check(fresh, { a: null, b: null }, null, ["a", "b"], { a: box("a", 70), b: box("b", 70) }), /cannot end level/, "a level final");
+  assert.throws(() => check(fresh, { a: null, b: null }, null, ["a", "b"], { a: { side: "a", lines: [{ player: "b1", twos: 1 }] }, b: box("b", 2) }), /belong to that team/);
+  assert.equal(fresh.events.length, 0, "the check writes nothing");
+
+  // a finished one: the totals swapped is fine, a level edit is not
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START");
+  const a = m.push("BOX_SCORE", box("a", 60));
+  const b = m.push("BOX_SCORE", box("b", 58));
+  const done = m.push("MATCH_COMPLETE");
+  const cur = { a: a.id, b: b.id };
+  check(m, cur, done.id, ["a", "b"], { a: box("a", 58), b: box("b", 60) });
+  check(m, cur, done.id, ["b"], { a: box("a", 60), b: box("b", 52) });
+  assert.throws(() => check(m, cur, done.id, ["b"], { a: box("a", 60), b: box("b", 60) }), /level/);
+});
+
+
+section("basketball: a game scored with the simple keys (points, fouls, timeouts) is never refused", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START");
+  m.push("PERIOD_START");
+  m.push("SHOT_MADE", { side: "a", player: "a1", points: 2 });               // +2, who: #1
+  m.push("SHOT_MADE", { side: "b", points: 3 });                              // +3, don't know
+  m.push("FOUL", { side: "a", player: "a2", kind: "shooting", freeThrows: 2 }); // shooting, 2 FT
+  m.push("FREE_THROW_MADE", { side: "b" }); m.push("FREE_THROW_MISSED", { side: "b" });
+  m.push("SHOT_MADE", { side: "a", player: "a3", points: 2 });
+  m.push("FOUL", { side: "b", player: "b1", kind: "shooting" });             // and-one
+  assert.equal(m.env.sport.freeThrows[0]?.total, 1, "an and-one is one free throw");
+  m.push("FREE_THROW_MADE", { side: "a" });
+  for (let i = 0; i < 4; i++) m.push("FOUL", { side: "b", player: `b${i + 2}`, kind: "personal" });
+  assert.ok(m.env.sport.freeThrows.length, "in the bonus: free throws for the fifth foul");
+  m.push("FREE_THROW_MADE", { side: "a" }); m.push("FREE_THROW_MADE", { side: "a" });
+  m.push("TIMEOUT", { side: "b" });
+  m.push("FOUL", { side: "a", kind: "technical" });                           // bench technical
+  m.push("FREE_THROW_MADE", { side: "b", technical: true });
+  m.push("PERIOD_END");
+  for (let i = 0; i < 3; i++) { m.push("PERIOD_START"); m.push("PERIOD_END"); }
+  m.push("MATCH_COMPLETE");
+  assert.deepEqual(m.env.sport.score, { a: 7, b: 5 });
+  m.assertReconstructs("simple keys");
 });

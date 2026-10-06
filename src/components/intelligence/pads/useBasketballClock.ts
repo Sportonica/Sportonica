@@ -45,7 +45,7 @@ export interface BasketballClock {
   setShot: (seconds: number) => void;
   /** after an event is sent: the shot clock resets by rule, the whistle stops the clocks */
   afterEvent: (type: string, payload: Record<string, unknown>) => void;
-  periodStarted: (period: number) => void;
+  periodStarted: (period: number, run?: boolean) => void;
   periodEnded: () => void;
 }
 
@@ -127,7 +127,7 @@ export function useBasketballClock(contestId: string, s: BasketballState, rules:
       if (shotFull !== null) next.shot = shotClockAfter(type, payload, next.shot, rules);
       save(next);
     },
-    periodStarted: (period) => save({ ...fresh(period), game: periodSeconds(period, rules), used: false }),
+    periodStarted: (period, run = false) => { setNow(Date.now()); save({ ...fresh(period), game: periodSeconds(period, rules), used: run, running: run, since: run ? Date.now() : null }); },
     periodEnded: () => save({ ...frozen(false), breakFrom: Date.now() }),
   };
 }
