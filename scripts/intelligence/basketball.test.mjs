@@ -1203,3 +1203,28 @@ section("basketball: a box score save is checked whole before anything is writte
   assert.throws(() => check(m, cur, done.id, ["b"], { a: box("a", 60), b: box("b", 60) }), /level/);
 });
 
+
+section("basketball: a game scored with the simple keys (points, fouls, timeouts) is never refused", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START");
+  m.push("PERIOD_START");
+  m.push("SHOT_MADE", { side: "a", player: "a1", points: 2 });               // +2, who: #1
+  m.push("SHOT_MADE", { side: "b", points: 3 });                              // +3, don't know
+  m.push("FOUL", { side: "a", player: "a2", kind: "shooting", freeThrows: 2 }); // shooting, 2 FT
+  m.push("FREE_THROW_MADE", { side: "b" }); m.push("FREE_THROW_MISSED", { side: "b" });
+  m.push("SHOT_MADE", { side: "a", player: "a3", points: 2 });
+  m.push("FOUL", { side: "b", player: "b1", kind: "shooting" });             // and-one
+  assert.equal(m.env.sport.freeThrows[0]?.total, 1, "an and-one is one free throw");
+  m.push("FREE_THROW_MADE", { side: "a" });
+  for (let i = 0; i < 4; i++) m.push("FOUL", { side: "b", player: `b${i + 2}`, kind: "personal" });
+  assert.ok(m.env.sport.freeThrows.length, "in the bonus: free throws for the fifth foul");
+  m.push("FREE_THROW_MADE", { side: "a" }); m.push("FREE_THROW_MADE", { side: "a" });
+  m.push("TIMEOUT", { side: "b" });
+  m.push("FOUL", { side: "a", kind: "technical" });                           // bench technical
+  m.push("FREE_THROW_MADE", { side: "b", technical: true });
+  m.push("PERIOD_END");
+  for (let i = 0; i < 3; i++) { m.push("PERIOD_START"); m.push("PERIOD_END"); }
+  m.push("MATCH_COMPLETE");
+  assert.deepEqual(m.env.sport.score, { a: 7, b: 5 });
+  m.assertReconstructs("simple keys");
+});

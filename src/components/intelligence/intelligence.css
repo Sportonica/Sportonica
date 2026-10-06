@@ -229,3 +229,17 @@ details.si-more[open] > summary::after { content: " -"; }
 @media (min-width: 760px) {
   .si-two { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); align-items: start; }
 }
+
+/* basketball simple scoring */
+.si-keys.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.si-key-btn.score.big { font-size: 26px; min-height: 76px; }
+.si-big-btn { min-height: 52px; padding: 0 24px; font-size: 16px; }
+.si-ask { display: grid; gap: 10px; padding: 12px; border-radius: 14px; border: 2px solid var(--si-accent); background: var(--si-surface-2); }
+.si-ask-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.si-ask-btn { display: grid; gap: 2px; justify-items: center; min-height: 64px; padding: 8px 6px; border-radius: 12px; border: 1px solid var(--si-line); background: var(--si-solid); color: var(--si-text); font: inherit; cursor: pointer; touch-action: manipulation; }
+.si-ask-btn b { font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.si-ask-btn span { font-size: 12.5px; font-weight: 700; color: var(--si-text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.si-ask-btn i { font-style: normal; font-size: 11px; color: var(--si-live); font-weight: 800; }
+.si-ask-btn:active { transform: scale(.97); }
+.si-ask-btn.on { background: var(--si-accent); border-color: var(--si-accent); color: #fff; }
+.si-ask-btn.on span { color: #fff; }
