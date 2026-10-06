@@ -15,7 +15,7 @@ import { sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
 import EventTabs from "@/components/tournaments/public/EventTabs";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
-import { listTournamentContests } from "@/lib/intelligence/actions";
+import { getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
 import { computeBasketballStandings, isBasketball } from "@/lib/tournaments/standings";
@@ -85,6 +85,9 @@ export default async function TournamentDetailPage({
   }
   const teams = isActionError(teamsRes) ? [] : teamsRes;
   const playerStats = isActionError(playerStatsRes) ? [] : playerStatsRes;
+  // basketball's player stats come from its scored games (points, rebounds…), not the goals table
+  const leadersRes = isLiveOrDone && isBasketball(tournament.sport) ? await getTournamentLeaders(id) : null;
+  const leaders = leadersRes && !isActionError(leadersRes) ? leadersRes : null;
   const awards = isActionError(awardsRes) ? { winner: null, runnerUp: null, semifinalists: [] } : awardsRes;
 
   const hasStandings = tournament.format === "league" || tournament.format === "group_knockout";
@@ -190,6 +193,7 @@ export default async function TournamentDetailPage({
               matches={matches}
               standingsByGroup={standingsByGroup}
               playerStats={playerStats}
+              leaders={leaders}
               awards={awards}
               myTeam={isActionError(myTeam) ? null : myTeam}
               loggedIn={!!user}

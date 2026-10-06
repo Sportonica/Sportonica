@@ -130,6 +130,8 @@ export interface BasketballState {
   boxScore?: Record<Side, boolean>;
   /** a box score left out shot attempts: percentages cannot be calculated */
   attemptsUnknown?: boolean;
+  /** the game was called before all periods were played (local games run short), with why */
+  endedEarly?: string | null;
   /** who has the ball right now, when the events say so (null: loose or unknown) */
   ball: Side | null;
   /** alternating-possession arrow: the side that gets the next held ball */
@@ -605,7 +607,7 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
   sport: "basketball",
   label: "Basketball",
   eventTypes: [
-    "BOX_SCORE", "PERIOD_START", "PERIOD_END", "PERIOD_REOPEN", "LINEUP", "SUBSTITUTION", "SHOT_MADE", "SHOT_MISSED",
+    "BOX_SCORE", "PERIOD_START", "PERIOD_END", "PERIOD_REOPEN", "GAME_END_EARLY", "LINEUP", "SUBSTITUTION", "SHOT_MADE", "SHOT_MISSED",
     "FREE_THROW_MADE", "FREE_THROW_MISSED", "REBOUND", "ASSIST", "STEAL", "BLOCK", "TURNOVER", "FOUL", "TIMEOUT",
     "JUMP_BALL", "HELD_BALL", "ARROW", "OFFICIALS", "ROSTER", "VIOLATION", "OUT_OF_BOUNDS", "GOALTENDING",
     ...Object.keys(EVENT_ALIASES),
@@ -818,6 +820,7 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
       if (s.score.a === s.score.b && !rules.allowTie) return "The score is level. A game cannot end level: enter the score after overtime";
       return null;
     }
+    if (s.endedEarly && !s.periodOpen) return s.score.a === s.score.b && !rules.allowTie ? "The score is level. A game cannot end level" : null;
     if (s.periodOpen) return `${periodName(s.period, rules)} is still in progress. Tap End ${periodName(s.period, rules)} under the clock, and play the remaining ${rules.periods === 4 ? "quarters" : "periods"} first`;
     if (s.period < rules.periods) return `Only ${s.period} of ${rules.periods} ${rules.periods === 4 ? "quarters" : "periods"} have been played. To stop early, use Abandon`;
     if (s.score.a === s.score.b && !rules.allowTie) return "The score is level. Play overtime";
@@ -918,6 +921,7 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
       case "PERIOD_START": return "Period started";
       case "PERIOD_END": return "Period ended";
       case "PERIOD_REOPEN": return "Period reopened";
+      case "GAME_END_EARLY": return `Game ended early${str(p.reason) ? `: ${str(p.reason)}` : ""}`;
       case "LINEUP": return `${side} lineup set`;
       case "SUBSTITUTION": return `${side}: ${playerName(ctx, str(p.in))} on for ${playerName(ctx, str(p.out))}`;
       case "TIMEOUT": return `Timeout ${side}`;
@@ -1076,6 +1080,7 @@ function validateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, ru
       return validateBoxScore(s, p, ctx, rules);
     case "PERIOD_START":
       if (isBoxScore(s)) return "This game was entered as a box score. Correct the box score instead";
+      if (s.endedEarly) return "The game was ended early";
       if (s.periodOpen) return `${periodName(s.period, rules)} is still in progress`;
       if (s.period === 0) {
         for (const side of SIDES) {
@@ -1089,6 +1094,13 @@ function validateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, ru
     case "PERIOD_END":
       return s.periodOpen ? null : "No period is in progress";
     // the last period taken back, to add what was missed before it ended (after reopening a finished match)
+    // the game is called with periods still to play: the score as it stands is the result
+    case "GAME_END_EARLY":
+      if (isBoxScore(s)) return "This game was entered as a box score";
+      if (s.period === 0) return "The game has not started";
+      if (s.periodOpen) return `End ${periodName(s.period, rules)} first`;
+      if (s.score.a === s.score.b && !rules.allowTie) return "The score is level. A game cannot end level: play on until one team leads";
+      return null;
     case "PERIOD_REOPEN":
       if (isBoxScore(s)) return "This game was entered as a box score. Correct the box score instead";
       if (s.periodOpen) return `${periodName(s.period, rules)} is still in progress`;
@@ -1263,7 +1275,12 @@ function updateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, rule
 
   switch (ev.type) {
     case "BOX_SCORE": applyBoxScore(s, ev, ctx, rules); break;
+    case "GAME_END_EARLY":
+      s.endedEarly = str(p.reason) ?? "called early";
+      s.log.push({ seq: ev.seq, text: `Game ended after ${periodName(s.period, rules)}` });
+      break;
     case "PERIOD_REOPEN":
+      s.endedEarly = null;
       s.periodOpen = true; s.clock = null;
       s.log.push({ seq: ev.seq, text: `${periodName(s.period, rules)} reopened` });
       break;

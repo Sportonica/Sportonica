@@ -85,11 +85,22 @@ export default function BasketballPad({ contest, send }: PadProps) {
   const needsStarters = (side: Side) => s.period === 0 && !needsRoster(side) && !s.onCourt[side] && eligibleOf(s, ctx, side).length > 0;
   const subsLeft = (side: Side) => substitutionsLeft(s, side, rules);
   const finishable = !s.periodOpen && s.period >= rules.periods && !canStartPeriod;
+  // a game can be finished at any point once it has started: early if quarters are left (local games run short)
+  const finishGame = () => {
+    const score = `${sides.a.name} ${s.score.a} – ${s.score.b} ${sides.b.name}`;
+    if (level && !rules.allowTie) { window.alert(`The score is level (${score}). A basketball game can't end level: play on until one team leads.`); return; }
+    if (finishable) { if (window.confirm(`Finish the game? ${score}`)) send("MATCH_COMPLETE"); return; }
+    const left = rules.periods - s.period + (s.periodOpen ? 1 : 0);
+    if (!window.confirm(`End the game now at ${score}?\n${left} ${rules.periods === 4 ? "quarter" : "period"}${left === 1 ? "" : "s"} will not be played.`)) return;
+    if (s.periodOpen) { fire("PERIOD_END"); clk.periodEnded(); }
+    send("GAME_END_EARLY", { reason: "Ended early by the scorer" });
+    send("MATCH_COMPLETE");
+  };
 
   // simple mode: record what was tapped, for the player picked (or nobody)
-  const answer = (who: string | null) => {
-    if (!ask) return;
-    const { side, what } = ask;
+  const answer = (who: string | null, now: { side: Side; what: "1" | "2" | "3" | "foul" } | null = ask) => {
+    if (!now) return;
+    const { side, what } = now;
     const base = { side, ...(who ? { player: who } : {}) };
     if (what === "1") fire("FREE_THROW_MADE", base);
     else if (what === "2") fire("SHOT_MADE", { ...base, points: rules.twoPointValue });
@@ -99,8 +110,17 @@ export default function BasketballPad({ contest, send }: PadProps) {
     // on a basket that counted: the engine gives the one free throw
     else if (foulKind === "andone") fire("FOUL", { ...base, kind: "shooting" });
     else fire("FOUL", { ...base, kind: "shooting", freeThrows: foulKind === "shooting3" ? 3 : 2 });
-    setAsk(null); setFoulKind("personal");
+    setAsk(null); setFoulKind("personal"); setPlayer((cur) => ({ ...cur, [side]: null }));
   };
+  // +1/+2/+3: for the selected jersey, or ask who
+  const key = (side: Side, what: "1" | "2" | "3" | "foul") => {
+    if (what !== "foul" && player[side]) answer(player[side], { side, what });
+    else setAsk({ side, what });
+  };
+  const teamColor = (side: Side) => (side === "a" ? "var(--si-series-1)" : "var(--si-series-2)");
+  const jersey = (side: Side, p: Participant, onClick: () => void, on = false) => (
+    <Jersey key={p.id} p={p} color={teamColor(side)} on={on} fouls={fouls(p.id)} out={!!s.out[p.id]} onClick={onClick} />
+  );
 
   return (
     <div className="si-pad">
@@ -110,12 +130,10 @@ export default function BasketballPad({ contest, send }: PadProps) {
           onEnd={endPeriod} />
       ) : (
         <div className="si-row">
-          {canStartPeriod
+          {canStartPeriod && !s.endedEarly
             ? <button type="button" className="si-btn primary si-big-btn" onClick={startPeriod}>Start {periodName(next, rules)}</button>
-            : finishable ? (
-              <button type="button" className="si-btn primary si-big-btn" onClick={() => { if (window.confirm("Finish the game? The result goes to the fixture.")) send("MATCH_COMPLETE"); }}>
-                Finish game
-              </button>
+            : finishable || s.endedEarly ? (
+              <button type="button" className="si-btn primary si-big-btn" onClick={finishGame}>Finish game</button>
             ) : null}
           {finishable ? (
             <button type="button" className="si-btn small" title="To add something that was missed before it ended" onClick={() => send("PERIOD_REOPEN")}>
@@ -196,43 +214,47 @@ export default function BasketballPad({ contest, send }: PadProps) {
                   <button type="button" className="si-btn small" style={{ justifySelf: "start" }} onClick={() => setSubbing(null)}>Cancel</button>
                 </div>
               ) : subbing?.side === side ? (
-                <SubPanel court={onCourt(side)} bench={byIds(side, benchOf(s, ctx, side) ?? [])} picked={subbing} badge={badge}
+                <SubPanel court={onCourt(side)} bench={byIds(side, benchOf(s, ctx, side) ?? [])} picked={subbing} badge={badge} color={teamColor(side)}
                   left={subsLeft(side)} onPick={(role, id) => pickSub(side, role, id)} onDone={() => setSubbing(null)} />
-              ) : ask?.side === side ? (
-                <div className="si-ask" aria-live="polite">
-                  <div className="si-pad-name">
-                    {ask.what === "foul" ? "Who fouled?" : `Who scored +${ask.what === "1" ? rules.freeThrowValue : ask.what === "2" ? rules.twoPointValue : rules.threePointValue}?`}
-                  </div>
-                  {ask.what === "foul" ? (
-                    <div className="si-chips wrap">
-                      {([["personal", "Foul"], ["shooting2", "Shooting, 2 FT"], ["shooting3", "Shooting, 3 FT"], ["andone", "And-one, 1 FT"], ["technical", "Technical"]] as const).map(([k, l]) => (
-                        <button type="button" key={k} className={`si-chip${foulKind === k ? " on" : ""}`} onClick={() => setFoulKind(k)}>{l}</button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="si-ask-grid">
-                    {onCourt(side).map((p) => (
-                      <button type="button" key={p.id} className="si-ask-btn" onClick={() => answer(p.id)}>
-                        <b>{p.number != null ? `#${p.number}` : "–"}</b><span>{p.name}</span>{badge(p.id) ? <i>{badge(p.id)}</i> : null}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="si-row">
-                    <button type="button" className="si-btn small" onClick={() => answer(null)}>{ask.what === "foul" ? "Team / bench" : "Don't know"}</button>
-                    <button type="button" className="si-btn small" onClick={() => setAsk(null)}>Cancel</button>
-                  </div>
-                </div>
               ) : (
                 <>
+                  {ask?.side === side ? (
+                    <div className="si-ask" aria-live="polite">
+                      <div className="si-pad-name">
+                        {ask.what === "foul" ? "Who fouled? Tap the jersey" : `Who scored +${ask.what === "1" ? rules.freeThrowValue : ask.what === "2" ? rules.twoPointValue : rules.threePointValue}? Tap the jersey`}
+                      </div>
+                      {ask.what === "foul" ? (
+                        <div className="si-chips wrap">
+                          {([["personal", "Foul"], ["shooting2", "Shooting, 2 FT"], ["shooting3", "Shooting, 3 FT"], ["andone", "And-one, 1 FT"], ["technical", "Technical"]] as const).map(([k, l]) => (
+                            <button type="button" key={k} className={`si-chip${foulKind === k ? " on" : ""}`} onClick={() => setFoulKind(k)}>{l}</button>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="si-row">
+                        <button type="button" className="si-btn small" onClick={() => answer(null)}>{ask.what === "foul" ? "Team / bench" : "Don't know"}</button>
+                        <button type="button" className="si-btn small" onClick={() => setAsk(null)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : null}
+                  <div className={`si-jerseys${ask?.side === side ? " asking" : ""}`}>
+                    {onCourt(side).map((p) => jersey(side, p,
+                      () => (ask?.side === side ? answer(p.id) : setPlayer({ ...player, [side]: player[side] === p.id ? null : p.id })),
+                      player[side] === p.id))}
+                  </div>
+                  {benchOf(s, ctx, side)?.length ? (
+                    <div className="si-muted" style={{ fontSize: 12 }}>
+                      Bench: {byIds(side, benchOf(s, ctx, side)!).map((p, i) => <span key={p.id}>{i ? " · " : ""}<PlayerName p={p} /></span>)}
+                    </div>
+                  ) : null}
                   <div className="si-keys three">
                     {(["1", "2", "3"] as const).map((w) => (
-                      <button type="button" key={w} className="si-key-btn score big" onClick={() => setAsk({ side, what: w })}>
+                      <button type="button" key={w} className="si-key-btn score big" onClick={() => key(side, w)}>
                         +{w === "1" ? rules.freeThrowValue : w === "2" ? rules.twoPointValue : rules.threePointValue}
                       </button>
                     ))}
                   </div>
                   <div className="si-keys three">
-                    <button type="button" className="si-key-btn warn" onClick={() => setAsk({ side, what: "foul" })}>Foul</button>
+                    <button type="button" className="si-key-btn warn" onClick={() => key(side, "foul")}>Foul</button>
                     <button type="button" className="si-key-btn" disabled={timeoutsLeft(s, side, rules) <= 0} onClick={() => fire("TIMEOUT", { side })}>Timeout</button>
                     <button type="button" className="si-key-btn" disabled={subsLeft(side) === 0}
                       onClick={() => setSubbing({ side, out: null, in: null })}>Sub</button>
@@ -266,7 +288,7 @@ export default function BasketballPad({ contest, send }: PadProps) {
               <div key={side} className="si-pad-side">
                 <div className="si-pad-name">{sides[side].name}</div>
                 {subbing?.side === side ? (
-                  <SubPanel court={onCourt(side)} bench={byIds(side, benchOf(s, ctx, side) ?? [])} picked={subbing} badge={badge}
+                  <SubPanel court={onCourt(side)} bench={byIds(side, benchOf(s, ctx, side) ?? [])} picked={subbing} badge={badge} color={teamColor(side)}
                     left={subsLeft(side)} onPick={(role, id) => pickSub(side, role, id)} onDone={() => setSubbing(null)} />
                 ) : (
                   <>
@@ -355,6 +377,10 @@ export default function BasketballPad({ contest, send }: PadProps) {
         </>
       ) : null}
 
+      {s.period > 0 && !finishable && !s.endedEarly ? (
+        <button type="button" className="si-btn" onClick={finishGame} style={{ justifySelf: "start" }}>Finish game now</button>
+      ) : null}
+
       {s.period > 0 || full ? (
         <button type="button" className="si-link-btn" onClick={toggleFull} style={{ justifySelf: "start" }}>
           {full ? "Simple scoring (points, fouls, timeouts)" : "Full stats: rebounds, assists, steals, misses…"}
@@ -393,18 +419,32 @@ export default function BasketballPad({ contest, send }: PadProps) {
   );
 }
 
+/** A basketball vest in the team's colour: the number big, the name and position under it. */
+function Jersey({ p, color, on, fouls, out, onClick }: { p: Participant; color: string; on: boolean; fouls: number; out: boolean; onClick: () => void }) {
+  const first = p.name.split(" ")[0];
+  return (
+    <button type="button" className={`si-jersey${on ? " on" : ""}${out ? " out" : ""}`} style={{ ["--team" as string]: color }} onClick={onClick}
+      aria-pressed={on} aria-label={`${p.number != null ? `#${p.number} ` : ""}${p.name}${p.position ? `, ${p.position}` : ""}${fouls ? `, ${fouls} fouls` : ""}`}>
+      <span className="si-vest">
+        <svg viewBox="0 0 60 66" aria-hidden="true"><path d="M17 3 Q30 15 43 3 L52 6 Q49 19 57 26 L57 63 L3 63 L3 26 Q11 19 8 6 Z" /></svg>
+        <b>{p.number ?? "–"}</b>
+      </span>
+      <span className="si-jersey-name">{first}</span>
+      {p.position || fouls ? <span className="si-jersey-meta">{[p.position, fouls ? `${fouls}f` : null].filter(Boolean).join(" · ")}</span> : null}
+    </button>
+  );
+}
+
 /** Two taps: who goes off, who comes on (either order). Stays open for the next change. */
-function SubPanel({ court, bench, picked, badge, left, onPick, onDone }: {
-  court: Participant[]; bench: Participant[];
+function SubPanel({ court, bench, picked, badge, left, color, onPick, onDone }: {
+  court: Participant[]; bench: Participant[]; color: string;
   picked: { out: string | null; in: string | null }; badge: (id: string) => string | null; left: number | null;
   onPick: (role: "out" | "in", id: string) => void; onDone: () => void;
 }) {
   const grid = (players: Participant[], role: "out" | "in") => (
-    <div className="si-ask-grid">
+    <div className="si-jerseys">
       {players.map((p) => (
-        <button type="button" key={p.id} className={`si-ask-btn${picked[role] === p.id ? " on" : ""}`} onClick={() => onPick(role, p.id)}>
-          <b>{p.number != null ? `#${p.number}` : "–"}</b><span>{p.name}</span>{badge(p.id) ? <i>{badge(p.id)}</i> : null}
-        </button>
+        <Jersey key={p.id} p={p} color={color} on={picked[role] === p.id} fouls={Number(badge(p.id)?.replace("f", "")) || 0} out={false} onClick={() => onPick(role, p.id)} />
       ))}
     </div>
   );

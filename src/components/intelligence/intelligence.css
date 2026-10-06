@@ -243,3 +243,20 @@ details.si-more[open] > summary::after { content: " -"; }
 .si-ask-btn:active { transform: scale(.97); }
 .si-ask-btn.on { background: var(--si-accent); border-color: var(--si-accent); color: #fff; }
 .si-ask-btn.on span { color: #fff; }
+
+/* basketball jersey tiles */
+.si-jerseys { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.si-jersey { display: grid; justify-items: center; gap: 1px; padding: 4px 2px 6px; border-radius: 12px; border: 2px solid transparent; background: none; color: var(--si-text); font: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; min-width: 0; }
+.si-vest { position: relative; width: 100%; max-width: 58px; aspect-ratio: 60 / 66; display: grid; place-items: center; }
+.si-vest svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.si-vest path { fill: var(--team); stroke: rgba(0,0,0,.18); stroke-width: 1.5; }
+.si-vest b { position: relative; margin-top: 18%; color: #fff; font-size: 20px; font-weight: 900; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.si-jersey-name { font-size: 11.5px; font-weight: 800; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.si-jersey-meta { font-size: 10.5px; font-weight: 700; color: var(--si-text-2); }
+.si-jersey.on { border-color: var(--team); background: var(--si-surface-2); }
+.si-jersey.on .si-vest path { stroke: var(--si-text); stroke-width: 3; }
+.si-jersey.out { opacity: .4; }
+.si-jersey:active { transform: scale(.96); }
+.si-jerseys.asking .si-jersey { animation: si-pulse 1.2s ease-in-out infinite; }
+@keyframes si-pulse { 50% { background: var(--si-surface-2); } }
+@media (prefers-reduced-motion: reduce) { .si-jerseys.asking .si-jersey { animation: none; background: var(--si-surface-2); } }

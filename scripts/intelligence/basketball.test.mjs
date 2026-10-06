@@ -1228,3 +1228,18 @@ section("basketball: a game scored with the simple keys (points, fouls, timeouts
   assert.deepEqual(m.env.sport.score, { a: 7, b: 5 });
   m.assertReconstructs("simple keys");
 });
+
+section("basketball: a game can be called early at the score as it stands", () => {
+  const m = openMatch(E, ctx);
+  m.push("MATCH_START"); m.push("PERIOD_START");
+  m.refuses("GAME_END_EARLY", {}, /End Q1 first/, "mid-quarter");
+  m.push("PERIOD_END");
+  m.refuses("GAME_END_EARLY", {}, /level/, "a level game");
+  m.push("PERIOD_START"); m.push("SHOT_MADE", { side: "b", points: 2 }); m.push("PERIOD_END");
+  m.push("GAME_END_EARLY", { reason: "Out of court time" });
+  m.refuses("PERIOD_START", {}, /ended early/, "no more quarters");
+  m.push("MATCH_COMPLETE");
+  assert.equal(m.env.result.winner, "b");
+  m.assertReconstructs("ended early");
+});
+
