@@ -305,11 +305,11 @@ export async function getContestEvents(
 async function sideContext(sb: Sb, teamId: string): Promise<SideContext | ActionError> {
   const [{ data: team, error: tErr }, { data: rows, error: pErr }] = await Promise.all([
     sb.from("tournament_teams").select("id, name").eq("id", teamId).maybeSingle(),
-    sb.from("tournament_team_players").select("id, user_id, guest_name, jersey_number, joined_at").eq("team_id", teamId).order("joined_at", { ascending: true }),
+    sb.from("tournament_team_players").select("id, user_id, guest_name, jersey_number, position, joined_at").eq("team_id", teamId).order("joined_at", { ascending: true }),
   ]);
   if (tErr || pErr) return fail((tErr ?? pErr)!.message);
   if (!team) return fail("TEAM_NOT_FOUND");
-  const players = (rows ?? []) as { id: string; user_id: string | null; guest_name: string | null; jersey_number: number | null }[];
+  const players = (rows ?? []) as { id: string; user_id: string | null; guest_name: string | null; jersey_number: number | null; position: string | null }[];
   const userIds = players.map((p) => p.user_id).filter((x): x is string => !!x);
   const { data: profiles } = userIds.length
     ? await sb.from("profiles").select("id, full_name, name, username").in("id", userIds)
@@ -319,7 +319,7 @@ async function sideContext(sb: Sb, teamId: string): Promise<SideContext | Action
     teamId: team.id, name: team.name,
     players: players.map((p) => {
       const pr = p.user_id ? prof.get(p.user_id) : undefined;
-      return { id: p.id, name: pr?.full_name ?? pr?.name ?? pr?.username ?? p.guest_name ?? "Player", number: p.jersey_number, userId: p.user_id };
+      return { id: p.id, name: pr?.full_name ?? pr?.name ?? pr?.username ?? p.guest_name ?? "Player", number: p.jersey_number, userId: p.user_id, position: p.position };
     }),
   };
 }

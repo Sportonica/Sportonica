@@ -32,6 +32,8 @@ export interface Participant {
   name: string;
   number?: number | null;
   userId?: string | null;
+  /** roster position ("PG", "Point Guard"), when the team gave one */
+  position?: string | null;
 }
 
 export interface SideContext {
