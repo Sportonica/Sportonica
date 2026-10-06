@@ -194,6 +194,26 @@
 .si-chips::-webkit-scrollbar { display: none; }
 .si-chip { flex: none; min-height: 36px; padding: 6px 11px; border-radius: 999px; border: 1px solid var(--si-line); background: transparent; color: var(--si-text-2); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .si-chip.on { background: var(--si-text); color: var(--si-surface); border-color: var(--si-text); }
+.si-chips.wrap { flex-wrap: wrap; overflow: visible; }
+.si-chip-num { font-weight: 900; margin-right: 5px; font-variant-numeric: tabular-nums; }
+.si-chip.dim { opacity: .6; }
+.si-search { max-width: 260px; }
+
+/* basketball game clock and shot clock */
+.si-clock { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--si-surface-2); border: 1px solid var(--si-line); }
+.si-clock-period { font-size: 15px; font-weight: 900; color: var(--si-text-2); }
+.si-clock-main { display: flex; align-items: baseline; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.si-clock-game { font-size: 40px; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1; background: none; border: 0; color: var(--si-text); font-family: inherit; cursor: pointer; padding: 0; }
+.si-clock-game.zero, .si-clock-shot.zero { color: var(--si-live); }
+.si-clock-shot { font-size: 24px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--si-warn); background: none; border: 0; font-family: inherit; cursor: pointer; padding: 0; }
+.si-clock-shot.off { color: var(--si-text-2); opacity: .5; font-size: 16px; }
+.si-clock-tools { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.si-clock-input { width: 84px; font-size: 18px; font-weight: 800; text-align: center; }
+@media (max-width: 520px) {
+  .si-clock { grid-template-columns: 1fr auto; }
+  .si-clock-main { grid-column: 1 / -1; grid-row: 2; }
+  .si-clock-game { font-size: 34px; }
+}
 [data-theme="paper"] .si-chip.on { background: #14171e; color: #fff; border-color: #14171e; }
 .si-error { background: rgba(229,72,77,.12); color: var(--si-live); border: 1px solid currentColor; border-radius: 12px; padding: 10px 12px; font-size: 13.5px; font-weight: 600; }
 .si-info { background: var(--si-surface-2); border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--si-text-2); }

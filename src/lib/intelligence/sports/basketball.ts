@@ -124,6 +124,12 @@ export interface BasketballState {
   teamFouls: Record<Side, Record<string, number>>;
   /** timeouts used per pool ("H1", "G", "OT1") */
   timeoutsUsed: Record<Side, Record<string, number>>;
+  /** substitutions made in the game (absent in states saved before it was counted) */
+  subsUsed?: Record<Side, number>;
+  /** sides whose game was entered as a box score after the fact, not play by play */
+  boxScore?: Record<Side, boolean>;
+  /** a box score left out shot attempts: percentages cannot be calculated */
+  attemptsUnknown?: boolean;
   /** who has the ball right now, when the events say so (null: loose or unknown) */
   ball: Side | null;
   /** alternating-possession arrow: the side that gets the next held ball */
@@ -180,6 +186,9 @@ export function benchOf(s: BasketballState, ctx: MatchContext, side: Side): stri
 const lineupSize = (s: BasketballState, ctx: MatchContext, side: Side, rules: BasketballRules): number =>
   Math.min(rules.playersOnCourt, eligibleOf(s, ctx, side).length);
 const n0 = (raw: Record<string, number> | undefined, k: string): number => raw?.[k] ?? 0;
+
+/** Misses are known: the competition records them, and no box score left them out. */
+const tracksShots = (s: BasketballState, rules: BasketballRules): boolean => rules.trackShotAttempts && !s.attemptsUnknown;
 const openPossession = (s: BasketballState): Possession | null => {
   const p = s.possessions[s.possessions.length - 1];
   return p && p.endSeq === null ? p : null;
@@ -417,7 +426,7 @@ interface TeamFigures {
 }
 
 function teamFigures(s: BasketballState, side: Side, rules: BasketballRules): TeamFigures {
-  const counted = rules.trackShotAttempts;
+  const counted = tracksShots(s, rules);
   return {
     poss: counted ? s.possessions.filter((p) => p.side === side).length : null,
     oppPoss: counted ? s.possessions.filter((p) => p.side !== side).length : null,
@@ -478,7 +487,7 @@ function playerStatus(s: BasketballState, id: string): string {
 }
 
 function playerRows(s: BasketballState, ctx: MatchContext, rules: BasketballRules): StatRow[] {
-  const tracked = rules.trackShotAttempts;
+  const tracked = tracksShots(s, rules);
   const minutesOk = s.minutesValid && lineupsKnown(s);
   const ratingsOk = s.ratingsValid && lineupsKnown(s) && tracked;
   const teamSecs: Record<Side, number> = { a: 0, b: 0 };
@@ -520,7 +529,7 @@ function playerRows(s: BasketballState, ctx: MatchContext, rules: BasketballRule
 function teamValues(s: BasketballState, ctx: MatchContext, rules: BasketballRules, side: Side): Record<string, StatValue> {
   const own = withReb(s.team[side]), opp = withReb(s.team[otherSide(side)]);
   const lead = leadStats(s.scoring);
-  const counted = rules.trackShotAttempts;
+  const counted = tracksShots(s, rules);
   return {
     ...Object.fromEntries(BOX_RAW.map((c) => [c.key, n0(own, c.key)])),
     fg: made(own, "fgm", "fga"), tp: made(own, "tpm", "tpa"), ft: made(own, "ftm", "fta"),
@@ -530,7 +539,7 @@ function teamValues(s: BasketballState, ctx: MatchContext, rules: BasketballRule
     benchPts: s.starters[side] ? n0(own, "benchPts") : null,
     largestLead: lead.largestLead[side],
     timeouts: n0(own, "timeouts"),
-    ...teamDerived(own, opp, teamFigures(s, side, rules), rules, s.period),
+    ...teamDerived(own, opp, teamFigures(s, side, rules), { ...rules, trackShotAttempts: tracksShots(s, rules) }, s.period),
   };
 }
 
@@ -558,7 +567,14 @@ export function timeoutsLeft(s: BasketballState, side: Side, rules: BasketballRu
   return Math.max(0, pool.allowance - (s.timeoutsUsed[side][pool.key] ?? 0));
 }
 
+/** Substitutions a side may still make, or null when they are unlimited. */
+export function substitutionsLeft(s: BasketballState, side: Side, rules: BasketballRules): number | null {
+  const limit = rules.substitutionsPerGame ?? null;
+  return limit === null ? null : Math.max(0, limit - (s.subsUsed?.[side] ?? 0));
+}
+
 function periodLabel(s: BasketballState, rules: BasketballRules): string {
+  if (isBoxScore(s)) return "Box score";
   if (s.period === 0) return "Not started";
   if (s.periodOpen) return `${periodName(s.period, rules)}${s.clock !== null ? `, ${formatClock(s.clock)} remaining` : ""}`;
   if (s.period === rules.periods && s.score.a === s.score.b && !rules.allowTie) return "End of regulation";
@@ -576,9 +592,9 @@ function gameFacts(s: BasketballState, ctx: MatchContext, rules: BasketballRules
     period: s.period, periodOpen: s.periodOpen, clock: s.clock, periodLabel: periodLabel(s, rules), overtime: isOvertime(s.period, rules), regulationPeriods: rules.periods,
     leadChanges: lead.leadChanges, timesTied: lead.timesTied, largestLead: lead.largestLead,
     runs: scoringRunsOf(s.scoring, 1).map((r) => ({ side: r.side, points: r.points, period: periodName(r.period, rules) })),
-    possessionsTracked: rules.trackShotAttempts,
+    possessionsTracked: tracksShots(s, rules),
     possessions: { a: s.possessions.filter((p) => p.side === "a").length, b: s.possessions.filter((p) => p.side === "b").length },
-    ball: s.ball, foulLimit: rules.foulLimit, trackShotAttempts: rules.trackShotAttempts,
+    ball: s.ball, foulLimit: rules.foulLimit, trackShotAttempts: tracksShots(s, rules),
     plusMinusValid: s.plusMinusValid && lineupsKnown(s),
     rules, recent: s.recent,
     freeThrowDue: s.freeThrows[0] ? freeThrowLabel(s.freeThrows[0], ctx) : null,
@@ -589,7 +605,7 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
   sport: "basketball",
   label: "Basketball",
   eventTypes: [
-    "PERIOD_START", "PERIOD_END", "LINEUP", "SUBSTITUTION", "SHOT_MADE", "SHOT_MISSED",
+    "BOX_SCORE", "PERIOD_START", "PERIOD_END", "PERIOD_REOPEN", "LINEUP", "SUBSTITUTION", "SHOT_MADE", "SHOT_MISSED",
     "FREE_THROW_MADE", "FREE_THROW_MISSED", "REBOUND", "ASSIST", "STEAL", "BLOCK", "TURNOVER", "FOUL", "TIMEOUT",
     "JUMP_BALL", "HELD_BALL", "ARROW", "OFFICIALS", "ROSTER", "VIOLATION", "OUT_OF_BOUNDS", "GOALTENDING",
     ...Object.keys(EVENT_ALIASES),
@@ -602,7 +618,7 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
     return {
       period: 0, periodOpen: false, clock: null, score: { a: 0, b: 0 }, byPeriod: { a: [], b: [] },
       team: { a: {}, b: {} }, players: {}, out: {}, gameRoster: { a: null, b: null }, onCourt: { a: null, b: null }, starters: { a: null, b: null },
-      teamFouls: { a: {}, b: {} }, timeoutsUsed: { a: {}, b: {} },
+      teamFouls: { a: {}, b: {} }, timeoutsUsed: { a: {}, b: {} }, subsUsed: { a: 0, b: 0 },
       ball: null, arrow: null, owner: null, ending: null, possessions: [], shots: [], scoring: [], run: { side: null, points: 0 },
       plusMinusValid: true, minutesValid: true, ratingsValid: true,
       clutch: { team: { a: {}, b: {} }, players: {}, seen: false, unknown: false },
@@ -752,10 +768,10 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
     const lines: StatLine[] = [];
     if (ctx.sides) {
       const winner = s.score.a === s.score.b ? null : s.score.a > s.score.b ? "a" : "b";
-      const tracked = rules.trackShotAttempts ? 1 : 0;
+      const tracked = tracksShots(s, rules) ? 1 : 0;
       const secs = secondsPlayed(s, rules) ?? 0;
       const minutesOk = s.minutesValid && lineupsKnown(s);
-      const ratingsOk = s.ratingsValid && lineupsKnown(s) && rules.trackShotAttempts;
+      const ratingsOk = s.ratingsValid && lineupsKnown(s) && tracksShots(s, rules);
       for (const side of SIDES) {
         const own = withReb(s.team[side]), opp = withReb(s.team[otherSide(side)]);
         const f = teamFigures(s, side, rules);
@@ -794,7 +810,13 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
     return basketballAnalytics(s, ctx, rules);
   },
 
-  validateMatchCompletion(s, _ctx, rules) {
+  validateMatchCompletion(s, ctx, rules) {
+    if (isBoxScore(s)) {
+      const missing = SIDES.filter((x) => !s.boxScore![x]);
+      if (missing.length) return `Enter ${sideName(ctx, missing[0])}'s box score too`;
+      if (s.score.a === s.score.b && !rules.allowTie) return "The score is level. A game cannot end level: enter the score after overtime";
+      return null;
+    }
     if (s.periodOpen) return `${periodName(s.period, rules)} is still in progress. End the period first`;
     if (s.period < rules.periods) return `Only ${s.period} of ${rules.periods} periods have been played`;
     if (s.score.a === s.score.b && !rules.allowTie) return "The score is level. Play overtime";
@@ -891,8 +913,10 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
     const who = str(p.player) ? playerName(ctx, str(p.player)) : side;
     const detail = [p.zone ? label(String(p.zone)) : null, p.shotType ? label(String(p.shotType)) : null, p.fastBreak ? "fast break" : null].filter(Boolean).join(", ");
     switch (ev.type) {
+      case "BOX_SCORE": return `${side} box score: ${boxScorePoints(p, rules)} points`;
       case "PERIOD_START": return "Period started";
       case "PERIOD_END": return "Period ended";
+      case "PERIOD_REOPEN": return "Period reopened";
       case "LINEUP": return `${side} lineup set`;
       case "SUBSTITUTION": return `${side}: ${playerName(ctx, str(p.in))} on for ${playerName(ctx, str(p.out))}`;
       case "TIMEOUT": return `Timeout ${side}`;
@@ -929,6 +953,92 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
   },
 };
 
+// ── box score: a game entered after the fact ─────────────────────────
+// A game nobody scored play by play can still be entered from the score
+// sheet: one BOX_SCORE event per team with each player's line (and a
+// line with no player for points not credited to anyone). It feeds the
+// same score, standings, box score and career totals as live scoring.
+// What needs the play-by-play (minutes, plus/minus, possessions, runs,
+// clutch) is withheld; percentages too when attempts are left out.
+
+export const BOX_SCORE_FIELDS = ["twos", "threes", "ftm", "fga", "tpa", "fta", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf"] as const;
+export type BoxScoreLine = { player?: string | null } & Partial<Record<(typeof BOX_SCORE_FIELDS)[number], number>>;
+
+export const isBoxScore = (s: BasketballState): boolean => !!(s.boxScore?.a || s.boxScore?.b);
+
+const lineNum = (l: BoxScoreLine, k: (typeof BOX_SCORE_FIELDS)[number]): number => l[k] ?? 0;
+const linePoints = (l: BoxScoreLine, rules: BasketballRules): number =>
+  lineNum(l, "twos") * rules.twoPointValue + lineNum(l, "threes") * rules.threePointValue + lineNum(l, "ftm") * rules.freeThrowValue;
+
+/** The points a BOX_SCORE payload adds up to. */
+export function boxScorePoints(p: Record<string, unknown>, rules: BasketballRules): number {
+  return Array.isArray(p.lines) ? (p.lines as BoxScoreLine[]).reduce((t, l) => t + linePoints(l, rules), 0) : 0;
+}
+
+function validateBoxScore(s: BasketballState, p: Record<string, unknown>, ctx: MatchContext, rules: BasketballRules): string | null {
+  if (!isSide(p.side)) return "Say which side the box score is for";
+  if (s.period > 0 && !isBoxScore(s)) return "This game is being scored play by play. A box score is for a game that was not";
+  if (s.boxScore?.[p.side]) return `${sideName(ctx, p.side)}'s box score is already in. Correct it instead`;
+  const lines = p.lines;
+  if (!Array.isArray(lines) || !lines.length) return "Enter at least one line";
+  const seen = new Set<string>();
+  for (const l of lines as BoxScoreLine[]) {
+    if (!l || typeof l !== "object") return "Each line must be a player's figures";
+    const who = l.player ?? null;
+    if (who !== null) {
+      if (typeof who !== "string" || sideOfPlayer(ctx, who) !== p.side) return "Every player must belong to that team";
+      if (seen.has(who)) return `${playerName(ctx, who)} appears twice`;
+      seen.add(who);
+    } else if (seen.has("")) return "Only one line can be for the team";
+    else seen.add("");
+    for (const k of BOX_SCORE_FIELDS) {
+      const v = l[k];
+      if (v !== undefined && v !== null && (!isNonNegInt(v) || v > 300)) return `${k} must be a whole number from 0 to 300`;
+    }
+    const name = who ? playerName(ctx, who) : sideName(ctx, p.side);
+    if (l.fga != null && l.fga < lineNum(l, "twos") + lineNum(l, "threes")) return `${name}: more field goals made than attempted`;
+    if (l.tpa != null && l.tpa < lineNum(l, "threes")) return `${name}: more threes made than attempted`;
+    if (l.fta != null && l.fta < lineNum(l, "ftm")) return `${name}: more free throws made than attempted`;
+  }
+  const total = boxScorePoints(p, rules);
+  if (p.periods != null) {
+    const per = p.periods;
+    if (!Array.isArray(per) || !per.length || per.length > rules.periods + 6 || per.some((v) => !isNonNegInt(v))) return "Period scores must be whole numbers, one per period";
+    if (per.length < rules.periods) return `Give all ${rules.periods} periods, or none`;
+    const sum = (per as number[]).reduce((t, v) => t + v, 0);
+    if (sum !== total) return `The period scores add up to ${sum}, but the players' points add up to ${total}`;
+  }
+  return null;
+}
+
+function applyBoxScore(s: BasketballState, ev: EngineEvent, ctx: MatchContext, rules: BasketballRules): void {
+  const p = ev.payload;
+  const side = p.side as Side;
+  let total = 0;
+  for (const l of p.lines as BoxScoreLine[]) {
+    const who = l.player ?? null;
+    const fgm = lineNum(l, "twos") + lineNum(l, "threes");
+    if ((fgm && l.fga == null) || (lineNum(l, "threes") && l.tpa == null) || (lineNum(l, "ftm") && l.fta == null)) s.attemptsUnknown = true;
+    const counts: Record<string, number> = {
+      fgm, fga: l.fga ?? fgm, tpm: lineNum(l, "threes"), tpa: l.tpa ?? lineNum(l, "threes"), ftm: lineNum(l, "ftm"), fta: l.fta ?? lineNum(l, "ftm"),
+      oreb: lineNum(l, "oreb"), dreb: lineNum(l, "dreb"), ast: lineNum(l, "ast"), stl: lineNum(l, "stl"), blk: lineNum(l, "blk"), tov: lineNum(l, "tov"), pf: lineNum(l, "pf"),
+      pts: linePoints(l, rules),
+    };
+    for (const [k, v] of Object.entries(counts)) if (v) credit(s, side, who, k, v, false);
+    if (who && counts.pf >= rules.foulLimit) s.out[who] = "fouled_out";
+    total += counts.pts;
+  }
+  s.boxScore = { ...(s.boxScore ?? { a: false, b: false }), [side]: true };
+  s.score[side] += total;
+  if (Array.isArray(p.periods)) {
+    s.byPeriod[side] = [...(p.periods as number[])];
+    s.period = Math.max(s.period, p.periods.length);
+  } else s.byPeriod[side] = [(s.byPeriod[side][0] ?? 0) + total];
+  s.scoring.push({ seq: ev.seq, side, pts: total, period: 0, clock: null, a: s.score.a, b: s.score.b });
+  s.plusMinusValid = false; s.minutesValid = false; s.ratingsValid = false; s.clutch.unknown = true;
+  s.log.push({ seq: ev.seq, text: `${sideName(ctx, side)} box score entered: ${total} points` });
+}
+
 // ── core validation and reducer (wrapped by ./basketball/… rules below) ──
 
 function validateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, rules: BasketballRules): string | null {
@@ -958,7 +1068,10 @@ function validateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, ru
       if (court && court.some((id) => !list.includes(id))) return "Every player in the lineup must be in the game roster";
       return null;
     }
+    case "BOX_SCORE":
+      return validateBoxScore(s, p, ctx, rules);
     case "PERIOD_START":
+      if (isBoxScore(s)) return "This game was entered as a box score. Correct the box score instead";
       if (s.periodOpen) return `${periodName(s.period, rules)} is still in progress`;
       if (s.period === 0) {
         for (const side of SIDES) {
@@ -971,6 +1084,11 @@ function validateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, ru
       return null;
     case "PERIOD_END":
       return s.periodOpen ? null : "No period is in progress";
+    // the last period taken back, to add what was missed before it ended (after reopening a finished match)
+    case "PERIOD_REOPEN":
+      if (isBoxScore(s)) return "This game was entered as a box score. Correct the box score instead";
+      if (s.periodOpen) return `${periodName(s.period, rules)} is still in progress`;
+      return s.period > 0 ? null : "No period has been played yet";
     case "LINEUP": {
       if (!isSide(p.side)) return "Say which side the lineup is for";
       const list = p.players;
@@ -992,6 +1110,7 @@ function validateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, ru
       if (!court.includes(p.out)) return "The player going off is not on court";
       if (court.includes(p.in)) return "The player coming on is already on court";
       if (s.out[p.in]) return "A fouled out or disqualified player cannot come back on";
+      if (substitutionsLeft(s, p.side, rules) === 0) return `${sideName(ctx, p.side)} has used all ${rules.substitutionsPerGame} substitutions`;
       return null;
     }
     case "TIMEOUT": {
@@ -1139,6 +1258,11 @@ function updateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, rule
   }
 
   switch (ev.type) {
+    case "BOX_SCORE": applyBoxScore(s, ev, ctx, rules); break;
+    case "PERIOD_REOPEN":
+      s.periodOpen = true; s.clock = null;
+      s.log.push({ seq: ev.seq, text: `${periodName(s.period, rules)} reopened` });
+      break;
     case "PERIOD_START":
       s.period += 1; s.periodOpen = true; s.clock = periodSeconds(s.period, rules);
       for (const x of SIDES) s.byPeriod[x][s.period - 1] = 0;
@@ -1159,6 +1283,8 @@ function updateBase(s: BasketballState, ev: EngineEvent, ctx: MatchContext, rule
     case "SUBSTITUTION": {
       const court = s.onCourt[side]!;
       court[court.indexOf(p.out as string)] = p.in as string;
+      s.subsUsed = s.subsUsed ?? { a: 0, b: 0 };
+      s.subsUsed[side] += 1;
       if (clock === null) s.minutesValid = false;
       break;
     }
@@ -1311,7 +1437,8 @@ const takesBall = (s: BasketballState, ev: EngineEvent): boolean => {
   return (WITH_BALL.has(ev.type) || ev.type === "REBOUND") && s.owner !== null && s.owner !== side;
 };
 
-function shotClockCapFor(s: BasketballState, ev: EngineEvent, rules: BasketballRules): number | null {
+/** The highest shot clock reading the engine accepts with this event (null: any). */
+export function shotClockCapFor(s: BasketballState, ev: EngineEvent, rules: BasketballRules): number | null {
   if (s.shotClockCap === null || takesBall(s, ev) || rules.shotClockSeconds === null) return null;
   if (resetsShotClock(ev)) return Math.max(s.shotClockCap, rules.shotClockReset ?? rules.shotClockSeconds);
   return s.shotClockCap;
@@ -1574,7 +1701,7 @@ function basketballAnalytics(s: BasketballState, ctx: MatchContext, rules: Baske
   const periodLabels = Array.from({ length: s.period }, (_, i) => periodName(i + 1, rules));
   const tv = { a: teamValues(s, ctx, rules, "a"), b: teamValues(s, ctx, rules, "b") };
   const rows = playerRows(s, ctx, rules);
-  const tracked = rules.trackShotAttempts;
+  const tracked = tracksShots(s, rules);
   const num = (v: StatValue) => (typeof v === "number" ? v : null);
 
   const cards: AnalyticsCard[] = [

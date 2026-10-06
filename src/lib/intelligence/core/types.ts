@@ -22,7 +22,7 @@ export type ContestStatus = (typeof CONTEST_STATUS)[number];
 // Shared by every sport; handled in core/lifecycle.ts, never by an engine.
 export const LIFECYCLE_EVENTS = [
   "MATCH_START", "MATCH_PAUSE", "MATCH_RESUME", "MATCH_POSTPONE", "MATCH_CANCEL",
-  "MATCH_ABANDON", "MATCH_FORFEIT", "MATCH_RESTART", "MATCH_COMPLETE",
+  "MATCH_ABANDON", "MATCH_FORFEIT", "MATCH_RESTART", "MATCH_COMPLETE", "MATCH_REOPEN",
 ] as const;
 export type LifecycleEventType = (typeof LIFECYCLE_EVENTS)[number];
 export const CORRECTION_VOID = "CORRECTION_VOID";

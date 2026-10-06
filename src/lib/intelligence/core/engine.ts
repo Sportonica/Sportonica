@@ -93,6 +93,11 @@ export function applyEvent<R, S>(
         env.sport = engine.initializeMatch(ctx, rules);
         env.status = "live"; env.restarts += 1; env.statusReason = null; env.result = null;
         return null;
+      // a finished match taken back into play to fix or add events; completing it again sends the new result on
+      case "MATCH_REOPEN":
+        if (st !== "completed") return "Only a completed match can be reopened";
+        env.status = "live"; env.completedAt = null; env.result = null; env.statusReason = reasonOf(ev);
+        return null;
       case "MATCH_COMPLETE": {
         if (st !== "live" && st !== "paused") return "Only a match in progress can be completed";
         const why = engine.validateMatchCompletion(env.sport, ctx, rules);
@@ -286,6 +291,7 @@ export function describe<R, S>(engine: SportIntelligenceEngine<R, S>, ev: Engine
     case "MATCH_ABANDON": return `Match abandoned${reasonOf(ev) ? `: ${reasonOf(ev)}` : ""}`;
     case "MATCH_FORFEIT": return isSide(ev.payload.side) ? `${sideName(ctx, ev.payload.side)} forfeited` : "Forfeit";
     case "MATCH_RESTART": return `Match restarted${reasonOf(ev) ? `: ${reasonOf(ev)}` : ""}`;
+    case "MATCH_REOPEN": return `Match reopened${reasonOf(ev) ? `: ${reasonOf(ev)}` : ""}`;
     case "MATCH_COMPLETE": return "Match completed";
     case CORRECTION_VOID: return "Correction: event reversed";
     default: return engine.describeEvent(ev, ctx, rules);

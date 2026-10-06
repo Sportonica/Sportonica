@@ -407,7 +407,10 @@ export async function openSwimRace(
 async function syncFixture(sb: Sb, row: ContestRow, env: MatchEnvelope, mirror: MirrorScore | null): Promise<string | null> {
   if (!row.match_id || !row.context.sides) return null;
   const teamOf = (s: Side | null) => (s ? row.context.sides![s].teamId : null);
-  const warn = (message: string) => `The match was saved, but the fixture could not be updated: ${friendlyTournamentError(message)}`;
+  const warn = (message: string) => message.includes("CASCADE_CONFIRMATION_REQUIRED")
+    // never forced from here: a cascade resets later rounds' results
+    ? "The match was saved, but the fixture still shows the old result: the new one changes who advances, and a later round already involves the old winner. Sort out that round in the Fixtures tab, then reopen and complete this match again."
+    : `The match was saved, but the fixture could not be updated: ${friendlyTournamentError(message)}`;
 
   if (env.status === "postponed" || env.status === "cancelled" || env.status === "abandoned") {
     const { error } = await sb.rpc("set_match_status", { p_match_id: row.match_id, p_status: env.status === "postponed" ? "postponed" : "cancelled" });
