@@ -11,6 +11,7 @@ import { isActionError } from "@/lib/actionError";
 import { useProfile } from "@/lib/hooks/useProfile";
 import { getSportKind } from "@/lib/sports";
 import type { MatchIntel } from "@/lib/intelligence/matchIntel";
+import type { TournamentLeaders } from "@/lib/intelligence/types";
 import { signed, standingsScheme } from "@/lib/tournaments/standings";
 import {
   FORMAT_LABELS, compareStageRound,
@@ -51,8 +52,10 @@ function statusInfo(status: Tournament["status"]): { label: string; cls: string 
 }
 
 export default function EventTabs({
-  tournament, teams, matches, standingsByGroup, playerStats, awards, myTeam, loggedIn, initialTab, intel = {},
+  tournament, teams, matches, standingsByGroup, playerStats, leaders = null, awards, myTeam, loggedIn, initialTab, intel = {},
 }: {
+  // basketball: per-player figures from its scored games
+  leaders?: TournamentLeaders | null;
   // match id -> its score in that sport's own terms, for matches scored
   // event by event. Empty for football.
   intel?: Record<string, MatchIntel>;
@@ -74,6 +77,7 @@ export default function EventTabs({
   const hasStandings = tournament.format === "league" || tournament.format === "group_knockout";
   const isSingleEvent = tournament.format === "single_event";
   const isIndividualRace = getSportKind(tournament.sport) === "individual_race";
+  const isBasketballSport = tournament.sport === "Basketball";
   // Hide the Register tab once the tournament is well underway with no
   // team of your own to manage — nothing to do there.
   const showRegister =
@@ -207,11 +211,13 @@ export default function EventTabs({
         <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} />
       )}
       {activeTab === "Player Stats" && (
-        authLoading ? null : user ? <PlayerStatsTab rows={playerStats} teams={teams} /> : <SignInGate what="the player stats" pathname={pathname} />
+        authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
+          : isBasketballSport ? <BasketballLeadersTab leaders={leaders} />
+          : <PlayerStatsTab rows={playerStats} teams={teams} />
       )}
       {activeTab === "Results" && <ResultsTab tournamentId={tournament.id} />}
       {activeTab === "Teams" && (
-        authLoading ? null : user ? <TeamsTab teams={confirmedTeams} playerStats={playerStats} /> : <SignInGate what="the teams and squads" pathname={pathname} />
+        authLoading ? null : user ? <TeamsTab teams={confirmedTeams} playerStats={isBasketballSport ? [] : playerStats} /> : <SignInGate what="the teams and squads" pathname={pathname} />
       )}
 
       {/* Rules only matter while you're deciding whether to register or
@@ -633,6 +639,53 @@ function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; team
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Basketball leaders: one stat at a time, the game total with the per-game average beside it.
+const BB_STATS = [
+  { total: "pts", avg: "ppg", label: "Points" },
+  { total: "reb", avg: "rpg", label: "Rebounds" },
+  { total: "ast", avg: "apg", label: "Assists" },
+  { total: "stl", avg: "spg", label: "Steals" },
+  { total: "blk", avg: "bpg", label: "Blocks" },
+  { total: "tpm", avg: "tpmPg", label: "3-pointers" },
+] as const;
+
+function BasketballLeadersTab({ leaders }: { leaders: TournamentLeaders | null }) {
+  const [stat, setStat] = useState<(typeof BB_STATS)[number]>(BB_STATS[0]);
+  if (!leaders?.rows.length) return <div className="ev2-empty">Player stats appear here once games are scored.</div>;
+  const num = (v: unknown) => (typeof v === "number" ? v : 0);
+  const sorted = leaders.rows.filter((r) => num(r.values[stat.total]) > 0).sort((a, b) => num(b.values[stat.total]) - num(a.values[stat.total]));
+  return (
+    <div>
+      <div className="ev2-subtabs">
+        {BB_STATS.map((t) => (
+          <button key={t.total} className={`ev2-subtab ${stat.total === t.total ? "on" : ""}`} onClick={() => setStat(t)}>{t.label}</button>
+        ))}
+      </div>
+      {sorted.length === 0 ? <div className="ev2-empty">No {stat.label.toLowerCase()} recorded yet.</div> : (
+        <div className="ev2-standings">
+          <div className="ev2-srow-head">
+            <span className="ev2-srow-head-rank" />
+            <span className="ev2-srow-head-badge" />
+            <span>Player</span>
+            <span className="ev2-srow-head-stat">{stat.label}</span>
+          </div>
+          {sorted.map((r, i) => (
+            <div key={r.subjectKey} className={`ev2-srow${i < 2 ? " top3" : ""}`}>
+              <span className="ev2-srow-rank">{i + 1}</span>
+              <TeamCrest name={r.name} />
+              <div className="ev2-prow-id">
+                <span className="ev2-srow-name">{r.name}</span>
+                <span className="ev2-prow-team">{r.teamName} · {r.contests} game{r.contests === 1 ? "" : "s"} · {num(r.values[stat.avg]).toFixed(1)} per game</span>
+              </div>
+              <span className="ev2-srow-stat">{num(r.values[stat.total])}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
