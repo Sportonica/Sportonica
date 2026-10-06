@@ -955,3 +955,70 @@ export async function basketballScoringModes(tournamentId: string): Promise<Reco
   return out;
 }
 
+// ── public game cards: what each finished game recorded ─────────
+
+export interface MatchHighlight {
+  contestId: string;
+  sport: SportKey;
+  /** quarter (or innings) scores as the score card shows them; null when there is only one */
+  periods: { label: string; a: string; b: string }[] | null;
+  result: string | null;
+  /** the best performers, a line each: "#23 Rajesh 24 pts · 8 reb" */
+  stars: { side: Side; text: string }[];
+}
+
+/**
+ * Per fixture, the scored game's highlights for the public game cards:
+ * period scores, the result line and its top performers (finished games
+ * only, since a game's player lines are kept once it is complete).
+ */
+export async function getMatchHighlights(tournamentId: string): Promise<Record<string, MatchHighlight> | ActionError> {
+  const sb = await createClient();
+  const [{ data: contests, error }, { data: lines }] = await Promise.all([
+    sb.from("si_contests").select("id, match_id, sport, summary, context").eq("tournament_id", tournamentId).not("match_id", "is", null),
+    sb.from("si_stat_lines").select("contest_id, subject_key, team_player_id, raw").eq("tournament_id", tournamentId).eq("subject", "player").limit(5000),
+  ]);
+  if (error) return fail(error.message);
+  const byContest = new Map<string, { id: string; raw: Record<string, number> }[]>();
+  for (const l of (lines ?? []) as { contest_id: string; subject_key: string; team_player_id: string | null; raw: Record<string, number> }[]) {
+    byContest.set(l.contest_id, [...(byContest.get(l.contest_id) ?? []), { id: l.team_player_id ?? l.subject_key, raw: l.raw ?? {} }]);
+  }
+  const out: Record<string, MatchHighlight> = {};
+  for (const c of (contests ?? []) as { id: string; match_id: string; sport: SportKey; summary: { view?: { periods?: MatchHighlight["periods"] }; resultText?: string | null } | null; context: MatchContext }[]) {
+    const sides = c.context?.sides;
+    if (!sides) continue;
+    const who = (id: string): { side: Side; name: string } | null => {
+      for (const side of ["a", "b"] as Side[]) {
+        const p = sides[side].players.find((x) => x.id === id);
+        if (p) return { side, name: `${p.number != null ? `#${p.number} ` : ""}${p.name}` };
+      }
+      return null;
+    };
+    const n = (r: Record<string, number>, k: string) => r[k] ?? 0;
+    const pl = byContest.get(c.id) ?? [];
+    const stars: MatchHighlight["stars"] = [];
+    const best = (score: (r: Record<string, number>) => number, text: (r: Record<string, number>) => string) => {
+      for (const side of ["a", "b"] as Side[]) {
+        const top = pl.map((x) => ({ x, w: who(x.id) })).filter((y) => y.w?.side === side && score(y.x.raw) > 0)
+          .sort((p, q) => score(q.x.raw) - score(p.x.raw))[0];
+        if (top) stars.push({ side, text: `${top.w!.name} ${text(top.x.raw)}` });
+      }
+    };
+    if (c.sport === "basketball") {
+      best((r) => n(r, "pts"), (r) => {
+        const reb = n(r, "oreb") + n(r, "dreb");
+        return [`${n(r, "pts")} pts`, reb ? `${reb} reb` : null, n(r, "ast") ? `${n(r, "ast")} ast` : null].filter(Boolean).join(" · ");
+      });
+    } else if (c.sport === "cricket") {
+      best((r) => n(r, "batRuns"), (r) => `${n(r, "batRuns")} (${n(r, "batBalls")})`);
+      best((r) => n(r, "wickets") * 1000 - n(r, "bowlRuns"), (r) => `${n(r, "wickets")}/${n(r, "bowlRuns")}`);
+    }
+    const periods = c.summary?.view?.periods ?? null;
+    out[c.match_id] = {
+      contestId: c.id, sport: c.sport, periods: periods && periods.length > 1 ? periods : null,
+      result: c.summary?.resultText ?? null, stars,
+    };
+  }
+  return out;
+}
+

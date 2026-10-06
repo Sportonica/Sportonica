@@ -15,7 +15,7 @@ import { sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
 import EventTabs from "@/components/tournaments/public/EventTabs";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
-import { getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
+import { getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
 import { computeBasketballStandings, computeCricketStandings, isBasketball, isCricket } from "@/lib/tournaments/standings";
@@ -91,6 +91,9 @@ export default async function TournamentDetailPage({
   // cricket: batting and bowling figures entered from the fixtures
   const cricketRes = isLiveOrDone && isCricket(tournament.sport) ? await getTournamentCricketStats(id) : null;
   const cricketStats = cricketRes && !isActionError(cricketRes) ? cricketRes : [];
+  // what each scored game recorded: period scores, result, top performers
+  const highlightsRes = isLiveOrDone && sportKeyFor(tournament.sport) ? await getMatchHighlights(id) : null;
+  const highlights = highlightsRes && !isActionError(highlightsRes) ? highlightsRes : {};
   const awards = isActionError(awardsRes) ? { winner: null, runnerUp: null, semifinalists: [] } : awardsRes;
 
   const hasStandings = tournament.format === "league" || tournament.format === "group_knockout";
@@ -201,6 +204,7 @@ export default async function TournamentDetailPage({
               playerStats={playerStats}
               leaders={leaders}
               cricketStats={cricketStats}
+              highlights={highlights}
               awards={awards}
               myTeam={isActionError(myTeam) ? null : myTeam}
               loggedIn={!!user}

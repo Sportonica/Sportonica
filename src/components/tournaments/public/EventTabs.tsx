@@ -12,6 +12,7 @@ import { useProfile } from "@/lib/hooks/useProfile";
 import { getSportKind } from "@/lib/sports";
 import type { MatchIntel } from "@/lib/intelligence/matchIntel";
 import type { TournamentLeaders } from "@/lib/intelligence/types";
+import type { MatchHighlight } from "@/lib/intelligence/actions";
 import { diffText, standingsScheme } from "@/lib/tournaments/standings";
 import {
   FORMAT_LABELS, compareStageRound, sideScore,
@@ -52,12 +53,14 @@ function statusInfo(status: Tournament["status"]): { label: string; cls: string 
 }
 
 export default function EventTabs({
-  tournament, teams, matches, standingsByGroup, playerStats, leaders = null, cricketStats = [], awards, myTeam, loggedIn, initialTab, intel = {},
+  tournament, teams, matches, standingsByGroup, playerStats, leaders = null, cricketStats = [], highlights = {}, awards, myTeam, loggedIn, initialTab, intel = {},
 }: {
   // basketball: per-player figures from its scored games
   leaders?: TournamentLeaders | null;
   // cricket: batting and bowling entered from the fixtures
   cricketStats?: TournamentCricketStatRow[];
+  // match id -> what the scorer recorded for that game (period scores, top performers)
+  highlights?: Record<string, MatchHighlight>;
   // match id -> its score in that sport's own terms, for matches scored
   // event by event. Empty for football.
   intel?: Record<string, MatchIntel>;
@@ -81,6 +84,15 @@ export default function EventTabs({
   const isIndividualRace = getSportKind(tournament.sport) === "individual_race";
   const isBasketballSport = tournament.sport === "Basketball";
   const isCricketSport = getSportKind(tournament.sport) === "cricket";
+  // basketball and cricket call these their own way; the URL keeps the same tab keys
+  const tabLabel = (t: Tab): string => {
+    if (!isBasketballSport && !isCricketSport) return t;
+    if (t === "Fixtures") return isCricketSport ? "Matches" : "Games";
+    if (t === "Table") return isCricketSport ? "Points table" : "Standings";
+    if (t === "Knockout") return "Bracket";
+    if (t === "Player Stats") return "Leaders";
+    return t;
+  };
   // Hide the Register tab once the tournament is well underway with no
   // team of your own to manage — nothing to do there.
   const showRegister =
@@ -185,7 +197,7 @@ export default function EventTabs({
                 key={t} ref={(el) => { if (el) tabRefs.current[t] = el; }}
                 className={`ev2-tab ${activeTab === t ? "on" : ""}`} onClick={() => selectTab(t)}
               >
-                <Icon size={15} /> {t}
+                <Icon size={15} /> {tabLabel(t)}
               </button>
             );
           })}
@@ -198,7 +210,11 @@ export default function EventTabs({
       </div>
 
       {activeTab === "Overview" && (
-        <OverviewTab tournament={tournament} teams={teams} matches={matches} awards={awards} />
+        <OverviewTab tournament={tournament} teams={teams} matches={matches} awards={awards}
+          sportBoard={isBasketballSport || isCricketSport ? (
+            <SportBoard basketball={isBasketballSport} leaders={leaders} cricketStats={cricketStats} matches={matches} teams={teams}
+              highlights={highlights} tournamentId={tournament.id} onAll={() => selectTab("Player Stats")} />
+          ) : null} />
       )}
       {activeTab === "Register" && (
         <TournamentRegisterTab
@@ -211,7 +227,7 @@ export default function EventTabs({
       {activeTab === "Table" && <TableTab tournament={tournament} standingsByGroup={standingsByGroup} teams={teams} />}
       {activeTab === "Knockout" && <KnockoutTab matches={matches} teams={teams} intel={intel} tournamentId={tournament.id} />}
       {activeTab === "Fixtures" && (
-        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} />
+        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} />
       )}
       {activeTab === "Player Stats" && (
         authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
@@ -262,8 +278,10 @@ function SignInGate({ what, pathname }: { what: string; pathname: string }) {
 }
 
 // ── Overview ─────────────────────────────────────────────────────
-function OverviewTab({ tournament, teams, matches, awards }: {
+function OverviewTab({ tournament, teams, matches, awards, sportBoard = null }: {
   tournament: Tournament; teams: TournamentTeam[]; matches: TournamentMatch[]; awards: TournamentAwards;
+  // basketball / cricket: leaders and latest results, from what was scored
+  sportBoard?: React.ReactNode;
 }) {
   const confirmed = teams.filter((t) => t.status === "confirmed");
   const groups = [...new Set(teams.map((t) => t.group_name).filter((g): g is string => !!g))].sort();
@@ -289,6 +307,8 @@ function OverviewTab({ tournament, teams, matches, awards }: {
           <div style={{ marginTop: 14, fontSize: 12.5, opacity: 0.8 }}>Organised by <b style={{ opacity: 1 }}>{tournament.organizer_name}</b></div>
         )}
       </div>
+
+      {sportBoard}
 
       {hasAwards && (
         <div className="ev2-card">
@@ -502,8 +522,9 @@ function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: str
   );
 }
 
-function FixturesPublicTab({ tournamentId, matches, teams, intel }: {
+function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {} }: {
   tournamentId: string; matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>;
+  highlights?: Record<string, MatchHighlight>;
 }) {
   if (matches.length === 0) return <div className="ev2-empty">Fixtures haven&apos;t been generated yet.</div>;
   const team = (id: string | null) => (id ? teams.find((t) => t.id === id) : undefined);
@@ -584,6 +605,7 @@ function FixturesPublicTab({ tournamentId, matches, teams, intel }: {
                     </Link>
                   ) : m.round_label}
                 </div>
+                {highlights[m.id] ? <GameDetail h={highlights[m.id]} tournamentId={tournamentId} /> : null}
               </div>
             );
           })}
@@ -652,6 +674,89 @@ function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; team
   );
 }
 
+/** Under a game card: the period scores, the result and the top performers, then the full box score. */
+function GameDetail({ h, tournamentId }: { h: MatchHighlight; tournamentId: string }) {
+  if (!h.periods && !h.stars.length && !h.result) return null;
+  return (
+    <div className="ev2-fixture-extra">
+      {h.periods ? (
+        <div className="ev2-periods">
+          {h.periods.map((p) => <span key={p.label}><b>{p.label}</b> {p.a}–{p.b}</span>)}
+        </div>
+      ) : null}
+      {h.result ? <div className="ev2-game-result">{h.result}</div> : null}
+      {h.stars.length ? (
+        <div className="ev2-stars">
+          {h.stars.map((st, i) => <span key={i} className={`side-${st.side}`}>{st.text}</span>)}
+        </div>
+      ) : null}
+      <Link className="ev2-game-link" href={`/tournaments/${tournamentId}/live/${h.contestId}`}>{h.sport === "cricket" ? "Scorecard" : "Box score"} ›</Link>
+    </div>
+  );
+}
+
+/** Overview for basketball and cricket: who leads the tournament, and the latest results. */
+function SportBoard({ basketball, leaders, cricketStats, matches, teams, highlights, tournamentId, onAll }: {
+  basketball: boolean; leaders: TournamentLeaders | null; cricketStats: TournamentCricketStatRow[];
+  matches: TournamentMatch[]; teams: TournamentTeam[]; highlights: Record<string, MatchHighlight>; tournamentId: string; onAll: () => void;
+}) {
+  const num = (v: unknown) => (typeof v === "number" ? v : 0);
+  const name = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "TBD";
+  type Lead = { label: string; who: string; team: string; value: string };
+  const leads: Lead[] = [];
+  if (basketball) {
+    for (const [avg, label] of [["ppg", "Points"], ["rpg", "Rebounds"], ["apg", "Assists"]] as const) {
+      const top = [...(leaders?.rows ?? [])].sort((a, b) => num(b.values[avg]) - num(a.values[avg]))[0];
+      if (top && num(top.values[avg]) > 0) leads.push({ label, who: top.name, team: top.teamName, value: `${num(top.values[avg]).toFixed(1)} per game` });
+    }
+  } else {
+    const board = cricketBoard(cricketStats, leaders);
+    for (const [k, label, unit] of [["runs", "Most runs", "runs"], ["wickets", "Most wickets", "wickets"], ["sixes", "Most sixes", "sixes"]] as const) {
+      const top = [...board.values()].sort((a, b) => b[k] - a[k])[0];
+      if (top && top[k] > 0) leads.push({ label, who: top.name, team: top.team, value: `${top[k]} ${unit}` });
+    }
+  }
+  const latest = matches.filter((m) => m.status === "completed" && m.team_a_id && m.team_b_id)
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 3);
+  if (!leads.length && !latest.length) return null;
+  return (
+    <>
+      {leads.length ? (
+        <div className="ev2-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <div className="ev2-card-t">Leaders</div>
+            <button className="ev2-game-link" onClick={onAll}>All ›</button>
+          </div>
+          <div className="ev2-leads">
+            {leads.map((l) => (
+              <div key={l.label} className="ev2-lead">
+                <span className="l">{l.label}</span>
+                <span className="who">{l.who}</span>
+                <span className="v">{l.value}{l.team ? ` · ${l.team}` : ""}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {latest.length ? (
+        <div className="ev2-card">
+          <div className="ev2-card-t">Latest results</div>
+          {latest.map((m) => {
+            const h = highlights[m.id];
+            const line = <><b>{name(m.team_a_id)}</b> {sideScore(m, "a")} – {sideScore(m, "b")} <b>{name(m.team_b_id)}</b></>;
+            return (
+              <div key={m.id} className="ev2-latest">
+                {h ? <Link href={`/tournaments/${tournamentId}/live/${h.contestId}`}>{line} ›</Link> : <span>{line}</span>}
+                {h?.stars.length ? <div className="ev2-stars">{h.stars.slice(0, 2).map((st, i) => <span key={i} className={`side-${st.side}`}>{st.text}</span>)}</div> : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 // Basketball leaders: one stat at a time, the game total with the per-game average beside it.
 const BB_STATS = [
   { total: "pts", avg: "ppg", label: "Points" },
@@ -710,10 +815,9 @@ const CRICKET_STATS = [
 ] as const;
 type CricketKey = (typeof CRICKET_STATS)[number]["key"];
 
-function CricketLeadersTab({ rows, leaders }: { rows: TournamentCricketStatRow[]; leaders: TournamentLeaders | null }) {
-  const [stat, setStat] = useState<CricketKey>("runs");
+/** One line per player: figures entered from the fixtures and from ball-by-ball scoring added together. */
+function cricketBoard(rows: TournamentCricketStatRow[], leaders: TournamentLeaders | null) {
   const num = (v: unknown) => (typeof v === "number" ? v : 0);
-  // one line per player: hand-entered and ball-by-ball figures added together
   const players = new Map<string, { name: string; team: string } & Record<CricketKey, number>>();
   const line = (id: string, name: string, team: string) => {
     if (!players.has(id)) players.set(id, { name, team, runs: 0, wickets: 0, sixes: 0, fours: 0, catches: 0, mom: 0 });
@@ -727,6 +831,12 @@ function CricketLeadersTab({ rows, leaders }: { rows: TournamentCricketStatRow[]
     const p = line(r.subjectKey, r.name, r.teamName);
     p.runs += num(r.values.batRuns); p.wickets += num(r.values.wickets); p.sixes += num(r.values.sixes); p.fours += num(r.values.fours); p.catches += num(r.values.catches);
   }
+  return players;
+}
+
+function CricketLeadersTab({ rows, leaders }: { rows: TournamentCricketStatRow[]; leaders: TournamentLeaders | null }) {
+  const [stat, setStat] = useState<CricketKey>("runs");
+  const players = cricketBoard(rows, leaders);
   if (!players.size) return <div className="ev2-empty">Player stats appear here once match figures are entered.</div>;
   const label = CRICKET_STATS.find((t) => t.key === stat)!.label;
   const sorted = [...players.entries()].filter(([, p]) => p[stat] > 0).sort(([, a], [, b]) => b[stat] - a[stat]);

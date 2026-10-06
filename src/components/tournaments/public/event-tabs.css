@@ -197,7 +197,7 @@
    are fixed so the score stays a true, never-moving center anchor. */
 .ev2-fixture {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 64px minmax(0, 1fr) 84px;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(64px, auto) minmax(0, 1fr) 84px;
   align-items: center; column-gap: 10px; padding: 12px 16px; border-radius: 13px; margin-bottom: 8px;
   background: rgba(242,237,230,0.035); border: 1px solid rgba(242,237,230,0.08);
   transition: border-color .2s, background .2s;
@@ -495,3 +495,22 @@
 .tr-price-table tr:last-child td { border-bottom: none; }
 [data-theme="paper"] .tr-price-table { border-color: rgba(20,23,30,0.08); }
 [data-theme="paper"] .tr-price-table th, [data-theme="paper"] .tr-price-table td { border-color: rgba(20,23,30,0.08); }
+
+/* ── Game cards: what was recorded (basketball, cricket) ── */
+.ev2-fixture-extra { grid-column: 1 / -1; display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(242,237,230,0.08); }
+[data-theme="paper"] .ev2-fixture-extra { border-top-color: rgba(20,23,30,0.07); }
+.ev2-periods { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; font-variant-numeric: tabular-nums; opacity: .85; }
+.ev2-periods b { opacity: .6; font-weight: 800; margin-right: 2px; }
+.ev2-game-result { font-size: 12.5px; font-weight: 700; }
+.ev2-stars { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; }
+.ev2-stars span::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: #3987e5; }
+.ev2-stars span.side-b::before { background: #d95926; }
+.ev2-game-link { justify-self: end; font-size: 12.5px; font-weight: 800; color: #00875a; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; text-decoration: none; }
+.ev2-leads { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ev2-lead { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: rgba(0,135,90,0.07); }
+.ev2-lead .l { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
+.ev2-lead .who { font-weight: 800; font-size: 14.5px; }
+.ev2-lead .v { font-size: 12px; opacity: .75; }
+.ev2-latest { display: grid; gap: 4px; padding: 8px 0; border-bottom: 1px solid rgba(242,237,230,0.06); font-size: 13.5px; }
+.ev2-latest:last-child { border-bottom: 0; }
+.ev2-latest a { color: inherit; text-decoration: none; }
