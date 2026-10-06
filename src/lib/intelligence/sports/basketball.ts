@@ -818,8 +818,8 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
       if (s.score.a === s.score.b && !rules.allowTie) return "The score is level. A game cannot end level: enter the score after overtime";
       return null;
     }
-    if (s.periodOpen) return `${periodName(s.period, rules)} is still in progress. End the period first`;
-    if (s.period < rules.periods) return `Only ${s.period} of ${rules.periods} periods have been played`;
+    if (s.periodOpen) return `${periodName(s.period, rules)} is still in progress. Tap End ${periodName(s.period, rules)} under the clock, and play the remaining ${rules.periods === 4 ? "quarters" : "periods"} first`;
+    if (s.period < rules.periods) return `Only ${s.period} of ${rules.periods} ${rules.periods === 4 ? "quarters" : "periods"} have been played. To stop early, use Abandon`;
     if (s.score.a === s.score.b && !rules.allowTie) return "The score is level. Play overtime";
     return null;
   },
