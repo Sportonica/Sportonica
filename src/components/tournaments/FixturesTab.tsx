@@ -14,6 +14,9 @@ import { isActionError } from "@/lib/actionError";
 import { friendlyTournamentError } from "@/lib/tournaments/types";
 import { getSportKind, type SportKind } from "@/lib/sports";
 import { sportKeyFor } from "@/lib/intelligence/registry";
+import { basketballScoringModes, getBasketballBoxScore, saveBasketballBoxScore, type BasketballBoxScoreView } from "@/lib/intelligence/actions";
+import type { Side } from "@/lib/intelligence/core/types";
+import type { BoxScoreLine } from "@/lib/intelligence/sports/basketball";
 import { standingsScheme } from "@/lib/tournaments/standings";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry } from "@/lib/tournaments/types";
 
@@ -313,6 +316,27 @@ export default function FixturesTab({
   const drawless = !scheme.draws;
   // what a drawless sport's final score is: basketball plays overtime, set and game sports count sets or games
   const drawlessHint = /basketball/i.test(tournament.sport) ? "after overtime" : scheme.forName.toLowerCase();
+  // basketball: each match is scored live in the scorer, entered as a box score, or neither yet.
+  // Only one of those can hold its result, so the row offers what fits (see MatchRow).
+  const basketball = sportKeyFor(tournament.sport) === "basketball";
+  const [bbModes, setBbModes] = useState<Record<string, { contestId: string; mode: "box" | "live" }>>({});
+  const [boxScoring, setBoxScoring] = useState<{ match: TournamentMatch; prefill: { a: number | null; b: number | null } } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!basketball) return;
+    let stale = false;
+    basketballScoringModes(tournament.id).then((res) => { if (!stale && !isActionError(res)) setBbModes(res); }).catch(() => { /* scoring tables unavailable: quick entry only */ });
+    return () => { stale = true; };
+  }, [basketball, tournament.id, matches]);
+  const bbFor = (m: TournamentMatch) => {
+    if (!basketball) return null;
+    const c = bbModes[m.id];
+    return {
+      mode: c?.mode ?? ("none" as const),
+      scorerHref: c ? `/tournaments/${tournament.id}/score/${c.contestId}` : null,
+      centreHref: c ? `/tournaments/${tournament.id}/live/${c.contestId}` : null,
+    };
+  };
 
   // The error banner sits at the top of a card that can scroll for a
   // while (many rounds/matches) — an action taken far down the list
@@ -446,6 +470,12 @@ export default function FixturesTab({
       </div>
       {regenMsg && <div className="tc-card-sub" style={{ marginBottom: 10 }}>{regenMsg}</div>}
       {err && <div ref={errRef} className="tc-err">{err}</div>}
+      {notice && (
+        <div className="tc-err" role="status">
+          {notice}{" "}
+          <button className="tc-btn" style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => setNotice(null)}>Dismiss</button>
+        </div>
+      )}
 
       {filteredMatches.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -643,6 +673,8 @@ export default function FixturesTab({
                     key={`${m.id}:${m.status}:${m.score_a}:${m.score_b}`} match={m} teams={teams} matches={matches} teamName={teamName} pending={pending}
                     sportKind={sportKind}
                     liveScoringHref={liveScoringHref}
+                    basketball={bbFor(m)}
+                    onBoxScore={(typed) => setBoxScoring({ match: m, prefill: typed ?? { a: m.score_a, b: m.score_b } })}
                     drawless={drawless}
                     drawlessHint={drawlessHint}
                     selected={selected.has(m.id)}
@@ -669,6 +701,16 @@ export default function FixturesTab({
             </table>
           </div>
         ))
+      )}
+
+      {boxScoring && (
+        <BasketballBoxScoreModal
+          match={boxScoring.match}
+          teamName={teamName}
+          prefill={boxScoring.prefill}
+          onClose={() => setBoxScoring(null)}
+          onSaved={(warning) => { setBoxScoring(null); setNotice(warning); router.refresh(); }}
+        />
       )}
 
       {recordingStats && (
@@ -919,13 +961,17 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
   teamName: (id: string | null) => string;
   sportKind: SportKind;
   liveScoringHref: string | null;
+  // basketball: how this match is being scored (null for other sports)
+  basketball: { mode: "none" | "box" | "live"; scorerHref: string | null; centreHref: string | null } | null;
+  // open the box score, with the score typed so far for the team lines
+  onBoxScore: (typed?: { a: number; b: number }) => void;
   // no draws in this sport (basketball): a level score is never a result
   drawless: boolean;
   drawlessHint: string;
@@ -1182,6 +1228,19 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           ) : null
         ) : !bothSet ? (
           <span className="tc-dim" style={{ fontSize: 12 }}>Waiting for teams</span>
+        ) : basketball && basketball.mode !== "none" ? (
+          // the result lives in the scorer or the box score: typing a score here would contradict it
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            {basketball.mode === "live" ? (
+              <Link className="tc-btn primary" href={basketball.scorerHref!} style={{ padding: "6px 10px", fontSize: 11.5, textDecoration: "none" }}>
+                {done ? "Open in scorer" : "Score live"}
+              </Link>
+            ) : (
+              <button className="tc-btn primary" disabled={pending} style={{ padding: "6px 10px", fontSize: 11.5 }} onClick={() => onBoxScore()}>Edit box score</button>
+            )}
+            <Link className="tc-btn" href={basketball.centreHref!} style={{ padding: "6px 10px", fontSize: 11.5, textDecoration: "none" }}>Box score</Link>
+            <span className="tc-dim" style={{ fontSize: 11 }}>{basketball.mode === "live" ? "Scored live: fix it in the scorer." : "Entered as a box score."}</span>
+          </div>
         ) : sportKind === "cricket" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
             <CricketScoreEntry match={match} teamName={teamName} pending={pending} onSave={onCricketResult} confirmCascadeIfNeeded={confirmCascadeIfNeeded} />
@@ -1217,21 +1276,25 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                 +1 pushes the new score straight to the public pages. The
                 inputs below correct it ("Update live score") or finish it
                 ("Full-time", which records the result and advances the winner). */}
-            {!done && liveScoringHref ? (
+            {!done && liveScoringHref && !basketball ? (
               <Link className="tc-btn primary" href={liveScoringHref} style={{ padding: "6px 10px", fontSize: 11.5, textDecoration: "none" }}>
                 Score live
               </Link>
             ) : !done && (live ? (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 <span className="tc-badge live">Live</span>
-                <button className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
-                  onClick={() => onLiveScore((match.score_a ?? 0) + 1, match.score_b ?? 0)}>
-                  +1 {teamName(match.team_a_id)}
-                </button>
-                <button className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
-                  onClick={() => onLiveScore(match.score_a ?? 0, (match.score_b ?? 0) + 1)}>
-                  +1 {teamName(match.team_b_id)}
-                </button>
+                {(basketball ? [1, 2, 3] : [1]).map((n) => (
+                  <button key={`a${n}`} className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
+                    onClick={() => onLiveScore((match.score_a ?? 0) + n, match.score_b ?? 0)}>
+                    +{n} {teamName(match.team_a_id)}
+                  </button>
+                ))}
+                {(basketball ? [1, 2, 3] : [1]).map((n) => (
+                  <button key={`b${n}`} className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
+                    onClick={() => onLiveScore(match.score_a ?? 0, (match.score_b ?? 0) + n)}>
+                    +{n} {teamName(match.team_b_id)}
+                  </button>
+                ))}
               </div>
             ) : (
               <button className="tc-btn" disabled={pending} style={{ padding: "6px 10px", fontSize: 11.5 }}
@@ -1239,6 +1302,11 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                 Start match (live 0 : 0)
               </button>
             ))}
+            {!done && basketball && liveScoringHref ? (
+              <Link href={liveScoringHref} className="tc-dim" style={{ fontSize: 11.5 }}>
+                Or score it live with players, fouls and the clock
+              </Link>
+            ) : null}
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_a_id)}</span>
@@ -1263,14 +1331,22 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                   Update live score
                 </button>
               )}
-              {!showEt && (
+              {!showEt && (basketball && !done ? (
+                // the result goes in as a box score, so players' points can be added now or later
+                <button
+                  className="tc-btn primary" disabled={pending} style={{ padding: "6px 10px", alignSelf: "flex-end" }}
+                  onClick={() => onBoxScore(scoreA !== "" && scoreB !== "" ? { a: Number(scoreA), b: Number(scoreB) } : undefined)}
+                >
+                  Full-time: box score
+                </button>
+              ) : (
                 <button
                   className="tc-btn primary" disabled={pending || !canSave} style={{ padding: "6px 10px", alignSelf: "flex-end" }}
                   onClick={save}
                 >
                   {saveLabel}
                 </button>
-              )}
+              ))}
             </div>
             {drawless && regTied && (
               <span className="tc-dim" style={{ fontSize: 11 }}>
@@ -1874,6 +1950,172 @@ function MatchHistoryPanel({ matchId }: { matchId: string }) {
           </div>
         ))
       )}
+    </div>
+  );
+}
+
+// Basketball box score: each player's line (or just the team's points)
+// for a game nobody scored live. Saving finishes the match; saving again
+// corrects it, with a reason that stays on the record.
+const BOX_COLS: { key: keyof BoxScoreLine; label: string; title: string }[] = [
+  { key: "twos", label: "2PM", title: "Two-point baskets made" },
+  { key: "threes", label: "3PM", title: "Three-point baskets made" },
+  { key: "ftm", label: "FTM", title: "Free throws made" },
+  { key: "oreb", label: "OREB", title: "Offensive rebounds" },
+  { key: "dreb", label: "DREB", title: "Defensive rebounds" },
+  { key: "ast", label: "AST", title: "Assists" },
+  { key: "stl", label: "STL", title: "Steals" },
+  { key: "blk", label: "BLK", title: "Blocks" },
+  { key: "tov", label: "TOV", title: "Turnovers" },
+  { key: "pf", label: "PF", title: "Personal fouls" },
+];
+type BoxDraft = Record<string, Partial<Record<keyof BoxScoreLine, string>>>;
+const TEAM_LINE = "__team";
+
+function BasketballBoxScoreModal({ match, teamName, prefill, onClose, onSaved }: {
+  match: TournamentMatch;
+  teamName: (id: string | null) => string;
+  // the live score so far, put on the team line when nothing is entered yet
+  prefill: { a: number | null; b: number | null };
+  onClose: () => void;
+  onSaved: (warning: string | null) => void;
+}) {
+  const [view, setView] = useState<BasketballBoxScoreView | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [side, setSide] = useState<Side>("a");
+  const [draft, setDraft] = useState<Record<Side, BoxDraft>>({ a: {}, b: {} });
+  const [periods, setPeriods] = useState<Record<Side, string[]>>({ a: [], b: [] });
+  const [reason, setReason] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const preA = prefill.a, preB = prefill.b;
+  useEffect(() => {
+    let cancelled = false;
+    getBasketballBoxScore(match.id).then((v) => {
+      if (cancelled) return;
+      if (isActionError(v)) { setLoadErr(v.message); return; }
+      const toDraft = (s: Side): BoxDraft => {
+        const out: BoxDraft = {};
+        for (const l of v.box[s]?.lines ?? []) {
+          const row: Partial<Record<keyof BoxScoreLine, string>> = {};
+          for (const [k, n] of Object.entries(l)) if (k !== "player" && typeof n === "number") row[k as keyof BoxScoreLine] = String(n);
+          out[l.player ?? TEAM_LINE] = row;
+        }
+        const live = s === "a" ? preA : preB;
+        if (!v.box[s] && live) out[TEAM_LINE] = { points: String(live) };
+        return out;
+      };
+      setView(v);
+      setDraft({ a: toDraft("a"), b: toDraft("b") });
+      setPeriods({ a: (v.box.a?.periods ?? []).map(String), b: (v.box.b?.periods ?? []).map(String) });
+    });
+    return () => { cancelled = true; };
+  }, [match.id, preA, preB]);
+
+  const editing = !!(view?.box.a || view?.box.b);
+  const num = (v: string | undefined) => (v && v.trim() !== "" ? Math.max(0, Math.floor(Number(v)) || 0) : 0);
+  const pointsOf = (s: Side) => {
+    if (!view) return 0;
+    const r = view.rules;
+    return Object.entries(draft[s]).reduce((t, [, l]) =>
+      t + num(l.twos) * r.twoPointValue + num(l.threes) * r.threePointValue + num(l.ftm) * r.freeThrowValue + num(l.points), 0);
+  };
+  const set = (s: Side, who: string, key: keyof BoxScoreLine, value: string) =>
+    setDraft((d) => ({ ...d, [s]: { ...d[s], [who]: { ...d[s][who], [key]: value } } }));
+  const toLines = (s: Side): BoxScoreLine[] => Object.entries(draft[s]).flatMap(([who, l]) => {
+    const line: BoxScoreLine = who === TEAM_LINE ? {} : { player: who };
+    for (const [k, v] of Object.entries(l)) if (num(v) > 0) (line as Record<string, number>)[k] = num(v);
+    return Object.keys(line).length > (who === TEAM_LINE ? 0 : 1) ? [line] : [];
+  });
+  const periodList = (s: Side) => (periods[s].some((x) => x.trim() !== "") ? periods[s].map(num) : null);
+  const level = view && pointsOf("a") === pointsOf("b") && !view.rules.allowTie;
+
+  function save() {
+    setErr(null);
+    const box = { a: { lines: toLines("a"), periods: periodList("a") }, b: { lines: toLines("b"), periods: periodList("b") } };
+    for (const s of ["a", "b"] as Side[]) if (!box[s].lines.length) { setErr(`Enter ${teamName(s === "a" ? match.team_a_id : match.team_b_id)}'s points.`); return; }
+    startTransition(async () => {
+      const res = await saveBasketballBoxScore(match.id, box, editing ? reason : undefined);
+      if (isActionError(res)) { setErr(res.message); return; }
+      onSaved(res.warning);
+    });
+  }
+
+  const cols = `minmax(130px, 1.6fr) repeat(${BOX_COLS.length}, 46px) 44px`;
+  return (
+    <div className="tc-scrim" onClick={onClose}>
+      <div className="tc-modal" style={{ maxWidth: 860 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <h3 style={{ margin: 0, fontFamily: "'Inter',sans-serif", fontSize: 18, fontWeight: 800 }}>Box score</h3>
+          <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", color: "inherit", opacity: 0.6, cursor: "pointer", width: 36, height: 36, display: "grid", placeItems: "center" }}><X size={18} /></button>
+        </div>
+        <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 14 }}>
+          {teamName(match.team_a_id)} <b className="tc-num">{pointsOf("a")}</b> – <b className="tc-num">{pointsOf("b")}</b> {teamName(match.team_b_id)}
+          {" · "}Fill in what you have: a player&apos;s points, or only the team&apos;s total. Saving finishes the match.
+        </div>
+
+        {loadErr ? <div className="tc-empty">{loadErr}</div> : !view ? <div className="tc-empty">Loading rosters…</div> : view.mode === "live" ? (
+          <div className="tc-empty">This match was scored live. Correct it in the live scorer.</div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+              {(["a", "b"] as Side[]).map((s) => (
+                <button key={s} className={`tc-btn ${side === s ? "primary" : ""}`} style={{ padding: "7px 12px", fontSize: 12.5 }} onClick={() => setSide(s)}>
+                  {view.sides[s].name} <span className="tc-num" style={{ opacity: 0.75, marginLeft: 4 }}>{pointsOf(s)}</span>
+                </button>
+              ))}
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <div style={{ display: "grid", gridTemplateColumns: cols, gap: 6, fontSize: 11, fontWeight: 700, opacity: 0.6, letterSpacing: ".04em", marginBottom: 6, minWidth: 720 }}>
+                <div>PLAYER</div>{BOX_COLS.map((c) => <div key={c.key} title={c.title}>{c.label}</div>)}<div title="Points">PTS</div>
+              </div>
+              {view.sides[side].players.map((p) => {
+                const l = draft[side][p.id] ?? {};
+                const pts = num(l.twos) * view.rules.twoPointValue + num(l.threes) * view.rules.threePointValue + num(l.ftm) * view.rules.freeThrowValue;
+                return (
+                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 6, alignItems: "center", padding: "4px 0", minWidth: 720 }}>
+                    <div style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.number ?? null} /><span>{p.name}</span></div>
+                    {BOX_COLS.map((c) => (
+                      <input key={c.key} type="number" min={0} inputMode="numeric" value={l[c.key] ?? ""} onChange={(e) => set(side, p.id, c.key, e.target.value)}
+                        style={{ ...inputStyle, width: 44, padding: "5px 4px" }} aria-label={`${p.name} ${c.title}`} />
+                    ))}
+                    <div className="tc-num" style={{ fontWeight: 800 }}>{pts || ""}</div>
+                  </div>
+                );
+              })}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13 }}>Points not credited to a player</span>
+                <input type="number" min={0} inputMode="numeric" value={draft[side][TEAM_LINE]?.points ?? ""} onChange={(e) => set(side, TEAM_LINE, "points", e.target.value)}
+                  style={{ ...inputStyle, width: 64 }} aria-label={`${view.sides[side].name} points not credited to a player`} />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13 }}>Score by period (optional)</span>
+                {Array.from({ length: Math.max(view.rules.periods, periods[side].length) }, (_, i) => (
+                  <input key={i} type="number" min={0} inputMode="numeric" placeholder={view.rules.periods === 4 ? `Q${i + 1}` : `P${i + 1}`} value={periods[side][i] ?? ""}
+                    onChange={(e) => setPeriods((p) => { const next = [...p[side]]; next[i] = e.target.value; return { ...p, [side]: next }; })}
+                    style={{ ...inputStyle, width: 52 }} aria-label={`${view.sides[side].name} period ${i + 1}`} />
+                ))}
+                <button className="tc-btn" style={{ padding: "5px 8px", fontSize: 11.5 }} onClick={() => setPeriods((p) => ({ ...p, [side]: [...p[side], ""] }))}>+ OT</button>
+              </div>
+            </div>
+
+            {level ? <div className="tc-dim" style={{ fontSize: 12, marginTop: 12 }}>The score is level. A game can&apos;t end level: enter the score after overtime.</div> : null}
+            {editing ? (
+              <div style={{ marginTop: 12 }}>
+                <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is the box score changing? (kept on the record)" style={{ ...inputStyle, width: "100%" }} />
+              </div>
+            ) : null}
+            {err ? <div style={{ color: "#ef4444", fontSize: 12.5, marginTop: 10 }}>{err}</div> : null}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
+              <button className="tc-btn" onClick={onClose}>Cancel</button>
+              <button className="tc-btn primary" disabled={pending || !!level || (editing && !reason.trim())} onClick={save}>
+                {pending ? "Saving…" : editing ? "Save changes" : "Save and finish match"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

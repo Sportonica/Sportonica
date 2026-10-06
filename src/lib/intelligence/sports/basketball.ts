@@ -637,7 +637,8 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
       const sum = s.byPeriod[side].reduce((t, v) => t + (v ?? 0), 0);
       if (sum !== s.score[side]) bad("Period scores do not add up to the total");
       const t = s.team[side];
-      const fromShots = (n0(t, "fgm") - n0(t, "tpm")) * rules.twoPointValue + n0(t, "tpm") * rules.threePointValue + n0(t, "ftm") * rules.freeThrowValue;
+      const fromShots = (n0(t, "fgm") - n0(t, "tpm")) * rules.twoPointValue + n0(t, "tpm") * rules.threePointValue + n0(t, "ftm") * rules.freeThrowValue
+        + n0(t, "unattributedPts");
       if (fromShots !== s.score[side]) bad("The score does not match the baskets recorded");
       if (n0(t, "fgm") > n0(t, "fga") || n0(t, "tpm") > n0(t, "tpa") || n0(t, "ftm") > n0(t, "fta")) bad("More shots made than attempted");
       // a player's share can never exceed the team's
@@ -961,14 +962,15 @@ export const basketballEngine: SportIntelligenceEngine<BasketballRules, Basketba
 // What needs the play-by-play (minutes, plus/minus, possessions, runs,
 // clutch) is withheld; percentages too when attempts are left out.
 
-export const BOX_SCORE_FIELDS = ["twos", "threes", "ftm", "fga", "tpa", "fta", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf"] as const;
+// `points`: on the team line only, points nobody was credited with (a final score typed without the scorers)
+export const BOX_SCORE_FIELDS = ["twos", "threes", "ftm", "fga", "tpa", "fta", "oreb", "dreb", "ast", "stl", "blk", "tov", "pf", "points"] as const;
 export type BoxScoreLine = { player?: string | null } & Partial<Record<(typeof BOX_SCORE_FIELDS)[number], number>>;
 
 export const isBoxScore = (s: BasketballState): boolean => !!(s.boxScore?.a || s.boxScore?.b);
 
 const lineNum = (l: BoxScoreLine, k: (typeof BOX_SCORE_FIELDS)[number]): number => l[k] ?? 0;
 const linePoints = (l: BoxScoreLine, rules: BasketballRules): number =>
-  lineNum(l, "twos") * rules.twoPointValue + lineNum(l, "threes") * rules.threePointValue + lineNum(l, "ftm") * rules.freeThrowValue;
+  lineNum(l, "twos") * rules.twoPointValue + lineNum(l, "threes") * rules.threePointValue + lineNum(l, "ftm") * rules.freeThrowValue + lineNum(l, "points");
 
 /** The points a BOX_SCORE payload adds up to. */
 export function boxScorePoints(p: Record<string, unknown>, rules: BasketballRules): number {
@@ -995,6 +997,7 @@ function validateBoxScore(s: BasketballState, p: Record<string, unknown>, ctx: M
       const v = l[k];
       if (v !== undefined && v !== null && (!isNonNegInt(v) || v > 300)) return `${k} must be a whole number from 0 to 300`;
     }
+    if (who && l.points) return `${playerName(ctx, who)}: a player's points come from baskets and free throws`;
     const name = who ? playerName(ctx, who) : sideName(ctx, p.side);
     if (l.fga != null && l.fga < lineNum(l, "twos") + lineNum(l, "threes")) return `${name}: more field goals made than attempted`;
     if (l.tpa != null && l.tpa < lineNum(l, "threes")) return `${name}: more threes made than attempted`;
@@ -1025,6 +1028,7 @@ function applyBoxScore(s: BasketballState, ev: EngineEvent, ctx: MatchContext, r
       pts: linePoints(l, rules),
     };
     for (const [k, v] of Object.entries(counts)) if (v) credit(s, side, who, k, v, false);
+    if (!who && lineNum(l, "points")) add(s.team[side], "unattributedPts", lineNum(l, "points"));
     if (who && counts.pf >= rules.foulLimit) s.out[who] = "fouled_out";
     total += counts.pts;
   }
