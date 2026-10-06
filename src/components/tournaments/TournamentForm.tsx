@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Trophy, Upload, X, Users, User, Handshake, MapPin } from "lucide-react";
-import { SPORT_NAMES as SPORTS, sportTeamSize } from "@/lib/sports";
+import { SPORT_NAMES as SPORTS, normalizeSport, sportTeamSize } from "@/lib/sports";
+import { saveScoringRules } from "@/lib/intelligence/actions";
+import { BASKETBALL_PRESETS, type BasketballPreset } from "@/lib/intelligence/sports/basketball/rules";
 import { createTournament, updateTournamentDraft, publishTournament, uploadTournamentBanner, uploadTournamentQr } from "@/lib/tournaments/actions";
 import { parseMapsUrl } from "@/lib/admin/location";
 import { isActionError } from "@/lib/actionError";
@@ -129,6 +131,26 @@ export default function TournamentForm({
   // sports/tournaments that don't use them.
   const [yellowCardFine, setYellowCardFine] = useState(existing?.yellow_card_fine ?? 0);
   const [redCardFine, setRedCardFine] = useState(existing?.red_card_fine ?? 0);
+  // card fines are a futsal thing
+  const cardSport = normalizeSport(sport) === "Futsal";
+  // basketball: the game itself (saved as the tournament's scoring rules)
+  const isBasketballSport = sport === "Basketball";
+  const [bb, setBb] = useState(() => {
+    const saved = (existing?.scoring_rules ?? {}) as Partial<typeof BASKETBALL_PRESETS.fiba>;
+    const base = BASKETBALL_PRESETS[(saved.preset as BasketballPreset) in BASKETBALL_PRESETS ? (saved.preset as BasketballPreset) : "fiba"];
+    return { ...base, ...saved };
+  });
+  const setPreset = (preset: BasketballPreset) => setBb({ ...BASKETBALL_PRESETS[preset] });
+  const bbRules = () => ({
+    preset: bb.preset, periods: bb.periods, periodMinutes: bb.periodMinutes, overtimeMinutes: bb.overtimeMinutes,
+    allowTie: bb.allowTie, shotClockSeconds: bb.shotClockSeconds, shotClockReset: bb.shotClockSeconds === null ? null : Math.min(bb.shotClockReset ?? 14, bb.shotClockSeconds),
+  });
+  // scoring rules are saved next to the tournament, once it exists
+  async function saveGameRules(id: string): Promise<string | null> {
+    if (!isBasketballSport) return null;
+    const res = await saveScoringRules(id, bbRules());
+    return isActionError(res) ? `The tournament was saved, but the basketball settings were not: ${res.message}` : null;
+  }
 
   const [prizeWinner, setPrizeWinner] = useState(existing?.prize_winner ?? "");
   const [prizeRunnerUp, setPrizeRunnerUp] = useState(existing?.prize_runner_up ?? "");
@@ -333,6 +355,8 @@ export default function TournamentForm({
         ? await updateTournamentDraft(existing.id, payload())
         : await createTournament(payload());
       if (isActionError(result)) { setErr(result.message); return; }
+      const rulesErr = await saveGameRules(result.id);
+      if (rulesErr) { setErr(rulesErr); return; }
       if (onSaved) { onSaved(result); return; }
       setDone("draft");
       setTimeout(() => router.push(detailHref(result.id)), 900);
@@ -348,6 +372,8 @@ export default function TournamentForm({
         ? await updateTournamentDraft(existing.id, payload())
         : await createTournament(payload());
       if (isActionError(saved)) { setErr(saved.message); return; }
+      const rulesErr = await saveGameRules(saved.id);
+      if (rulesErr) { setErr(rulesErr); return; }
       const published = await publishTournament(saved.id);
       if (isActionError(published)) { setErr(published.message); return; }
       setDone("published");
@@ -680,6 +706,49 @@ export default function TournamentForm({
         </div>
       </div>
 
+      {isBasketballSport && (
+        <>
+          <SectionTitle>Basketball game</SectionTitle>
+          <div className="ev-row">
+            <div className="ev-field">
+              <label>Rules</label>
+              <select value={bb.preset} onChange={(e) => setPreset(e.target.value as BasketballPreset)}>
+                <option value="fiba">FIBA: 4 × 10 min</option>
+                <option value="nba">NBA: 4 × 12 min</option>
+                <option value="ncaa">College: 2 × 20 min</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div className="ev-field">
+              <label>{bb.periods === 4 ? "Quarter" : "Period"} length (min)</label>
+              <input type="number" min={1} max={30} value={bb.periodMinutes}
+                onChange={(e) => setBb({ ...bb, preset: "custom", periodMinutes: Math.max(1, Number(e.target.value) || 1) })} />
+            </div>
+          </div>
+          <div className="ev-row">
+            <div className="ev-field">
+              <label>Overtime</label>
+              <select value={bb.allowTie ? "none" : String(bb.overtimeMinutes)}
+                onChange={(e) => setBb(e.target.value === "none" ? { ...bb, preset: "custom", allowTie: true } : { ...bb, preset: bb.preset, allowTie: false, overtimeMinutes: Number(e.target.value) })}>
+                {[...new Set([5, 3, bb.overtimeMinutes])].map((m) => <option key={m} value={m}>{m} minutes, until there&apos;s a winner</option>)}
+                <option value="none">No overtime: a game can end level</option>
+              </select>
+            </div>
+            <div className="ev-field">
+              <label>Shot clock</label>
+              <select value={bb.shotClockSeconds === null ? "off" : String(bb.shotClockSeconds)}
+                onChange={(e) => setBb({ ...bb, preset: "custom", shotClockSeconds: e.target.value === "off" ? null : Number(e.target.value) })}>
+                {[...new Set([24, 14, ...(bb.shotClockSeconds ? [bb.shotClockSeconds] : [])])].map((n) => <option key={n} value={n}>{n} seconds</option>)}
+                <option value="off">Off</option>
+              </select>
+            </div>
+          </div>
+          <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
+            Fouls, timeouts and the rest follow the rules chosen above. They can be fine-tuned in Live scoring before the first game.
+          </p>
+        </>
+      )}
+
       <SectionTitle>Registration & payment</SectionTitle>
       <div className="ev-field">
         <label>Registration fee per team (Rs, enter 0 for free)</label>
@@ -768,7 +837,7 @@ export default function TournamentForm({
         <label>Tournament rules</label>
         <textarea rows={3} value={rulesText} onChange={(e) => setRulesText(e.target.value)} placeholder="Paste your full rules & regulations here. Shown to every registered team." />
       </div>
-      <div className="ev-row">
+      {cardSport && <div className="ev-row">
         <div className="ev-field">
           <label>Yellow card fine (Rs)</label>
           <input type="number" min={0} value={yellowCardFine} onChange={(e) => setYellowCardFine(Number(e.target.value))} placeholder="0 = not tracked" />
@@ -777,7 +846,7 @@ export default function TournamentForm({
           <label>Red card fine (Rs)</label>
           <input type="number" min={0} value={redCardFine} onChange={(e) => setRedCardFine(Number(e.target.value))} placeholder="0 = not tracked" />
         </div>
-      </div>
+      </div>}
       <div className="ev-field">
         <label>Equipment notes</label>
         <textarea rows={2} value={equipmentNotes} onChange={(e) => setEquipmentNotes(e.target.value)} />

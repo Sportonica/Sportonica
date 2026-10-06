@@ -14,7 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getCachedUser } from "@/lib/supabase/authCache";
 import { isActionError } from "@/lib/actionError";
 import { useCaptcha } from "@/lib/captcha/useCaptcha";
-import { getSportKind } from "@/lib/sports";
+import { getSportKind, sportPositions } from "@/lib/sports";
 import PaymentStep from "@/components/payments/PaymentStep";
 import { type Tournament, type TournamentTeam, type TournamentRaceCategory } from "@/lib/tournaments/types";
 import { shrinkImage, IMAGE_MAX } from "@/lib/images/shrink";
@@ -299,6 +299,8 @@ export default function TournamentRegisterTab({
       <div className="rgt-hero-badge"><Trophy size={18} /></div>
       <div className="rgt-hero-main">
         <div className="rgt-hero-eyebrow">{tournament.sport} · {isIndividualRace ? "Individual entry" : "Team registration"}</div>
+        {/* position suggestions for the squad rows below; any text is still accepted */}
+        <datalist id="rgt-positions">{sportPositions(tournament.sport).map((x) => <option key={x.code} value={x.code}>{x.name}</option>)}</datalist>
         <h2 className="rgt-hero-title">{tournament.name}</h2>
       </div>
       <div className="rgt-hero-facts">
@@ -786,7 +788,8 @@ function RosterCard({
               <div className="rgt-ig">
                 <MapPin size={16} />
                 <input className="rgt-in" value={d.position} disabled={!regOpen}
-                  onChange={(e) => edit(d.key, "position", e.target.value)} placeholder="e.g. Goalkeeper" />
+                  onChange={(e) => edit(d.key, "position", e.target.value)} list="rgt-positions"
+                  placeholder={sportPositions(tournament.sport).length ? `e.g. ${sportPositions(tournament.sport).map((x) => x.code).join(", ")}` : "e.g. Goalkeeper"} />
               </div>
             </div>
 
