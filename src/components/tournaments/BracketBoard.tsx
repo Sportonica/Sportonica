@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Check, Trophy } from "lucide-react";
-import type { TournamentMatch, TournamentTeam } from "@/lib/tournaments/types";
+import { sideScore, type TournamentMatch, type TournamentTeam } from "@/lib/tournaments/types";
 
 const DONE_STATUSES = new Set(["completed", "walkover", "cancelled"]);
 const KTM = "Asia/Kathmandu";
@@ -215,8 +215,8 @@ function MatchCard({ match: m, team, isFinal, delayMs = 0, fallbackA = "TBD", fa
     onKeyDown: onClick ? (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } } : undefined,
   };
 
-  const rowA = <BracketRow team={a} fallback={fallbackA} score={m.score_a} pens={m.score_a_pens} winner={decided && m.winner_team_id === m.team_a_id} loser={decided && m.winner_team_id !== m.team_a_id && !!m.team_a_id} />;
-  const rowB = <BracketRow team={b} fallback={resolvedFallbackB} score={m.score_b} pens={m.score_b_pens} winner={decided && m.winner_team_id === m.team_b_id} loser={decided && m.winner_team_id !== m.team_b_id && !!m.team_b_id} />;
+  const rowA = <BracketRow team={a} fallback={fallbackA} score={sideScore(m, "a")} pens={m.score_a_pens} winner={decided && m.winner_team_id === m.team_a_id} loser={decided && m.winner_team_id !== m.team_a_id && !!m.team_a_id} />;
+  const rowB = <BracketRow team={b} fallback={resolvedFallbackB} score={sideScore(m, "b")} pens={m.score_b_pens} winner={decided && m.winner_team_id === m.team_b_id} loser={decided && m.winner_team_id !== m.team_b_id && !!m.team_b_id} />;
 
   // The Final gets its own hero treatment — a trophy label up top, "VS"
   // between the two rows instead of stacked plainly, and (once decided)
@@ -255,7 +255,7 @@ function MatchCard({ match: m, team, isFinal, delayMs = 0, fallbackA = "TBD", fa
 function BracketRow({ team: t, fallback, score, pens, winner, loser }: {
   team: TournamentTeam | undefined;
   fallback: string;
-  score: number | null;
+  score: string | null;
   pens: number | null;
   winner: boolean;
   loser: boolean;

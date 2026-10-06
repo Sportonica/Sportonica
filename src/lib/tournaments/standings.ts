@@ -11,6 +11,10 @@
 // competition allows ties, and either FIBA's head-to-head tiebreak or
 // overall point difference first. For an event-scored match the score
 // is the final the scorer console wrote to the fixture.
+//
+// Cricket is computed from the fixtures too: 2 for a win, 1 for a tie or
+// no result, ranked on points then net run rate (a side bowled out
+// counts the full overs it was allotted).
 
 import type { TournamentMatch, TournamentStanding, TournamentTeam } from "./types";
 import { resolveBasketballRules, type BasketballRules } from "../intelligence/sports/basketball/rules";
@@ -25,7 +29,19 @@ export interface StandingsScheme {
   forName: string;
   againstName: string;
   diffName: string;
+  // the drawn column, where a sport calls it something else (cricket: tied or no result)
+  drawLabel?: string;
+  drawName?: string;
+  // the difference column holds a rate, not a count (cricket's net run rate)
+  diffIsRate?: boolean;
 }
+
+const CRICKET: StandingsScheme = {
+  draws: true,
+  forLabel: "RF", againstLabel: "RA", diffLabel: "NRR",
+  forName: "Runs for", againstName: "Runs against", diffName: "Net run rate",
+  drawLabel: "T/NR", drawName: "Tied or no result", diffIsRate: true,
+};
 
 const FOOTBALL: StandingsScheme = {
   draws: true,
@@ -54,9 +70,11 @@ const GAMES: StandingsScheme = {
 
 const key = (sport: string | null | undefined) => (sport ?? "").trim().toLowerCase();
 export const isBasketball = (sport: string | null | undefined): boolean => key(sport) === "basketball";
+export const isCricket = (sport: string | null | undefined): boolean => key(sport) === "cricket";
 
 export function standingsScheme(sport: string | null | undefined, scoringRules?: unknown): StandingsScheme {
   if (isBasketball(sport)) return { ...BASKETBALL, draws: basketballRulesOf(scoringRules).allowTie };
+  if (isCricket(sport)) return CRICKET;
   if (key(sport) === "volleyball" || key(sport) === "tennis") return SETS;
   if (key(sport) === "badminton" || key(sport) === "pickleball") return GAMES;
   return FOOTBALL;
@@ -68,6 +86,10 @@ export function basketballRulesOf(scoringRules: unknown): BasketballRules {
 }
 
 export const signed = (n: number): string => (n > 0 ? `+${n}` : String(n));
+
+/** The difference column as the sport writes it: "+12", or a net run rate "+1.250". */
+export const diffText = (scheme: StandingsScheme, n: number): string =>
+  scheme.diffIsRate ? (n > 0 ? `+${n.toFixed(3)}` : n.toFixed(3)) : signed(n);
 
 export interface BasketballStanding extends TournamentStanding {
   win_pct: number | null;
@@ -171,3 +193,64 @@ export function computeBasketballStandings(
     };
   });
 }
+
+// ── cricket ─────────────────────────────────────────────────────────
+
+// What the table needs from the competition's cricket rules (the engine's
+// presets, sports/cricket.ts, without loading the engine into the page).
+interface CricketTableRules { oversPerInnings: number | null; ballsPerOver: number; wicketsPerInnings: number }
+const CRICKET_OVERS: Record<string, number | null> = { t20: 20, odi: 50, test: null, custom: 20 };
+
+export function cricketRulesOf(scoringRules: unknown): CricketTableRules {
+  const r = (scoringRules ?? {}) as Partial<CricketTableRules> & { preset?: string };
+  const preset = r.preset && r.preset in CRICKET_OVERS ? r.preset : "t20";
+  return {
+    oversPerInnings: r.oversPerInnings !== undefined ? r.oversPerInnings : CRICKET_OVERS[preset],
+    ballsPerOver: r.ballsPerOver ?? 6,
+    wicketsPerInnings: r.wicketsPerInnings ?? 10,
+  };
+}
+
+// "4.5" overs is 4 overs and 5 balls
+const ballsOf = (overs: number | null, ballsPerOver: number): number => {
+  if (overs === null) return 0;
+  const whole = Math.floor(overs);
+  return whole * ballsPerOver + Math.round((overs - whole) * 10);
+};
+
+export function computeCricketStandings(
+  matches: TournamentMatch[], teams: TeamRef[], scoringRules: unknown, group: string | null = null,
+): TournamentStanding[] {
+  const rules = cricketRulesOf(scoringRules);
+  const bpo = rules.ballsPerOver || 6;
+  const quota = rules.oversPerInnings !== null ? rules.oversPerInnings * bpo : null;
+  const pool = teams.filter((t) => t.status === "confirmed" && (group === null || t.group_name === group));
+  const t = new Map(pool.map((x) => [x.id, { name: x.name, played: 0, won: 0, tied: 0, lost: 0, points: 0, runsFor: 0, ballsFaced: 0, runsAgainst: 0, ballsBowled: 0 }]));
+  const games = matches.filter((m) => (m.stage === "league" || m.stage === "group") && (group === null || m.group_name === group)
+    && (m.status === "completed" || m.status === "walkover") && m.team_a_id && m.team_b_id);
+  for (const m of games) {
+    const a = t.get(m.team_a_id!), b = t.get(m.team_b_id!);
+    if (!a || !b) continue;
+    a.played += 1; b.played += 1;
+    if (m.winner_team_id === m.team_a_id) { a.won += 1; a.points += 2; b.lost += 1; }
+    else if (m.winner_team_id === m.team_b_id) { b.won += 1; b.points += 2; a.lost += 1; }
+    else { a.tied += 1; b.tied += 1; a.points += 1; b.points += 1; }
+    // net run rate only counts games with both innings recorded; a walkover has none
+    if (m.status === "walkover" || m.score_a === null || m.score_b === null) continue;
+    const faced = (overs: number | null, wickets: number | null) =>
+      wickets !== null && wickets >= rules.wicketsPerInnings && quota !== null ? quota : ballsOf(overs, bpo);
+    const fa = faced(m.overs_a, m.wickets_a), fb = faced(m.overs_b, m.wickets_b);
+    if (!fa || !fb) continue;
+    a.runsFor += m.score_a; a.ballsFaced += fa; a.runsAgainst += m.score_b; a.ballsBowled += fb;
+    b.runsFor += m.score_b; b.ballsFaced += fb; b.runsAgainst += m.score_a; b.ballsBowled += fa;
+  }
+  const nrr = (x: { runsFor: number; ballsFaced: number; runsAgainst: number; ballsBowled: number }) =>
+    x.ballsFaced && x.ballsBowled ? Math.round(((x.runsFor / x.ballsFaced) * bpo - (x.runsAgainst / x.ballsBowled) * bpo) * 1000) / 1000 : 0;
+  return [...t.entries()]
+    .map(([id, x]) => ({
+      team_id: id, team_name: x.name, played: x.played, won: x.won, drawn: x.tied, lost: x.lost,
+      goals_for: x.runsFor, goals_against: x.runsAgainst, goal_diff: nrr(x), points: x.points,
+    }))
+    .sort((x, y) => y.points - x.points || y.goal_diff - x.goal_diff || y.won - x.won || x.team_name.localeCompare(y.team_name));
+}
+

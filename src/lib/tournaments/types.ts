@@ -537,3 +537,16 @@ export function friendlyTournamentError(message: string): string {
   }
   return message;
 }
+
+/**
+ * One side's score as the sport writes it: "142/6" for cricket (only
+ * cricket fixtures carry wickets), the plain number otherwise; null before
+ * there is a score.
+ */
+export function sideScore(m: Pick<TournamentMatch, "score_a" | "score_b" | "wickets_a" | "wickets_b">, side: "a" | "b"): string | null {
+  const runs = side === "a" ? m.score_a : m.score_b;
+  const wkts = side === "a" ? m.wickets_a : m.wickets_b;
+  if (runs === null) return null;
+  return wkts !== null && wkts !== undefined ? `${runs}/${wkts}` : String(runs);
+}
+

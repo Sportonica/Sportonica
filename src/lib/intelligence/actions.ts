@@ -942,13 +942,13 @@ export async function saveBasketballBoxScore(
   return { contestId, warning: warnings[warnings.length - 1] ?? null };
 }
 
-/** Whether each of a tournament's matches was entered as a box score or scored live (basketball). */
+/** For each match with a scoring record: entered as a box score (basketball) or scored live. */
 export async function basketballScoringModes(tournamentId: string): Promise<Record<string, { contestId: string; mode: "box" | "live" }> | ActionError> {
   const contests = await listTournamentContests(tournamentId);
   if (isActionError(contests)) return contests;
   const out: Record<string, { contestId: string; mode: "box" | "live" }> = {};
   for (const c of contests) {
-    if (c.sport !== "basketball" || !c.matchId) continue;
+    if (!c.matchId) continue;
     const st = c.state as BasketballState | null;
     out[c.matchId] = { contestId: c.id, mode: st && isBoxScore(st) ? "box" : "live" };
   }

@@ -24,6 +24,14 @@ const toLocalDate = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) 
 const toLocalTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kathmandu" }) : "");
 const combine = (date: string, time: string) => (date && time ? `${date}T${time}:00${KTM_OFFSET}` : "");
 
+// the engine's cricket presets (sports/cricket.ts), as the form offers them
+const CRICKET_FORMATS = {
+  t20: { label: "T20: 20 overs", overs: 20, perBowler: 4 },
+  odi: { label: "One-day: 50 overs", overs: 50, perBowler: 10 },
+  test: { label: "Two innings, no over limit", overs: null, perBowler: null },
+  custom: { label: "Custom overs (box cricket)", overs: 8, perBowler: 2 },
+} as const;
+
 export default function TournamentForm({
   venues, existing, mode = "venue", onSaved,
 }: {
@@ -145,11 +153,18 @@ export default function TournamentForm({
     preset: bb.preset, periods: bb.periods, periodMinutes: bb.periodMinutes, overtimeMinutes: bb.overtimeMinutes,
     allowTie: bb.allowTie, shotClockSeconds: bb.shotClockSeconds, shotClockReset: bb.shotClockSeconds === null ? null : Math.min(bb.shotClockReset ?? 14, bb.shotClockSeconds),
   });
+  // cricket: the format and overs (saved as the tournament's scoring rules)
+  const isCricketSport = sport === "Cricket";
+  const [ck, setCk] = useState(() => {
+    const saved = (existing?.scoring_rules ?? {}) as { preset?: string; oversPerInnings?: number | null; maxOversPerBowler?: number | null };
+    const preset = (saved.preset && saved.preset in CRICKET_FORMATS ? saved.preset : "t20") as keyof typeof CRICKET_FORMATS;
+    return { preset, oversPerInnings: saved.oversPerInnings ?? CRICKET_FORMATS[preset].overs, maxOversPerBowler: saved.maxOversPerBowler ?? CRICKET_FORMATS[preset].perBowler };
+  });
   // scoring rules are saved next to the tournament, once it exists
   async function saveGameRules(id: string): Promise<string | null> {
-    if (!isBasketballSport) return null;
-    const res = await saveScoringRules(id, bbRules());
-    return isActionError(res) ? `The tournament was saved, but the basketball settings were not: ${res.message}` : null;
+    if (!isBasketballSport && !isCricketSport) return null;
+    const res = await saveScoringRules(id, isBasketballSport ? bbRules() : ck);
+    return isActionError(res) ? `The tournament was saved, but the ${sport.toLowerCase()} settings were not: ${res.message}` : null;
   }
 
   const [prizeWinner, setPrizeWinner] = useState(existing?.prize_winner ?? "");
@@ -745,6 +760,42 @@ export default function TournamentForm({
           </div>
           <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
             Fouls, timeouts and the rest follow the rules chosen above. They can be fine-tuned in Live scoring before the first game.
+          </p>
+        </>
+      )}
+
+      {isCricketSport && (
+        <>
+          <SectionTitle>Cricket game</SectionTitle>
+          <div className="ev-row">
+            <div className="ev-field">
+              <label>Format</label>
+              <select value={ck.preset} onChange={(e) => {
+                const p = e.target.value as keyof typeof CRICKET_FORMATS;
+                setCk({ preset: p, oversPerInnings: CRICKET_FORMATS[p].overs, maxOversPerBowler: CRICKET_FORMATS[p].perBowler });
+              }}>
+                {Object.entries(CRICKET_FORMATS).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
+              </select>
+            </div>
+            {ck.preset !== "test" && (
+              <div className="ev-field">
+                <label>Overs per side</label>
+                <input type="number" min={1} max={50} value={ck.oversPerInnings ?? ""}
+                  onChange={(e) => setCk({ ...ck, preset: "custom", oversPerInnings: Math.max(1, Number(e.target.value) || 1) })} />
+              </div>
+            )}
+          </div>
+          {ck.preset !== "test" && (
+            <div className="ev-row">
+              <div className="ev-field">
+                <label>Max overs per bowler</label>
+                <input type="number" min={1} value={ck.maxOversPerBowler ?? ""} placeholder="No limit"
+                  onChange={(e) => setCk({ ...ck, preset: "custom", maxOversPerBowler: e.target.value.trim() === "" ? null : Math.max(1, Number(e.target.value) || 1) })} />
+              </div>
+            </div>
+          )}
+          <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
+            Wides, no-balls, free hits and the rest follow the format. They can be fine-tuned in Live scoring before the first match.
           </p>
         </>
       )}

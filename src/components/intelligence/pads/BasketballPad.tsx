@@ -12,7 +12,7 @@ import type { Participant, Side } from "@/lib/intelligence/core/types";
 import { benchOf, bonusFor, eligibleOf, freeThrowLabel, gameRosterOf, periodName, substitutionsLeft, teamFoulsNow, timeoutsLeft, type BasketballRules, type BasketballState } from "@/lib/intelligence/sports/basketball";
 import { DEFENSIVE_VIOLATIONS, OFFENSIVE_VIOLATIONS, SHOT_TYPES, SHOT_ZONES, THREE_POINT_ZONES, foulKindName, label, periodSeconds, type ShotType, type ShotZone } from "@/lib/intelligence/sports/basketball/rules";
 import { clockReadings, clockText, parseClock } from "@/lib/intelligence/sports/basketball/clock";
-import { LineupPicker, PlayerChips, PlayerName, SIDE_KEYS, type PadProps } from "./shared";
+import { Jersey, LineupPicker, PlayerChips, PlayerName, SIDE_KEYS, teamColor, type PadProps } from "./shared";
 import { useBasketballClock, type BasketballClock } from "./useBasketballClock";
 
 const other = (s: Side): Side => (s === "a" ? "b" : "a");
@@ -117,7 +117,6 @@ export default function BasketballPad({ contest, send }: PadProps) {
     if (what !== "foul" && player[side]) answer(player[side], { side, what });
     else setAsk({ side, what });
   };
-  const teamColor = (side: Side) => (side === "a" ? "var(--si-series-1)" : "var(--si-series-2)");
   const jersey = (side: Side, p: Participant, onClick: () => void, on = false) => (
     <Jersey key={p.id} p={p} color={teamColor(side)} on={on} fouls={fouls(p.id)} out={!!s.out[p.id]} onClick={onClick} />
   );
@@ -416,22 +415,6 @@ export default function BasketballPad({ contest, send }: PadProps) {
       </details>
       </>) : null}
     </div>
-  );
-}
-
-/** A basketball vest in the team's colour: the number big, the name and position under it. */
-function Jersey({ p, color, on, fouls, out, onClick }: { p: Participant; color: string; on: boolean; fouls: number; out: boolean; onClick: () => void }) {
-  const first = p.name.split(" ")[0];
-  return (
-    <button type="button" className={`si-jersey${on ? " on" : ""}${out ? " out" : ""}`} style={{ ["--team" as string]: color }} onClick={onClick}
-      aria-pressed={on} aria-label={`${p.number != null ? `#${p.number} ` : ""}${p.name}${p.position ? `, ${p.position}` : ""}${fouls ? `, ${fouls} fouls` : ""}`}>
-      <span className="si-vest">
-        <svg viewBox="0 0 60 66" aria-hidden="true"><path d="M17 3 Q30 15 43 3 L52 6 Q49 19 57 26 L57 63 L3 63 L3 26 Q11 19 8 6 Z" /></svg>
-        <b>{p.number ?? "–"}</b>
-      </span>
-      <span className="si-jersey-name">{first}</span>
-      {p.position || fouls ? <span className="si-jersey-meta">{[p.position, fouls ? `${fouls}f` : null].filter(Boolean).join(" · ")}</span> : null}
-    </button>
   );
 }
 

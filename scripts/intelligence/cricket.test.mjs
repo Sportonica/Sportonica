@@ -336,3 +336,18 @@ section("cricket: career figures", () => {
   assert.equal(b4.runOuts, 1);
   assert.equal(aggregate(E, "player", [lines.find((l) => l.subjectKey === "b5").raw]).values.bowlAvg, null);
 });
+
+section("cricket: the formats the tournament form saves are valid rules", () => {
+  // what TournamentForm's Cricket game section sends (CRICKET_FORMATS there)
+  for (const r of [
+    { preset: "t20", oversPerInnings: 20, maxOversPerBowler: 4 },
+    { preset: "odi", oversPerInnings: 50, maxOversPerBowler: 10 },
+    { preset: "test", oversPerInnings: null, maxOversPerBowler: null },
+    { preset: "custom", oversPerInnings: 8, maxOversPerBowler: 2 },
+    { preset: "custom", oversPerInnings: 6, maxOversPerBowler: null },
+  ]) {
+    const rules = E.resolveRules(r);
+    assert.equal(rules.oversPerInnings, r.oversPerInnings, `${r.preset} overs`);
+    assert.equal(rules.maxOversPerBowler, r.maxOversPerBowler, `${r.preset} overs per bowler`);
+  }
+});
