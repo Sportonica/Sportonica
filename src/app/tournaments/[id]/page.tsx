@@ -16,6 +16,7 @@ import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
 import { cricketPlayers, cricketTeams } from "@/lib/tournaments/cricketRecords";
 import type { CricketTournamentData } from "@/components/tournaments/public/CricketStats";
 import EventTabs from "@/components/tournaments/public/EventTabs";
+import { CricketBall, CricketHeroArt, ballFor } from "@/components/tournaments/public/CricketArt";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
 import { canScoreTournament, getCricketMatchFacts, getCricketRecords, getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
@@ -185,12 +186,17 @@ export default async function TournamentDetailPage({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={tournament.banner_url!} alt="" />
             ) : (
-              <div className="bk-hero-empty"><Trophy size={40} /></div>
+              getSportKind(tournament.sport) === "cricket"
+                // cricket's own poster: a ball crossing the field, on cream
+                ? <div className="bk-hero-empty ck-hero-empty"><CricketHeroArt /></div>
+                : <div className="bk-hero-empty"><Trophy size={40} /></div>
             )}
             <div className="bk-hero-grad" />
           </div>
           <div className="bk-hero-info">
-            <span className="bk-sport-pill">{tournament.sport}</span>
+            {getSportKind(tournament.sport) === "cricket" ? (
+              <span className="bk-sport-pill ck-pill"><CricketBall kind={ballFor(tournament.scoring_rules)} size={14} />{tournament.sport}</span>
+            ) : <span className="bk-sport-pill">{tournament.sport}</span>}
             <h1>{tournament.name}</h1>
             <div className="sub t-sub">
               <span>{venueName}</span>

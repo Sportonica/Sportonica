@@ -10,6 +10,7 @@ import type { CricketStanding, CricketResult } from "@/lib/tournaments/standings
 import { oversOf } from "@/lib/tournaments/standings";
 import { bestByWicket, inningsText, type CricketPlayer, type CricketTeamStats, type PartnershipRecord, type TeamInnings } from "@/lib/tournaments/cricketRecords";
 import { TIEBREAKER_LABEL, type CricketTable } from "@/lib/intelligence/sports/cricketTable";
+import { CricketCrest } from "./CricketArt";
 import "./cricket-stats.css";
 
 export interface CricketTournamentData {
@@ -67,7 +68,7 @@ export function CricketTablePublic({ groups, logo, table }: {
                     <span className="cs-team">
                       <span className="cs-badge">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        {src ? <img src={src} alt="" /> : r.team_name.charAt(0).toUpperCase()}
+                        {src ? <img src={src} alt="" /> : <CricketCrest name={r.team_name} size={26} />}
                       </span>
                       <span className="cs-team-name">{r.team_name}<StatusBadge status={r.status} /></span>
                     </span>

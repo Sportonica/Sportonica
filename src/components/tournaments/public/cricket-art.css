@@ -1,0 +1,19 @@
+/* Cricket artwork: flat shapes, the cricket palette, no gradients or shadows. */
+
+.ck-art-ball { display: inline-block; vertical-align: -3px; flex: none; }
+.ck-art-crest { display: block; flex: none; border-radius: 50%; }
+.ck-art-hero { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.ck-art-status { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; line-height: 1.4; white-space: nowrap; }
+.ck-art-status.live { background: #CA023A; color: #fff; }
+.ck-art-status.upcoming { background: rgba(16,42,30,0.08); color: #102A1E; }
+.ck-art-status.completed { background: #102A1E; color: #F2EDE6; }
+.ck-art-pulse { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: ck-art-pulse 1.4s ease-in-out infinite; }
+@keyframes ck-art-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .ck-art-pulse { animation: none; } }
+
+/* the sport pill on a cricket tournament: the ball before the word */
+.bk-sport-pill.ck-pill { display: inline-flex; align-items: center; gap: 6px; }
+
+/* the poster behind a cricket tournament with no banner */
+.bk-hero-empty.ck-hero-empty { position: absolute; inset: 0; padding: 0; background: #F2EDE6; }

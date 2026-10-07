@@ -22,7 +22,7 @@
 .cs-row.in .cs-rank { color: var(--cs-green); }
 .cs-rank { font-weight: 800; color: var(--cs-3); }
 .cs-team { display: flex; align-items: center; gap: 9px; min-width: 0; }
-.cs-badge { width: 26px; height: 26px; border-radius: 7px; background: rgba(0, 98, 65, 0.1); color: var(--cs-green); display: grid; place-items: center; font-size: 12px; font-weight: 800; overflow: hidden; flex: none; }
+.cs-badge { width: 26px; height: 26px; border-radius: 50%; background: rgba(0, 98, 65, 0.1); color: var(--cs-green); display: grid; place-items: center; font-size: 12px; font-weight: 800; overflow: hidden; flex: none; }
 .cs-badge img { width: 100%; height: 100%; object-fit: cover; }
 .cs-team-name { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
 .cs-pts { font-weight: 900; font-size: 15px; }
