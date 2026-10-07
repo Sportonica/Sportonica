@@ -26,7 +26,8 @@ export function tableRulesText(t: CricketTable): string {
   const pts = [`${t.win} for a win`, t.tie === t.noResult ? `${t.tie} for a tie or no result` : `${t.tie} for a tie, ${t.noResult} for no result`, `${t.loss} for a loss`];
   const tb = t.tiebreakers.length ? ` Level on points: ${t.tiebreakers.map((x) => TIEBREAKER_LABEL[x]).join(", then ")}.` : "";
   const q = t.qualifiers ? ` Top ${t.qualifiers} go through.` : "";
-  return `${pts.join(", ")}.${tb}${q} A side bowled out is charged its full overs in net run rate.`;
+  const bp = t.bonusRatio !== null ? ` A bonus point for a win at a run rate ${t.bonusRatio} times the opponent's or better.` : "";
+  return `${pts.join(", ")}.${bp}${tb}${q} A side bowled out is charged its full overs in net run rate.`;
 }
 
 export function Form({ form }: { form: CricketResult[] }) {
@@ -81,6 +82,7 @@ export function CricketTablePublic({ groups, logo, table }: {
                     <div><span>Form</span><b><Form form={r.form} /></b></div>
                     <div><span>Runs for</span><b>{r.goals_for} <small>in {oversOf(r.balls_faced)} ov</small></b></div>
                     <div><span>Runs against</span><b>{r.goals_against} <small>in {oversOf(r.balls_bowled)} ov</small></b></div>
+                    {table.bonusRatio !== null ? <div><span>Bonus points</span><b>{r.bonus}</b></div> : null}
                     <div><span>Matches left</span><b>{r.remaining}</b></div>
                     <div><span>Most points possible</span><b>{r.max_points}</b></div>
                   </div>

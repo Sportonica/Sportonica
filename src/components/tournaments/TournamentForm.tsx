@@ -830,6 +830,20 @@ export default function TournamentForm({
                     onChange={(e) => setCk({ ...ck, table: { ...ck.table, qualifiers: e.target.value.trim() === "" ? null : Math.max(1, Math.round(Number(e.target.value) || 1)) } })} />
                 </div>
               </div>
+              <div className="ev-row">
+                <label className="ev-check" style={{ alignSelf: "center" }}>
+                  <input type="checkbox" checked={ck.table.bonusRatio !== null}
+                    onChange={(e) => setCk({ ...ck, table: { ...ck.table, bonusRatio: e.target.checked ? 1.25 : null } })} />
+                  Bonus point for a convincing win
+                </label>
+                {ck.table.bonusRatio !== null && (
+                  <div className="ev-field">
+                    <label>Winner&apos;s run rate at least (× the loser&apos;s)</label>
+                    <input type="number" min={1} max={3} step={0.05} value={ck.table.bonusRatio}
+                      onChange={(e) => setCk({ ...ck, table: { ...ck.table, bonusRatio: Math.min(3, Math.max(1, Number(e.target.value) || 1.25)) } })} />
+                  </div>
+                )}
+              </div>
               <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
                 {ck.table.win <= ck.table.loss ? "A win must be worth more than a loss. " : ""}
                 With teams going through set, the table marks each team Qualified, In contention or Eliminated, but only once it is mathematically certain.
