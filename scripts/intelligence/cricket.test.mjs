@@ -401,3 +401,41 @@ section("cricket screens: the chase", () => {
   const st = V.partnerships(m.env.sport.innings[1], ctx);
   assert.deepEqual([st.length, st[0].current, st[0].runs, st[0].batters[0].runs], [1, true, 4, 4]);
 });
+
+section("cricket: overs for this match, before the first ball and during the first innings", () => {
+  // set before the match: both innings use it
+  const m = openMatch(E, ctx, { preset: "t20" });
+  m.push("MATCH_START");
+  m.push("OVERS_CHANGE", { overs: 3 });
+  m.push("INNINGS_START", { batting: "a", striker: "a1", nonStriker: "a2" });
+  assert.equal(m.env.sport.innings[0].maxBalls, 18, "a 20-over format played as 3 overs");
+  m.refuses("OVERS_CHANGE", { overs: 0 }, /whole number/, "zero overs");
+
+  // cut during the first innings: not below what has been bowled
+  for (let i = 0; i < 7; i++) ball(m, m.env.sport.innings[0].striker, m.env.sport.innings[0].nonStriker, i < 6 ? "b1" : "b2", { runsBat: 1 });
+  m.refuses("OVERS_CHANGE", { overs: 1 }, /1\.1 overs have already been bowled/, "below the overs bowled");
+  m.push("OVERS_CHANGE", { overs: 2, reason: "Rain" });
+  assert.equal(m.env.sport.innings[0].maxBalls, 12);
+  assert.ok(!m.env.sport.innings[0].closed);
+  const inn = () => m.env.sport.innings[0];
+  for (let i = 0; i < 5; i++) ball(m, inn().striker, inn().nonStriker, "b2", { runsBat: 1 });
+  assert.equal(inn().closed, "overs", "the innings ends at the new limit");
+
+  // the chase gets the same overs, and changing them there is refused
+  m.push("INNINGS_START", { batting: "b", striker: "b1", nonStriker: "b2" });
+  assert.deepEqual([m.env.sport.innings[1].maxBalls, m.env.sport.innings[1].target], [12, 13]);
+  m.refuses("OVERS_CHANGE", { overs: 1 }, /Revise target/, "in the chase");
+  m.assertReconstructs("overs changes rebuild from the log");
+});
+
+section("cricket: setting the overs to those already bowled ends the innings; undo restores them", () => {
+  const m = openMatch(E, ctx, { preset: "custom", oversPerInnings: 5 });
+  m.push("MATCH_START");
+  m.push("INNINGS_START", { batting: "a", striker: "a1", nonStriker: "a2" });
+  const inn = () => m.env.sport.innings[0];
+  for (let i = 0; i < 6; i++) ball(m, inn().striker, inn().nonStriker, "b1", { runsBat: 2 });
+  const change = m.push("OVERS_CHANGE", { overs: 1 });
+  assert.equal(inn().closed, "overs");
+  m.correct("void", change.id, "Wrong button");
+  assert.deepEqual([inn().closed, inn().maxBalls, m.env.sport.oversLimit], [null, 30, undefined], "undoing the change reopens the innings at 5 overs");
+});

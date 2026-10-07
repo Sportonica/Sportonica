@@ -53,6 +53,47 @@ function UndoButton({ undo, ctx }: { undo: NonNullable<PadProps["undo"]>; ctx: M
   );
 }
 
+/**
+ * Overs per innings for this match. Before the first ball it replaces the
+ * tournament's number; during the first innings it shortens (or extends)
+ * this innings and the next one. Recorded as an event, so Undo reverses it.
+ */
+function OversEditor({ current, bowledBalls, ballsPerOver, onSave }: {
+  current: number; bowledBalls: number; ballsPerOver: number; onSave: (overs: number, reason: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [overs, setOvers] = useState(current);
+  const [reason, setReason] = useState("");
+  const min = Math.max(1, Math.ceil(bowledBalls / ballsPerOver));
+  if (!open) {
+    return (
+      <div className="ck-overs-line">
+        <span><span className="ck-label">Overs per innings</span> <b>{current}</b></span>
+        <button type="button" className="ck-link" onClick={() => { setOvers(current); setOpen(true); }}>Change</button>
+      </div>
+    );
+  }
+  const ends = bowledBalls > 0 && overs * ballsPerOver === bowledBalls;
+  return (
+    <div className="si-ask">
+      <div className="si-pad-name">Overs per innings for this match</div>
+      <div className="ck-stepper">
+        <button type="button" className="ck-key small" disabled={overs <= min} onClick={() => setOvers((o) => Math.max(min, o - 1))} aria-label="One over fewer">−</button>
+        <input className="si-input" inputMode="numeric" value={overs} aria-label="Overs per innings"
+          onChange={(e) => setOvers(Math.min(200, Math.max(0, Number(e.target.value.replace(/\D/g, "")) || 0)))} />
+        <button type="button" className="ck-key small" disabled={overs >= 200} onClick={() => setOvers((o) => Math.min(200, o + 1))} aria-label="One over more">+</button>
+      </div>
+      {bowledBalls ? <input className="si-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (optional): rain delay" /> : null}
+      {ends ? <div className="si-error">That is the overs already bowled: the innings ends now.</div> : null}
+      <div className="si-row">
+        <button type="button" className="si-btn primary" disabled={overs < min || overs === current}
+          onClick={() => { onSave(overs, reason.trim()); setOpen(false); setReason(""); }}>Set {overs} over{overs === 1 ? "" : "s"}</button>
+        <button type="button" className="ck-link" onClick={() => setOpen(false)}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 export default function CricketPad({ contest, send, undo }: PadProps) {
   const s = contest.state as CricketState;
   const rules = contest.rules as unknown as CricketRules;
@@ -69,6 +110,8 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
   const [wicketOpen, setWicketOpen] = useState(false);
   const [note, setNote] = useState("");
 
+  const matchOvers = rules.oversPerInnings === null ? null : s.oversLimit ?? rules.oversPerInnings;
+  const changeOvers = (overs: number, reason: string) => send("OVERS_CHANGE", { overs, ...(reason ? { reason } : {}) });
   const undoRow = undo ? <div className="ck-pad-foot"><UndoButton undo={undo} ctx={ctx} /></div> : null;
 
   if (s.result) return <><div className="si-info">The match is decided. Tap Complete match, or edit a ball in the commentary if the result is wrong.</div>{undoRow}</>;
@@ -89,6 +132,7 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
             </div>
           </details>
         ) : null}
+        {!s.innings.length && matchOvers !== null ? <OversEditor current={matchOvers} bowledBalls={0} ballsPerOver={rules.ballsPerOver} onSave={changeOvers} /> : null}
         <div className="si-pad-name">{s.innings.length ? `Innings ${s.innings.length + 1}: who bats?` : "Who bats first?"}</div>
         <div className="si-keys two">
           {SIDE_KEYS.map((side) => (
@@ -140,7 +184,8 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
   const shown = { ...inn, striker, nonStriker };
   const over = thisOver(inn);
   const midOver = !!over && !overComplete(over, rules);
-  const currentBowler = midOver ? over.bowler : bowler;
+  // the bowler picked for the last over cannot bowl the next one: ask again rather than keep a stale pick
+  const currentBowler = midOver ? over.bowler : bowler && bowler !== inn.lastOverBowler ? bowler : "";
   const base = { striker, nonStriker, bowler: currentBowler };
 
   const reset = () => { setExtra(null); setNote(""); setSwapped(false); };
@@ -226,8 +271,11 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
       {undoRow}
 
       <details className="si-more">
-        <summary>Commentary note, retirements, penalties and innings</summary>
+        <summary>{inn.target === null && matchOvers !== null ? "Change overs, commentary, retirements, penalties" : "Commentary note, retirements, penalties and innings"}</summary>
         <div className="si-grid" style={{ gap: 10 }}>
+          {inn.target === null && matchOvers !== null ? (
+            <OversEditor current={inn.maxBalls === null ? matchOvers : inn.maxBalls / rules.ballsPerOver} bowledBalls={inn.balls} ballsPerOver={rules.ballsPerOver} onSave={changeOvers} />
+          ) : null}
           <label className="si-label">Commentary for the next ball
             <input className="si-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional: driven through the covers" />
           </label>

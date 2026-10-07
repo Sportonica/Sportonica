@@ -27,7 +27,12 @@ export function CricketScorerHeader({ contest }: { contest: ContestView }) {
           <span key={o.side} className="ck-head-other">{o.name} <b>{o.score ?? "yet to bat"}</b>{o.score && o.overs ? <span className="ck-muted"> ({o.overs})</span> : null}</span>
         ))}
       </div>
-      {inn ? <LiveScore inn={inn} ctx={ctx} rules={rules} compact /> : <div className="ck-muted">{ctx.sides?.a.name} v {ctx.sides?.b.name}: no ball bowled yet</div>}
+      {inn ? <LiveScore inn={inn} ctx={ctx} rules={rules} compact /> : (
+        <div className="ck-muted">
+          {ctx.sides?.a.name} v {ctx.sides?.b.name}: no ball bowled yet
+          {rules.oversPerInnings !== null ? ` · ${s.oversLimit ?? rules.oversPerInnings} overs an innings` : ""}
+        </div>
+      )}
       {contest.summary.resultText ? <div className="ck-result-line">{contest.summary.resultText}</div> : null}
     </div>
   );

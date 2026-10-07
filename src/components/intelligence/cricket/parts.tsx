@@ -245,19 +245,36 @@ export interface CommentaryItem {
   text: string;
   /** "End of over 7: Team A 82/4" and the like, from the rules */
   after: string[];
+  /** not a ball: overs changed, target revised, innings declared or ended */
+  note?: boolean;
 }
+
+// what else the scorer records that viewers should see in the commentary
+const NOTE_EVENTS = new Set(["OVERS_CHANGE", "TARGET_REVISED", "DECLARE", "INNINGS_END", "PENALTY_RUNS", "RETIRE"]);
 
 /** Deliveries newest first, in match order: a corrected ball sits where the ball it replaced was. */
 export function commentaryFrom(entries: TimelineEntry[], ctx: MatchContext): CommentaryItem[] {
   const items: (CommentaryItem & { at: number })[] = [];
   for (const e of entries) {
-    if (e.type !== "DELIVERY" || e.superseded) continue;
+    if (e.superseded) continue;
+    if (NOTE_EVENTS.has(e.type)) {
+      // the innings is filled in from the balls around it, below
+      items.push({ entry: e, innings: 0, ball: "", badge: "", tone: "note", headline: "", text: e.text, after: e.derived.filter((t) => t !== e.text && !t.startsWith("Overs changed")), note: true, at: e.seq });
+      continue;
+    }
+    if (e.type !== "DELIVERY") continue;
     const at = parseBallLabel(e.label);
     if (!at) continue;
     const d = describeDelivery(e.payload as DeliveryPayload, ctx);
     items.push({ entry: e, innings: at.innings, ball: at.ball, ...d, after: e.derived, at: e.correction?.kind === "replace" && e.correction.targetSeq ? e.correction.targetSeq : e.seq });
   }
-  return items.sort((x, y) => y.at - x.at);
+  items.sort((x, y) => y.at - x.at);
+  for (let i = 0; i < items.length; i++) {
+    if (!items[i].note) continue;
+    const near = items.slice(i + 1).find((x) => !x.note) ?? items.slice(0, i).reverse().find((x) => !x.note);
+    items[i].innings = near?.innings ?? 1;
+  }
+  return items;
 }
 
 export function Commentary({ items, onEdit, onRemove, compact = false }: {
@@ -271,11 +288,12 @@ export function Commentary({ items, onEdit, onRemove, compact = false }: {
         return (
           <Fragment key={c.entry.id}>
             {prev && prev.innings !== c.innings ? <li className="ck-comm-break">{ordinal(c.innings)} innings</li> : null}
+            {c.note ? <li className="ck-comm-note">{c.text}</li> : null}
             {c.after.filter((t) => !t.startsWith("End of over")).map((t, k) => <li key={`a${k}`} className="ck-comm-event">{t}</li>)}
             {c.after.some((t) => t.startsWith("End of over")) ? (
               <li className="ck-comm-over">{c.after.find((t) => t.startsWith("End of over"))}</li>
             ) : null}
-            <li className={`ck-comm-ball ${c.tone}`}>
+            {c.note ? null : <li className={`ck-comm-ball ${c.tone}`}>
               <span className="ck-comm-at">{c.ball}</span>
               <span className={`ck-ball ${c.tone}`}>{c.badge}</span>
               <div className="ck-comm-body">
@@ -289,7 +307,7 @@ export function Commentary({ items, onEdit, onRemove, compact = false }: {
                   {onRemove ? <button type="button" className="ck-link danger" onClick={() => onRemove(c.entry)}>Remove</button> : null}
                 </span>
               ) : null}
-            </li>
+            </li>}
           </Fragment>
         );
       })}
