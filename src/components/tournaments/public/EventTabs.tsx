@@ -246,7 +246,7 @@ export default function EventTabs({
         : <TableTab tournament={tournament} standingsByGroup={standingsByGroup} teams={teams} />)}
       {activeTab === "Knockout" && <KnockoutTab matches={matches} teams={teams} intel={intel} tournamentId={tournament.id} />}
       {activeTab === "Fixtures" && (
-        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} stacked={isCricketSport} />
+        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} stacked={isCricketSport || isBasketballSport} />
       )}
       {activeTab === "Player Stats" && (
         authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
@@ -604,7 +604,7 @@ function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: str
 function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {}, stacked = false }: {
   tournamentId: string; matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>;
   highlights?: Record<string, MatchHighlight>;
-  // cricket's scores ("180/4 – 156/2") are too wide to share a phone's line with two names: there the teams stack
+  // cricket's and basketball's scores ("180/4 – 156/2", "114 – 113") are too wide to share a phone's line with two names: there the teams stack
   stacked?: boolean;
 }) {
   // a played game's detail (innings, result, top performers) opens on tap, one game at a time or several
