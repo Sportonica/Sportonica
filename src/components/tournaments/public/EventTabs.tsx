@@ -16,6 +16,7 @@ import { cricketRulesOf, type CricketStanding } from "@/lib/tournaments/standing
 import { CricketLeaders, CricketTablePublic, rankPlayers, type CricketTournamentData } from "./CricketStats";
 import { CricketCrest, CricketStatus } from "./CricketArt";
 import { BasketballCrest, BasketballStatus } from "./BasketballArt";
+import { BracketIcon, ClipboardIcon, HoopIcon, PlayerAvatar, StumpsIcon } from "./SportIcons";
 import type { MatchHighlight } from "@/lib/intelligence/actions";
 import { diffText, standingsScheme } from "@/lib/tournaments/standings";
 import {
@@ -202,7 +203,8 @@ export default function EventTabs({
         <div className="ev2-tabbar" ref={barRef}>
           {indicator && <div className="ev2-tab-indicator" style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }} />}
           {visibleTabs.map((t) => {
-            const Icon = TAB_ICON[t];
+            // cricket and basketball draw the bracket with their own icon set
+            const Icon = t === "Knockout" && (isCricketSport || isBasketballSport) ? BracketIcon : TAB_ICON[t];
             return (
               <button
                 key={t} ref={(el) => { if (el) tabRefs.current[t] = el; }}
@@ -841,7 +843,8 @@ function BasketballLeadersTab({ leaders }: { leaders: TournamentLeaders | null }
           {sorted.map((r, i) => (
             <div key={r.subjectKey} className={`ev2-srow${i < 2 ? " top3" : ""}`}>
               <span className="ev2-srow-rank">{i + 1}</span>
-              <TeamCrest name={r.name} />
+              {/* a player, not a team: an athlete in their team's colours */}
+              <span className="ev2-crest ck"><PlayerAvatar sport="basketball" team={r.teamName} size={40} /></span>
               <div className="ev2-prow-id">
                 <span className="ev2-srow-name">{r.name}</span>
                 <span className="ev2-prow-team">{r.teamName} · {r.contests} game{r.contests === 1 ? "" : "s"} · {num(r.values[stat.avg]).toFixed(1)} per game</span>
@@ -1105,10 +1108,10 @@ function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, crick
       <div className="ev2-card">
         <div className="ev2-mc-head">
           <div className="ev2-card-t">Live now</div>
-          {canScore ? <Link className="ev2-mc-score" href={`/tournaments/${tournamentId}/score`}>Live scoring</Link> : null}
+          {canScore ? <Link className="ev2-mc-score" href={`/tournaments/${tournamentId}/score`}><ClipboardIcon size={16} color="#fff" accent="#fff" /> Live scoring</Link> : null}
         </div>
         {live.length ? <div className="ev2-mc-grid">{live.map((m) => <Row key={m.id} m={m} kind="live" />)}</div>
-          : <div className="ev2-mc-none">No game in progress right now.{next[0] ? ` Next: ${name(next[0].team_a_id)} v ${name(next[0].team_b_id)}, ${matchWhen(next[0])}.` : ""}</div>}
+          : <div className="ev2-mc-none">{look === "cricket" ? <StumpsIcon size={22} /> : look === "basketball" ? <HoopIcon size={22} /> : null}<span>No game in progress right now.{next[0] ? ` Next: ${name(next[0].team_a_id)} v ${name(next[0].team_b_id)}, ${matchWhen(next[0])}.` : ""}</span></div>}
       </div>
       {next.length ? (
         <div className="ev2-card">

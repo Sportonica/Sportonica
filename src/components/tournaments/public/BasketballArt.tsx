@@ -36,10 +36,16 @@ const PALETTES = [
   { bg: BASKETBALL.orange, fg: "#FFFFFF", mark: "#FF9A57" },
   { bg: BASKETBALL.ink, fg: BASKETBALL.maple, mark: "#5A5A5A" },
   { bg: BASKETBALL.maple, fg: BASKETBALL.ink, mark: BASKETBALL.tan },
-  { bg: BASKETBALL.charcoal, fg: "#FFB27A", mark: "#4E4E4E" },
+  { bg: BASKETBALL.tan, fg: BASKETBALL.ink, mark: "#D2B48A" },
 ];
 
-const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+// FNV-1a, then a final mix: FNV's low bits barely change between short names, so without it most teams land on the same colourway
+const hash = (s: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  h ^= h >>> 16; h = Math.imul(h, 0x45d9f3b); h ^= h >>> 16;
+  return h >>> 0;
+};
 
 /** Up to two letters: "United States" → "US", "Japan" → "JA". */
 const initials = (name: string) => {
@@ -64,7 +70,7 @@ function Motif({ kind, color }: { kind: number; color: string }) {
 
 export function BasketballCrest({ name, size = 32 }: { name: string; size?: number }) {
   const h = hash(name || "?");
-  const p = PALETTES[h % PALETTES.length];
+  const p = PALETTES[(h >>> 8) % PALETTES.length];
   const text = initials(name);
   return (
     <svg className="bb-art-crest" width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">

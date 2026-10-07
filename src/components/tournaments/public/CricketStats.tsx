@@ -11,6 +11,7 @@ import { oversOf } from "@/lib/tournaments/standings";
 import { bestByWicket, inningsText, type CricketPlayer, type CricketTeamStats, type PartnershipRecord, type TeamInnings } from "@/lib/tournaments/cricketRecords";
 import { TIEBREAKER_LABEL, type CricketTable } from "@/lib/intelligence/sports/cricketTable";
 import { CricketCrest } from "./CricketArt";
+import { PlayerAvatar } from "./SportIcons";
 import "./cricket-stats.css";
 
 export interface CricketTournamentData {
@@ -159,6 +160,7 @@ export function CricketLeaders({ data }: { data: CricketTournamentData }) {
               {rows.map(({ p, shown, sub }, i) => (
                 <li key={p.id} className={i === 0 ? "first" : ""}>
                   <span className="cs-rank">{i + 1}</span>
+                  <PlayerAvatar sport="cricket" team={p.team} size={34} />
                   <span className="cs-who"><b>{p.name}</b><small>{p.team}{sub && sub !== p.team ? ` · ${sub}` : ""}</small></span>
                   <span className="cs-val">{shown}</span>
                 </li>

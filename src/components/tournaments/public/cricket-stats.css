@@ -101,3 +101,6 @@
 .cs-chip { flex: none; border: 1px solid var(--cs-line); background: #fff; color: var(--cs-2); border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .cs-chip.on { background: var(--cs-ink); border-color: var(--cs-ink); color: #fff; }
 .cs-empty { padding: 28px 16px; text-align: center; color: var(--cs-3); font-size: 13.5px; border: 1px dashed var(--cs-line); border-radius: 12px; }
+/* a player row: rank, avatar in the team colours, name, figure */
+.cs-board li:has(.si-avatar) { grid-template-columns: 26px 34px minmax(0, 1fr) auto; }
+.cs-board .si-avatar { border-radius: 50%; }

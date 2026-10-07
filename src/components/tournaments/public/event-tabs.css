@@ -554,3 +554,6 @@
 .ev2-mc-meta { align-items: center; }
 .ev2-srow-badge:has(.bb-art-crest), .ev2-srow-badge:has(.ck-art-crest) { background: none; border: 0; padding: 0; overflow: visible; }
 .ev2-srow-badge svg { width: 100%; height: 100%; }
+.ev2-mc-none { display: flex; align-items: center; gap: 10px; }
+.ev2-mc-none svg { flex: none; }
+.ev2-mc-score { display: inline-flex; align-items: center; gap: 6px; }

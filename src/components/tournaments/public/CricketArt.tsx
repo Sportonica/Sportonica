@@ -32,10 +32,10 @@ export function CricketBall({ kind = "red", size = 16, title }: { kind?: BallKin
   return (
     <svg className="ck-art-ball" width={size} height={size} viewBox="0 0 24 24" role={title ? "img" : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
       <circle cx="12" cy="12" r="11" fill={b.fill} stroke={kind === "white" ? "rgba(16,42,30,.25)" : "none"} strokeWidth="1" />
-      {/* the seam: two curved rows of stitching either side of the centre line */}
-      <path d="M8.2 1.7 C 12.6 7.4 12.6 16.6 8.2 22.3" fill="none" stroke={b.seam} strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M10.6 1.1 C 15 7.2 15 16.8 10.6 22.9" fill="none" stroke={b.seam} strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M8.9 4.4 l1.7-.4 M10.5 8 l1.9-.3 M11.1 12 h2 M10.5 16 l1.9.3 M8.9 19.6 l1.7.4" stroke={b.seam} strokeWidth="1" strokeLinecap="round" opacity=".85" />
+      {/* the seam: a band through the middle, bowed slightly, stitched on both edges */}
+      <path d="M10 1.4 C 13.6 7.4 13.6 16.6 10 22.6" fill="none" stroke={b.seam} strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M13.2 1.2 C 16.8 7.4 16.8 16.6 13.2 22.8" fill="none" stroke={b.seam} strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M10.4 4.6 l-1.5.5 M11.9 8.4 l-1.6.2 M12.3 12 h-1.6 M11.9 15.6 l-1.6-.2 M10.4 19.4 l-1.5-.5 M13.6 4.4 l1.5.5 M15.1 8.4 l1.6.2 M15.5 12 h1.6 M15.1 15.6 l1.6-.2 M13.6 19.6 l1.5-.5" stroke={b.seam} strokeWidth="1" strokeLinecap="round" opacity=".9" />
     </svg>
   );
 }
@@ -49,7 +49,13 @@ const PALETTES = [
   { bg: CRICKET.cream, fg: CRICKET.forest, mark: "#C9BBA6" },
 ];
 
-const hash = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+// FNV-1a, then a final mix: FNV's low bits barely change between short names, so without it most teams land on the same colourway
+const hash = (s: string) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  h ^= h >>> 16; h = Math.imul(h, 0x45d9f3b); h ^= h >>> 16;
+  return h >>> 0;
+};
 
 /** Up to two letters: "Sri Lanka" → "SL", "India" → "IN". */
 export const initials = (name: string) => {
@@ -74,7 +80,7 @@ function Motif({ kind, color }: { kind: number; color: string }) {
 
 export function CricketCrest({ name, size = 32 }: { name: string; size?: number }) {
   const h = hash(name || "?");
-  const p = PALETTES[h % PALETTES.length];
+  const p = PALETTES[(h >>> 8) % PALETTES.length];
   return (
     <svg className="ck-art-crest" width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
       <circle cx="20" cy="20" r="19.5" fill={p.bg} />
