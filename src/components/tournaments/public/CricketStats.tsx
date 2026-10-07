@@ -8,7 +8,7 @@
 import { useState } from "react";
 import type { CricketStanding, CricketResult } from "@/lib/tournaments/standings";
 import { oversOf } from "@/lib/tournaments/standings";
-import { inningsText, type CricketPlayer, type CricketTeamStats, type PartnershipRecord, type TeamInnings } from "@/lib/tournaments/cricketRecords";
+import { bestByWicket, inningsText, type CricketPlayer, type CricketTeamStats, type PartnershipRecord, type TeamInnings } from "@/lib/tournaments/cricketRecords";
 import { TIEBREAKER_LABEL, type CricketTable } from "@/lib/intelligence/sports/cricketTable";
 import "./cricket-stats.css";
 
@@ -133,7 +133,7 @@ export function rankPlayers(players: CricketPlayer[], key: string) {
     .map(({ p }) => ({ p, shown: st.shown(p), sub: st.sub?.(p) ?? p.team }));
 }
 
-const GROUPS = ["Batting", "Bowling", "Fielding", "Teams", "Records"] as const;
+const GROUPS = ["Batting", "Bowling", "Partnerships", "Fielding", "Teams", "Records"] as const;
 
 export function CricketLeaders({ data }: { data: CricketTournamentData }) {
   const [group, setGroup] = useState<(typeof GROUPS)[number]>("Batting");
@@ -147,7 +147,7 @@ export function CricketLeaders({ data }: { data: CricketTournamentData }) {
       <div className="cs-seg" role="tablist">
         {GROUPS.map((g) => <button key={g} role="tab" aria-selected={group === g} className={group === g ? "on" : ""} onClick={() => pickGroup(g)}>{g}</button>)}
       </div>
-      {group === "Teams" ? <TeamStats data={data} /> : group === "Records" ? <Records data={data} /> : (
+      {group === "Teams" ? <TeamStats data={data} /> : group === "Records" ? <Records data={data} /> : group === "Partnerships" ? <Partnerships list={data.partnerships} /> : (
         <>
           <div className="cs-chips">
             {stats.map((s) => <button key={s.key} className={`cs-chip${stat === s.key ? " on" : ""}`} onClick={() => setStat(s.key)}>{s.label}</button>)}
@@ -248,14 +248,10 @@ function Records({ data }: { data: CricketTournamentData }) {
           </dl>
         </section>
       ) : null)}
-      {data.partnerships.length > 1 ? (
+      {data.partnerships.length ? (
         <section>
-          <h3 className="cs-h">Highest partnerships</h3>
-          <ol className="cs-board">
-            {data.partnerships.slice(0, 5).map((p, i) => (
-              <li key={i}><span className="cs-rank">{i + 1}</span><span className="cs-who"><b>{p.batters.join(" & ")}</b><small>{p.team} v {p.opponent} · wicket {p.wicket} · {p.balls} balls</small></span><span className="cs-val">{p.runs}</span></li>
-            ))}
-          </ol>
+          <h3 className="cs-h">Highest partnership for each wicket</h3>
+          <PartnershipBoard list={bestByWicket(data.partnerships)} showWicket />
         </section>
       ) : null}
     </div>
@@ -290,5 +286,44 @@ export function CricketOverview({ data, standings, played, remaining, recent }: 
         </div>
       ) : null}
     </div>
+  );
+}
+
+// ── partnerships ────────────────────────────────────────────────
+
+const ord = (n: number) => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
+
+function PartnershipBoard({ list, showWicket = false }: { list: PartnershipRecord[]; showWicket?: boolean }) {
+  return (
+    <ol className="cs-board">
+      {list.map((p, i) => (
+        <li key={i} className={!showWicket && i === 0 ? "first" : ""}>
+          <span className="cs-rank">{showWicket ? ord(p.wicket) : i + 1}</span>
+          <span className="cs-who">
+            <b>{p.shares ? p.shares.map((x) => `${x.name} ${x.runs}`).join(" & ") : p.batters.join(" & ")}</b>
+            <small>{p.team} v {p.opponent} · {showWicket ? "" : `${ord(p.wicket)} wkt · `}{p.balls} balls{p.unbroken ? " · unbroken" : ""}</small>
+          </span>
+          <span className="cs-val">{p.runs}{p.unbroken ? "*" : ""}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** Every partnership from the finished matches, overall or for one wicket. */
+function Partnerships({ list }: { list: PartnershipRecord[] }) {
+  const [wicket, setWicket] = useState<number | null>(null);
+  if (!list.length) return <div className="cs-empty">Partnerships appear once matches scored ball by ball are complete.</div>;
+  const wickets = [...new Set(list.map((p) => p.wicket))].sort((a, b) => a - b);
+  const shown = list.filter((p) => wicket === null || p.wicket === wicket).slice(0, 20);
+  return (
+    <>
+      <div className="cs-chips">
+        <button className={`cs-chip${wicket === null ? " on" : ""}`} onClick={() => setWicket(null)}>Overall</button>
+        {wickets.map((w) => <button key={w} className={`cs-chip${wicket === w ? " on" : ""}`} onClick={() => setWicket(w)}>{ord(w)} wicket</button>)}
+      </div>
+      <PartnershipBoard list={shown} />
+      <p className="cs-note">From matches scored ball by ball, once complete. * not out at the end.</p>
+    </>
   );
 }

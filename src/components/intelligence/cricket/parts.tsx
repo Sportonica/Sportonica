@@ -11,7 +11,7 @@ import type { TimelineEntry } from "@/lib/intelligence/types";
 import type { CricketInnings, CricketRules, CricketState } from "@/lib/intelligence/sports/cricket";
 import {
   allInnings, ballBadge, battingCard, inningsName, bowlerLine, bowlingCard, crease, describeDelivery, extrasOf, fallOfWickets, fmt, liveNumbers,
-  ordinal, overComplete, overSummaries, parseBallLabel, partnerships, thisOver, type DeliveryPayload,
+  ordinal, overComplete, overSummaries, parseBallLabel, partnerships, thisOver, wicketName, type DeliveryPayload, type PartnershipLine,
 } from "@/lib/intelligence/sports/cricketView";
 import "./cricket.css";
 
@@ -129,7 +129,7 @@ function InningsCard({ inn, ctx, rules }: { inn: CricketInnings; ctx: MatchConte
   const bowl = bowlingCard(inn, ctx, rules);
   const ex = extrasOf(inn);
   const fow = fallOfWickets(inn, ctx, rules);
-  const stands = partnerships(inn, ctx);
+  const stands = partnerships(inn, ctx, rules);
   const n = liveNumbers(inn, rules);
   const [more, setMore] = useState(false);
   return (
@@ -166,6 +166,8 @@ function InningsCard({ inn, ctx, rules }: { inn: CricketInnings; ctx: MatchConte
         ) : null}
       </section>
 
+      <PartnershipTable stands={stands} />
+
       {fow.length ? (
         <section className="ck-panel">
           <div className="ck-panel-head"><h3>Fall of wickets</h3></div>
@@ -193,20 +195,6 @@ function InningsCard({ inn, ctx, rules }: { inn: CricketInnings; ctx: MatchConte
         </section>
       ) : null}
 
-      {stands.length ? (
-        <section className="ck-panel">
-          <div className="ck-panel-head"><h3>Partnerships</h3></div>
-          <div className="ck-stands">
-            {stands.slice().reverse().map((st) => (
-              <div key={st.wicket} className={`ck-stand${st.current ? " current" : ""}`}>
-                <span className="ck-label">{st.current ? "Current" : `${ordinal(st.wicket)} wkt`}</span>
-                <span className="ck-stand-who">{st.batters.map((b) => `${b.name}${b.runs !== null ? ` ${b.runs}*` : ""}`).join(" & ")}</span>
-                <span className="ck-stand-n"><b>{st.runs}</b> <span className="ck-muted">({st.balls})</span></span>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }
@@ -317,5 +305,75 @@ export function Commentary({ items, onEdit, onRemove, compact = false }: {
         );
       })}
     </ol>
+  );
+}
+
+// ── partnerships ────────────────────────────────────────────────
+
+const share = (b: PartnershipLine["batters"][number]) => (b.runs === null ? "" : `${b.runs}${b.balls !== null ? ` (${b.balls})` : ""}`);
+
+/** The two batters' shares as one bar: who has made the partnership. */
+function ShareBar({ st }: { st: PartnershipLine }) {
+  const [x, y] = st.batters;
+  if (!x || !y || x.runs === null || y.runs === null || x.runs + y.runs === 0) return null;
+  const left = (x.runs / (x.runs + y.runs)) * 100;
+  return (
+    <span className="ck-sharebar" aria-hidden="true"><i style={{ width: `${left}%` }} /><i style={{ width: `${100 - left}%` }} /></span>
+  );
+}
+
+/** The partnership in progress: always derived from the balls, nothing to enter. */
+export function LivePartnership({ inn, ctx, rules, compact = false }: { inn: CricketInnings; ctx: MatchContext; rules: CricketRules; compact?: boolean }) {
+  const st = partnerships(inn, ctx, rules).find((p) => p.current);
+  if (!st) return null;
+  return (
+    <section className={`ck-panel ck-live-stand${compact ? " compact" : ""}`} aria-live="polite">
+      <div className="ck-panel-head">
+        <h3>{compact ? `${ordinal(st.wicket)} wkt stand` : `${wicketName(st.wicket)} partnership`}</h3>
+        <span className="ck-total">{st.runs} <span className="ck-muted">run{st.runs === 1 ? "" : "s"} · {st.balls} ball{st.balls === 1 ? "" : "s"}</span></span>
+      </div>
+      <div className="ck-stand-pair">
+        {st.batters.map((b) => <span key={b.id}><b>{b.name}</b> {share(b)}</span>)}
+      </div>
+      <ShareBar st={st} />
+      {!compact && (st.extras || st.runRate !== null) ? (
+        <div className="ck-muted ck-stand-foot">{st.extras ? `${st.extras} extra${st.extras === 1 ? "" : "s"}` : ""}{st.extras && st.runRate !== null ? " · " : ""}{st.runRate !== null ? `RR ${fmt(st.runRate)}` : ""}</div>
+      ) : null}
+    </section>
+  );
+}
+
+/** Every partnership of an innings, newest first; each opens to its detail. */
+export function PartnershipTable({ stands }: { stands: PartnershipLine[] }) {
+  if (!stands.length) return null;
+  return (
+    <section className="ck-panel">
+      <div className="ck-panel-head"><h3>Partnerships</h3></div>
+      <div className="ck-pships">
+        <div className="ck-pship-row head"><span>Wkt</span><span>Batters</span><span>Runs</span><span>Balls</span></div>
+        {stands.slice().reverse().map((st) => (
+          <details key={`${st.wicket}-${st.from?.over ?? ""}-${st.batters.map((b) => b.id).join()}`} className={`ck-pship${st.current ? " current" : ""}`}>
+            <summary className="ck-pship-row">
+              <span className="ck-pship-w">{ordinal(st.wicket)}</span>
+              <span className="ck-pship-who">
+                {st.batters.map((b) => <span key={b.id}>{b.name} <small>{share(b)}</small></span>)}
+                <ShareBar st={st} />
+              </span>
+              <span className="ck-strong">{st.runs}{st.current ? "*" : ""}</span>
+              <span>{st.balls}{st.current ? "*" : ""}</span>
+            </summary>
+            <div className="ck-pship-more">
+              <div><span>Run rate</span><b>{fmt(st.runRate)}</b></div>
+              {st.from ? <div><span>Started</span><b>{st.from.score} <small>{st.from.over} ov</small></b></div> : null}
+              {st.to ? <div><span>{st.current ? "Now" : "Ended"}</span><b>{st.to.score} <small>{st.to.over} ov</small></b></div> : null}
+              {st.fours !== null ? <div><span>4s · 6s</span><b>{st.fours} · {st.sixes}</b></div> : null}
+              {st.extras !== null ? <div><span>Extras</span><b>{st.extras}</b></div> : null}
+              {st.unbroken ? <div><span>Ended</span><b>Unbroken</b></div> : null}
+            </div>
+          </details>
+        ))}
+      </div>
+      <p className="ck-muted ck-stand-foot">* still batting. Balls are legal balls: a wide or no-ball adds runs, not a ball.</p>
+    </section>
   );
 }

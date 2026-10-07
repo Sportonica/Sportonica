@@ -1060,25 +1060,27 @@ export async function getCricketRecords(tournamentId: string): Promise<{ lines: 
   const sb = await createClient();
   const [{ data: lineRows, error }, { data: contests, error: cErr }] = await Promise.all([
     sb.from("si_stat_lines").select("contest_id, team_player_id, subject_key, team_id, raw").eq("tournament_id", tournamentId).eq("subject", "player").eq("sport", "cricket").limit(5000),
-    sb.from("si_contests").select("id, status, context, b0:state->innings->0->>batting, p0:state->innings->0->partnerships, s0:state->innings->0->stand, c0:state->innings->0->closed, b1:state->innings->1->>batting, p1:state->innings->1->partnerships, s1:state->innings->1->stand, c1:state->innings->1->closed")
+    sb.from("si_contests").select("id, status, context, b0:state->innings->0->>batting, p0:state->innings->0->partnerships, b1:state->innings->1->>batting, p1:state->innings->1->partnerships")
       .eq("tournament_id", tournamentId).eq("sport", "cricket"),
   ]);
   if (error || cErr) return fail((error ?? cErr)!.message);
   const names: Record<string, { name: string; team: string }> = {};
   const partnerships: PartnershipRecord[] = [];
-  type Stand = { wicket: number; runs: number; balls: number; batters: string[] };
-  for (const c of (contests ?? []) as unknown as { context: MatchContext; b0: string | null; p0: Stand[] | null; s0: Stand | null; c0: string | null; b1: string | null; p1: Stand[] | null; s1: Stand | null; c1: string | null }[]) {
+  type Stand = { wicket: number; runs: number; balls: number; batters: string[]; contrib?: Record<string, { runs: number; balls: number }>; unbroken?: boolean };
+  for (const c of (contests ?? []) as unknown as { status: string; context: MatchContext; b0: string | null; p0: Stand[] | null; b1: string | null; p1: Stand[] | null }[]) {
     const sides = c.context?.sides;
     if (!sides) continue;
     for (const side of [sides.a, sides.b]) for (const pl of side.players) names[pl.id] = { name: pl.name, team: side.name };
-    for (const [bat, list, stand, closed] of [[c.b0, c.p0, c.s0, c.c0], [c.b1, c.p1, c.s1, c.c1]] as const) {
+    // records come from finished matches only: a stand still going is not a record yet
+    if (c.status !== "completed") continue;
+    for (const [bat, list] of [[c.b0, c.p0], [c.b1, c.p1]] as const) {
       if (bat !== "a" && bat !== "b") continue;
-      // the stand in progress counts too, so a big live partnership shows as it happens
-      const all = [...(list ?? []), ...(!closed && stand && (stand.runs || stand.balls) ? [stand] : [])];
-      for (const st of all) {
+      for (const st of list ?? []) {
+        const ids = [...new Set([...st.batters, ...Object.keys(st.contrib ?? {})])];
         partnerships.push({
-          wicket: st.wicket, runs: st.runs, balls: st.balls, batters: st.batters.map((id) => names[id]?.name ?? "Player"),
-          team: sides[bat].name, opponent: sides[bat === "a" ? "b" : "a"].name,
+          wicket: st.wicket, runs: st.runs, balls: st.balls, batters: ids.map((id) => names[id]?.name ?? "Player"),
+          team: sides[bat].name, opponent: sides[bat === "a" ? "b" : "a"].name, unbroken: !!st.unbroken,
+          ...(st.contrib ? { shares: ids.map((id) => ({ name: names[id]?.name ?? "Player", runs: st.contrib![id]?.runs ?? 0, balls: st.contrib![id]?.balls ?? 0 })) } : {}),
         });
       }
     }
@@ -1086,5 +1088,5 @@ export async function getCricketRecords(tournamentId: string): Promise<{ lines: 
   const lines: CricketLine[] = ((lineRows ?? []) as { contest_id: string; team_player_id: string | null; subject_key: string; team_id: string | null; raw: Record<string, number> }[])
     .map((l) => ({ contestId: l.contest_id, playerId: l.team_player_id ?? l.subject_key, teamId: l.team_id, raw: l.raw ?? {} }));
   partnerships.sort((x, y) => y.runs - x.runs || x.balls - y.balls);
-  return { lines, names, partnerships: partnerships.slice(0, 10) };
+  return { lines, names, partnerships };
 }

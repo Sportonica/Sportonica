@@ -212,3 +212,33 @@
 .ck-super .ck-label { color: var(--ck-wicket); }
 .ck-seg button small { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: .8; }
 .ck-tied { border: 1px solid var(--si-line); border-left: 3px solid var(--ck-wicket); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
+
+/* partnerships */
+.ck-live-stand { gap: 6px; }
+.ck-live-stand.compact { padding: 10px 12px; }
+.ck-stand-pair { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 14px; font-variant-numeric: tabular-nums; }
+.ck-stand-pair b { font-weight: 800; }
+.ck-stand-foot { font-size: 12px; }
+.ck-sharebar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; background: var(--si-line); }
+.ck-sharebar i { display: block; height: 100%; }
+.ck-sharebar i:first-child { background: var(--si-accent); }
+.ck-sharebar i:last-child { background: color-mix(in srgb, var(--si-accent) 35%, transparent); }
+.ck-pships { display: grid; font-variant-numeric: tabular-nums; }
+.ck-pship-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) 44px 44px; gap: 8px; align-items: center; padding: 8px 0; font-size: 13.5px; }
+.ck-pship-row > span:nth-child(n+3) { text-align: right; }
+.ck-pship-row.head { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--si-text-3); padding-top: 0; }
+.ck-pship { border-top: 1px solid var(--si-line); }
+.ck-pship > summary { list-style: none; cursor: pointer; }
+.ck-pship > summary::-webkit-details-marker { display: none; }
+.ck-pship.current .ck-pship-w { color: var(--si-accent); }
+.ck-pship-w { font-size: 12px; font-weight: 800; color: var(--si-text-2); }
+.ck-pship-who { display: grid; gap: 3px; min-width: 0; }
+.ck-pship-who > span { font-weight: 700; overflow-wrap: anywhere; }
+.ck-pship-who small { font-weight: 500; color: var(--si-text-3); }
+.ck-pship-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px 14px; padding: 0 0 12px 46px; font-size: 13px; }
+.ck-pship-more > div { display: grid; }
+.ck-pship-more span { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--si-text-3); }
+.ck-pship-more small { color: var(--si-text-3); font-weight: 500; }
+@media (max-width: 420px) { .ck-pship-more { padding-left: 0; } }
+.ck-live-stand .ck-total { white-space: nowrap; }
+.ck-live-stand .ck-panel-head { flex-wrap: wrap; }

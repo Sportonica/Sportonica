@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { cricketEngine as E, oversText, parseOvers, runRate } from "../../src/lib/intelligence/sports/cricket.ts";
 import { aggregate } from "../../src/lib/intelligence/aggregate.ts";
 import * as V from "../../src/lib/intelligence/sports/cricketView.ts";
+import { bestByWicket } from "../../src/lib/tournaments/cricketRecords.ts";
 import { makeContext, openMatch, section, cell, card } from "./harness.mjs";
 
 const ctx = makeContext("cricket", 6);
@@ -503,4 +504,59 @@ section("cricket: no super over unless the scores are level", () => {
   const t = openMatch(E, ctx, { preset: "test" });
   t.push("MATCH_START");
   t.refuses("SUPER_OVER_START", { batting: "b", striker: "b1", nonStriker: "b2" }, /no super over/, "a two-innings match");
+});
+
+section("cricket partnerships: each batter's share, legal balls, start and end, from the balls alone", () => {
+  const m = firstInnings();
+  const [first, second, third, fourth] = m.env.sport.innings[0].partnerships;
+  // a1 1 (1 ball); wide (no ball); a2 no-ball + four (faced, not legal); a2 four; a2 bowled
+  assert.deepEqual([first.wicket, first.runs, first.balls], [1, 11, 3], "wide and no-ball runs count, but not as balls");
+  assert.deepEqual(first.contrib, { a1: { runs: 1, balls: 1 }, a2: { runs: 8, balls: 3 } }, "a no-ball is a ball faced by the batter");
+  assert.deepEqual([first.start, first.end, first.unbroken, first.fours], [{ runs: 0, balls: 0 }, { runs: 11, balls: 3 }, false, 2]);
+  assert.deepEqual([second.wicket, second.start, second.end], [2, { runs: 11, balls: 3 }, { runs: 21, balls: 8 }], "the next one starts where the last ended");
+  assert.equal(second.contrib.a1.runs + second.contrib.a3.runs, 8, "the leg-byes belong to the partnership, not to a batter");
+  assert.equal(second.runs, 10);
+  assert.deepEqual([third.wicket, third.runs, third.balls, third.unbroken], [3, 0, 1, false], "a duck partnership still counts: one ball faced");
+  assert.equal(fourth, undefined, "the last batter left alone with no ball faced is no partnership");
+});
+
+section("cricket partnerships: a retirement ends one unbroken and the next is for the same wicket; undo restores it", () => {
+  const m = openMatch(E, ctx, SHORT);
+  m.push("MATCH_START");
+  m.push("INNINGS_START", { batting: "a", striker: "a1", nonStriker: "a2" });
+  ball(m, "a1", "a2", "b1", { runsBat: 4 });
+  const retire = m.push("RETIRE", { player: "a1", kind: "hurt" });
+  m.push("NEW_BATTER", { player: "a3" });
+  const two = ball(m, "a3", "a2", "b1", { runsBat: 2 });
+  const inn = () => m.env.sport.innings[0];
+  assert.ok(retire);
+  assert.deepEqual([inn().partnerships.length, inn().partnerships[0].unbroken, inn().stand.wicket, inn().stand.runs, [...inn().stand.batters].sort()], [1, true, 1, 2, ["a2", "a3"]]);
+  assert.deepEqual(inn().stand.contrib, { a3: { runs: 2, balls: 1 } });
+  // undo the last ball: the partnership goes back to nothing, with no stale share left behind
+  m.correct("void", two.id, "Wrong runs");
+  assert.deepEqual([inn().stand.runs, inn().stand.balls, inn().stand.contrib], [0, 0, {}]);
+  m.assertReconstructs("rebuilt after the correction");
+});
+
+section("cricket partnerships on screen: shares, run rate from legal balls, where it started and ended", () => {
+  const m = firstInnings();
+  const inn = m.env.sport.innings[0];
+  const [first, second] = V.partnerships(inn, ctx, m.rules);
+  assert.deepEqual(first.batters.map((b) => [b.id, b.runs, b.balls]), [["a1", 1, 1], ["a2", 8, 3]]);
+  assert.deepEqual([first.extras, first.runRate, first.from, first.to, first.current], [2, 22, { score: "0/0", over: "0.0" }, { score: "11/1", over: "0.3" }, false], "11 off 3 legal balls is 22 an over");
+  assert.deepEqual([second.from.score, second.to.score, second.to.over], ["11/1", "21/2", "1.2"]);
+  // the one in progress
+  const live = openMatch(E, ctx, SHORT);
+  live.push("MATCH_START");
+  live.push("INNINGS_START", { batting: "a", striker: "a1", nonStriker: "a2" });
+  ball(live, "a1", "a2", "b1", { runsBat: 4 });
+  ball(live, "a1", "a2", "b1", { extra: "wide" });
+  const [now] = V.partnerships(live.env.sport.innings[0], ctx, live.rules);
+  assert.deepEqual([now.current, now.runs, now.balls, now.to.score, now.batters[0].runs, now.batters[0].balls], [true, 5, 1, "5/0", 4, 1], "a wide adds a run, not a ball");
+});
+
+section("cricket partnership records: highest for each wicket", () => {
+  const p = (wicket, runs, balls, who) => ({ wicket, runs, balls, batters: [who], team: "T", opponent: "O" });
+  const best = bestByWicket([p(1, 40, 30, "a"), p(2, 74, 50, "b"), p(1, 87, 60, "c"), p(2, 74, 44, "d"), p(3, 10, 9, "e")]);
+  assert.deepEqual(best.map((x) => [x.wicket, x.runs, x.batters[0]]), [[1, 87, "c"], [2, 74, "d"], [3, 10, "e"]], "level on runs: fewer balls first");
 });
