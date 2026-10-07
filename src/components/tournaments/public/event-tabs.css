@@ -563,8 +563,9 @@
    featured with their avatar, team crest and the figure with its unit. */
 .ev2-tp { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 .ev2-tp-cat { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: 14px; border: 1px solid rgba(20,23,30,0.08); background: #FBF9F5; min-width: 0; }
-.ev2-tp-cat.major { grid-column: span 3; border-top: 3px solid #CA023A; }
-.ev2-tp-cat.minor { grid-column: span 2; }
+.ev2-tp-cat.major { border-top: 3px solid #CA023A; }
+.ev2-tp.bb .ev2-tp-cat.major { border-top-color: #E65C00; }
+.ev2-tp.bb .ev2-tp-val b, .ev2-tp.bb .ev2-tp-t { color: #1A1A1A; }
 .ev2-tp-t { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #102A1E; opacity: .7; }
 .ev2-tp-lead { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
 .ev2-tp-lead .si-avatar { border-radius: 50%; }
@@ -585,7 +586,7 @@
 .ev2-tp-rest b { font-size: 14.5px; font-weight: 800; }
 @media (max-width: 760px) {
   .ev2-tp { grid-template-columns: minmax(0, 1fr); }
-  .ev2-tp-cat.major, .ev2-tp-cat.minor { grid-column: auto; }
+  .ev2-tp-cat.major, .ev2-tp-cat.minor { grid-column: auto !important; }
 }
 /* a small category: avatar and figure on top, the name and team under them, the rest by name only */
 .ev2-tp-cat.minor .ev2-tp-lead { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av val" "who who"; row-gap: 10px; }
@@ -635,3 +636,17 @@
   .ev2-fixture.stack .ev2-fixture-extra { grid-area: x; }
 }
 .ev2-fixture-more i { font-size: 15px; opacity: 1; color: #006241; font-weight: 900; }
+/* three headline categories share the narrow column: stack them like the small ones */
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-lead { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av val" "who who"; row-gap: 10px; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-lead .si-avatar { grid-area: av; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-val { grid-area: val; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-who { grid-area: who; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-sub { padding-left: 0; margin-top: -2px; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-val b { font-size: 26px; }
+.ev2-tp.bb .ev2-tp-rest .n small { display: none; }
+@media (max-width: 760px) {
+  .ev2-tp.bb .ev2-tp-cat.major .ev2-tp-lead, .ev2-tp.bb .ev2-tp-cat.minor .ev2-tp-lead { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av who val"; }
+  .ev2-tp.bb .ev2-tp-cat.major .ev2-tp-sub { padding-left: 64px; }
+  .ev2-tp.bb .ev2-tp-rest .n small { display: inline; }
+}
+.ev2-tp.bb .ev2-tp-rest .n { white-space: normal; overflow: visible; font-size: 13px; line-height: 1.25; }

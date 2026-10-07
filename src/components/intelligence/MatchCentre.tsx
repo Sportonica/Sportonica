@@ -89,7 +89,7 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
             </div>
             {SPORTS_WITH_QUESTIONS.includes(contest.sport) ? <AskCard contestId={contest.id} lastSeq={contest.lastSeq} /> : null}
             {intel ? <Insights items={intel.analytics.insights?.slice(0, 5)} /> : null}
-            {intel ? <StatCards cards={intel.analytics.cards} /> : null}
+            {intel ? <StatCards cards={intel.analytics.cards} sides={contest.context.sides ? [contest.context.sides.a.name, contest.context.sides.b.name] : undefined} /> : null}
             {intel?.teams[0] ? <StatTableView table={intel.teams[0]} max={8} /> : null}
             {intel ? <RulesGuide sections={intel.guide} /> : null}
           </>
@@ -115,7 +115,7 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
           intel ? (
             <>
               <Insights items={intel.analytics.insights} />
-              <StatCards cards={intel.analytics.cards} />
+              <StatCards cards={intel.analytics.cards} sides={contest.context.sides ? [contest.context.sides.a.name, contest.context.sides.b.name] : undefined} />
               {intel.analytics.charts.map((c) => <ChartView key={c.key} chart={c} />)}
               {intel.analytics.tables.map((t) => <StatTableView key={t.key} table={t} />)}
             </>

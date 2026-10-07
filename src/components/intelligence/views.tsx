@@ -128,18 +128,61 @@ export function Insights({ items, title = "What the data says" }: { items?: stri
   );
 }
 
-export function StatCards({ cards }: { cards: AnalyticsCard[] }) {
+/** "Canada 3, Latvia 2" with the two sides' names → ["3", "2"], or null when the card is a single figure. */
+function splitPair(value: string, sides?: [string, string]): [string, string] | null {
+  if (!sides) return null;
+  const [a, b] = sides;
+  const prefix = `${a} `, mid = `, ${b} `;
+  if (!value.startsWith(prefix)) return null;
+  const i = value.lastIndexOf(mid);
+  if (i < prefix.length) return null;
+  return [value.slice(prefix.length, i), value.slice(i + mid.length)];
+}
+
+/**
+ * Single figures as a row of compact cards; figures for both sides
+ * ("Canada 3, Latvia 2") as one head-to-head panel, the sides named once
+ * on top in their colours and each figure either side of a split bar.
+ */
+export function StatCards({ cards, sides }: { cards: AnalyticsCard[]; sides?: [string, string] }) {
   if (!cards.length) return null;
+  const pairs = cards.map((c) => ({ c, pair: splitPair(c.value, sides) }));
+  const singles = pairs.filter((x) => !x.pair).map((x) => x.c);
+  const versus = pairs.filter((x): x is { c: AnalyticsCard; pair: [string, string] } => !!x.pair);
   return (
-    <div className="si-cards">
-      {cards.map((c) => (
-        <div key={c.label} className="si-stat">
-          <div className="si-stat-label">{c.label}</div>
-          <div className="si-stat-value">{c.value}</div>
-          {c.hint ? <div className="si-stat-hint">{c.hint}</div> : null}
+    <>
+      {singles.length ? (
+        <div className="si-cards">
+          {singles.map((c) => (
+            <div key={c.label} className="si-stat">
+              <div className="si-stat-label">{c.label}</div>
+              <div className="si-stat-value">{c.value}</div>
+              {c.hint ? <div className="si-stat-hint">{c.hint}</div> : null}
+            </div>
+          ))}
         </div>
-      ))}
-    </div>
+      ) : null}
+      {versus.length && sides ? (
+        <div className="si-card si-h2h">
+          <div className="si-h2h-head"><span className="a">{sides[0]}</span><span className="b">{sides[1]}</span></div>
+          {versus.map(({ c, pair: [va, vb] }) => {
+            const na = Number(va), nb = Number(vb);
+            const share = Number.isFinite(na) && Number.isFinite(nb) && na + nb > 0 ? (na / (na + nb)) * 100 : null;
+            return (
+              <div key={c.label} className="si-h2h-row">
+                <span className="v a">{va}</span>
+                <div className="si-h2h-mid">
+                  <span className="si-h2h-l">{c.label}</span>
+                  {share !== null ? <span className="si-h2h-bar" aria-hidden="true"><i style={{ width: `${share}%` }} /><i style={{ width: `${100 - share}%` }} /></span> : null}
+                  {c.hint ? <span className="si-h2h-hint">{c.hint}</span> : null}
+                </div>
+                <span className="v b">{vb}</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+    </>
   );
 }
 

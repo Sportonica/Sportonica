@@ -532,6 +532,46 @@ function MatchDetailModal({ match: m, team, onClose, intel: si, tournamentId }: 
 }
 
 // ── Fixtures (public, read-only, by date) ──────────────────────────
+type TPRow = { id: string; name: string; team: string; shown: string; sub?: string };
+type TPGroup = { k: string; title: string; unit: string; major: boolean; rows: TPRow[] };
+const BB_SHORT: Record<string, string> = { pts: "Pts", reb: "Reb", ast: "Ast", stl: "Stl", blk: "Blk", tpm: "3PM" };
+
+/**
+ * Each category's leader featured (avatar in team colours, crest, the
+ * figure with its unit and, for the headline row, its context), then
+ * second and third. The headline categories share one row; the rest share
+ * the next, so the grid is always complete.
+ */
+function TopPerformers({ groups, sport }: { groups: TPGroup[]; sport: "cricket" | "basketball" }) {
+  const majors = groups.filter((g) => g.major).length || 1;
+  return (
+    <div className={`ev2-tp ${sport === "basketball" ? "bb" : "ck"}`}>
+      {groups.map((g) => {
+        const [lead, ...rest] = g.rows;
+        return (
+          <section key={g.k} className={`ev2-tp-cat ${g.major ? "major" : "minor"}`} style={{ gridColumn: `span ${g.major ? 6 / majors : 2}` }}>
+            <div className="ev2-tp-t">{g.title}</div>
+            <div className="ev2-tp-lead">
+              <PlayerAvatar sport={sport} team={lead.team} size={g.major ? 52 : 40} />
+              <div className="ev2-tp-who">
+                <b>{lead.name}</b>
+                <span>{sport === "cricket" ? <CricketCrest name={lead.team} size={14} /> : <BasketballCrest name={lead.team} size={14} />}{lead.team}</span>
+              </div>
+              <div className="ev2-tp-val"><b>{lead.shown}</b><small>{g.unit}</small></div>
+            </div>
+            {g.major && lead.sub && lead.sub !== lead.team ? <div className="ev2-tp-sub">{lead.sub}</div> : null}
+            {rest.length ? (
+              <ol className="ev2-tp-rest">
+                {rest.map((r, i) => <li key={r.id}><span className="r">{i + 2}</span><span className="n">{r.name}<small>{r.team}</small></span><b>{r.shown}</b></li>)}
+              </ol>
+            ) : null}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 // the unit under a top performer's figure
 const TP_UNIT: Record<string, string> = { runs: "runs", wickets: "wickets", sr: "strike rate", econ: "economy", sixes: "sixes" };
 
@@ -761,20 +801,24 @@ function SportBoard({ basketball, leaders, cricket, matches, teams, highlights, 
 }) {
   const num = (v: unknown) => (typeof v === "number" ? v : 0);
   const name = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "TBD";
-  type Lead = { label: string; who: string; team: string; value: string };
-  const leads: Lead[] = [];
-  if (basketball) {
-    for (const [avg, label] of [["ppg", "Points"], ["rpg", "Rebounds"], ["apg", "Assists"]] as const) {
-      const top = [...(leaders?.rows ?? [])].sort((a, b) => num(b.values[avg]) - num(a.values[avg]))[0];
-      if (top && num(top.values[avg]) > 0) leads.push({ label, who: top.name, team: top.teamName, value: `${num(top.values[avg]).toFixed(1)} per game` });
-    }
-  }
-  const performers = !basketball && cricket ? ([
-    ["runs", "Top run scorers"], ["wickets", "Top wicket takers"], ["sr", "Best strike rate"], ["econ", "Best economy"], ["sixes", "Most sixes"],
-  ] as const).map(([k, title]) => ({ k, title, top: rankPlayers(cricket.players, k).slice(0, 3) })).filter((x) => x.top.length) : [];
+  // the categories each sport leads with, the first ones as the headline row
+  const performers: TPGroup[] = basketball
+    ? BB_STATS.map((st, i) => ({
+        k: st.total, title: st.label, unit: `${BB_SHORT[st.total]} / game`, major: i < 3,
+        rows: [...(leaders?.rows ?? [])].filter((r) => num(r.values[st.avg]) > 0)
+          .sort((a, b) => num(b.values[st.avg]) - num(a.values[st.avg])).slice(0, 3)
+          .map((r) => ({ id: r.subjectKey, name: r.name, team: r.teamName, shown: num(r.values[st.avg]).toFixed(1),
+            sub: `${num(r.values[st.total])} ${BB_SHORT[st.total].toLowerCase()} · ${r.contests} game${r.contests === 1 ? "" : "s"}` })),
+      })).filter((g) => g.rows.length)
+    : cricket ? ([
+        ["runs", "Top run scorers"], ["wickets", "Top wicket takers"], ["sr", "Best strike rate"], ["econ", "Best economy"], ["sixes", "Most sixes"],
+      ] as const).map(([k, title], i) => ({
+        k, title, unit: TP_UNIT[k], major: i < 2,
+        rows: rankPlayers(cricket.players, k).slice(0, 3).map(({ p, shown, sub }) => ({ id: p.id, name: p.name, team: p.team, shown, sub })),
+      })).filter((g) => g.rows.length) : [];
   const latest = matches.filter((m) => m.status === "completed" && m.team_a_id && m.team_b_id)
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 3);
-  if (!leads.length && !performers.length && !latest.length) return null;
+  if (!performers.length && !latest.length) return null;
   return (
     <>
       {performers.length ? (
@@ -783,50 +827,7 @@ function SportBoard({ basketball, leaders, cricket, matches, teams, highlights, 
             <div className="ev2-card-t">Top performers</div>
             <button className="ev2-game-link" onClick={onAll}>All ›</button>
           </div>
-          <div className="ev2-tp">
-            {performers.map((g, gi) => {
-              const [lead, ...rest] = g.top;
-              const major = gi < 2;
-              return (
-                <section key={g.k} className={`ev2-tp-cat ${major ? "major" : "minor"}`}>
-                  <div className="ev2-tp-t">{g.title}</div>
-                  <div className="ev2-tp-lead">
-                    <PlayerAvatar sport="cricket" team={lead.p.team} size={major ? 52 : 40} />
-                    <div className="ev2-tp-who">
-                      <b>{lead.p.name}</b>
-                      <span><CricketCrest name={lead.p.team} size={14} />{lead.p.team}</span>
-                    </div>
-                    <div className="ev2-tp-val"><b>{lead.shown}</b><small>{TP_UNIT[g.k]}</small></div>
-                  </div>
-                  {major && lead.sub && lead.sub !== lead.p.team ? <div className="ev2-tp-sub">{lead.sub}</div> : null}
-                  {rest.length ? (
-                    <ol className="ev2-tp-rest">
-                      {rest.map(({ p, shown }, i) => (
-                        <li key={p.id}><span className="r">{i + 2}</span><span className="n">{p.name}<small>{p.team}</small></span><b>{shown}</b></li>
-                      ))}
-                    </ol>
-                  ) : null}
-                </section>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-      {leads.length ? (
-        <div className="ev2-card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <div className="ev2-card-t">Leaders</div>
-            <button className="ev2-game-link" onClick={onAll}>All ›</button>
-          </div>
-          <div className="ev2-leads">
-            {leads.map((l) => (
-              <div key={l.label} className="ev2-lead">
-                <span className="l">{l.label}</span>
-                <span className="who">{l.who}</span>
-                <span className="v">{l.value}{l.team ? ` · ${l.team}` : ""}</span>
-              </div>
-            ))}
-          </div>
+          <TopPerformers groups={performers} sport={basketball ? "basketball" : "cricket"} />
         </div>
       ) : null}
       {latest.length ? (
