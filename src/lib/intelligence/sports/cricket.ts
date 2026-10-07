@@ -61,7 +61,27 @@ const RETIRE_KINDS = ["hurt", "out", "timed_out"] as const;
 interface Bat { runs: number; balls: number; fours: number; sixes: number; out: boolean; how: string | null; by: string | null; fielder: string | null; retiredHurt: boolean; order: number }
 interface Bowl { balls: number; runs: number; wickets: number; maidens: number; wides: number; noBalls: number }
 interface Over { n: number; bowler: string; runs: number; bowlerRuns: number; wickets: number; legal: number; balls: string[] }
-interface Stand { wicket: number; runs: number; balls: number; batters: string[] }
+/**
+ * A partnership: the two batters together until one is out (or retires, or
+ * the innings ends). Runs include extras; balls are legal balls, so a wide
+ * or no-ball adds runs but no ball. `contrib` is each batter's own runs and
+ * balls faced while in it.
+ */
+interface Stand {
+  wicket: number; runs: number; balls: number; batters: string[];
+  contrib?: Record<string, { runs: number; balls: number }>;
+  fours?: number; sixes?: number;
+  /** the innings score (runs, legal balls) when it began and ended */
+  start?: { runs: number; balls: number };
+  end?: { runs: number; balls: number };
+  /** ended without a wicket: retired, declared, overs used up, target reached */
+  unbroken?: boolean;
+}
+export type CricketPartnership = Stand;
+
+const newStand = (inn: Pick<CricketInnings, "wickets" | "runs" | "balls">, batters: string[]): Stand => ({
+  wicket: inn.wickets + 1, runs: 0, balls: 0, batters, contrib: {}, fours: 0, sixes: 0, start: { runs: inn.runs, balls: inn.balls },
+});
 
 export interface CricketInnings {
   n: number;
@@ -168,10 +188,13 @@ function chaseTarget(s: CricketState, rules: CricketRules, batting: Side): numbe
   return lastForBatting && otherDone ? total(s, otherSide(batting)) - total(s, batting) + 1 : null;
 }
 
-function closeStand(inn: CricketInnings): void {
+function closeStand(inn: CricketInnings, wicket = false): void {
+  const st = inn.stand;
+  st.end = { runs: inn.runs, balls: inn.balls };
+  st.unbroken = !wicket;
   // an empty stand (the not-out batter left alone at the end) is not a partnership
-  if (inn.stand.runs > 0 || inn.stand.balls > 0) inn.partnerships.push(inn.stand);
-  inn.stand = { wicket: inn.wickets + 1, runs: 0, balls: 0, batters: [inn.striker, inn.nonStriker].filter((x): x is string => !!x) };
+  if (st.runs > 0 || st.balls > 0) inn.partnerships.push(st);
+  inn.stand = newStand(inn, [inn.striker, inn.nonStriker].filter((x): x is string => !!x));
 }
 
 function evaluate(s: CricketState, ctx: MatchContext, rules: CricketRules, seq: number): void {
@@ -238,7 +261,7 @@ function recordWicket(inn: CricketInnings, player: string, how: string, bowler: 
   inn.fow.push({ wicket: inn.wickets, runs: inn.runs, balls: inn.balls, player });
   if (inn.striker === player) inn.striker = null;
   if (inn.nonStriker === player) inn.nonStriker = null;
-  closeStand(inn);
+  closeStand(inn, true);
 }
 
 // ── statistics ──────────────────────────────────────────────────────
@@ -516,7 +539,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
           extras: { wides: 0, noBalls: 0, byes: 0, legByes: 0, penalty: s.carry[batting] },
           batters: { [striker]: newBat(1), [nonStriker]: newBat(2) }, bowlers: {}, fielding: {},
           striker, nonStriker, bowler: null, lastOverBowler: null, overs: [], fow: [], partnerships: [],
-          stand: { wicket: 1, runs: 0, balls: 0, batters: [striker, nonStriker] },
+          stand: newStand({ wickets: 0, runs: s.carry[batting], balls: 0 }, [striker, nonStriker]),
           closed: null, target: chaseTarget(s, rules, batting),
           maxBalls: rules.oversPerInnings === null ? null : (s.oversLimit ?? rules.oversPerInnings) * rules.ballsPerOver,
           freeHit: false, followOn: p.followOn === true,
@@ -544,7 +567,10 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
         const id = p.player as string;
         if (p.kind === "hurt") {
           inn.batters[id].retiredHurt = true;
+          // a retirement ends the partnership, unbroken; the next one is for the same wicket
+          closeStand(inn);
           if (inn.striker === id) inn.striker = null; else inn.nonStriker = null;
+          inn.stand.batters = [inn.striker, inn.nonStriker].filter((x): x is string => !!x);
         } else {
           recordWicket(inn, id, p.kind === "timed_out" ? "timed_out" : "retired_out", null, null);
         }
@@ -586,7 +612,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
           extras: { wides: 0, noBalls: 0, byes: 0, legByes: 0, penalty: 0 },
           batters: { [striker]: newBat(1), [nonStriker]: newBat(2) }, bowlers: {}, fielding: {},
           striker, nonStriker, bowler: null, lastOverBowler: null, overs: [], fow: [], partnerships: [],
-          stand: { wicket: 1, runs: 0, balls: 0, batters: [striker, nonStriker] },
+          stand: newStand({ wickets: 0, runs: 0, balls: 0 }, [striker, nonStriker]),
           closed: null, target: first ? null : so[so.length - 1].runs + 1,
           maxBalls: rules.ballsPerOver, maxWickets: 2, freeHit: false, followOn: false,
           superOver: Math.floor(so.length / 2) + 1,
@@ -659,6 +685,13 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
     inn.runs += team; bowl.runs += conceded;
     over.runs += team; over.bowlerRuns += conceded;
     inn.stand.runs += team;
+    // each batter's share: runs off the bat and balls faced (every ball but a wide)
+    if (extra !== "wide") {
+      const c = ((inn.stand.contrib ??= {})[striker] ??= { runs: 0, balls: 0 });
+      c.runs += runsBat; c.balls += 1;
+      if (p.boundary !== false && runsBat === 4) inn.stand.fours = (inn.stand.fours ?? 0) + 1;
+      if (p.boundary !== false && runsBat === 6) inn.stand.sixes = (inn.stand.sixes ?? 0) + 1;
+    }
     if (legal) { inn.balls += 1; bowl.balls += 1; over.legal += 1; inn.stand.balls += 1; }
 
     const tag = extra === "wide" ? `${team}wd` : extra === "no_ball" ? `${team}nb` : extra === "bye" ? `${extraRuns}b` : extra === "leg_bye" ? `${extraRuns}lb` : String(runsBat);

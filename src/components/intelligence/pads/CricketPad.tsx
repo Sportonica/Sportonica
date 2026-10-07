@@ -9,7 +9,7 @@ import type { MatchContext, Participant, Side } from "@/lib/intelligence/core/ty
 import type { TimelineEntry } from "@/lib/intelligence/types";
 import { superOverBatting, type CricketRules, type CricketState } from "@/lib/intelligence/sports/cricket";
 import { bowlerLine, describeDelivery, openInnings, overComplete, parseBallLabel, thisOver, type DeliveryPayload } from "@/lib/intelligence/sports/cricketView";
-import { Balls, BattersPanel, BowlerPanel } from "../cricket/parts";
+import { Balls, BattersPanel, BowlerPanel, LivePartnership } from "../cricket/parts";
 import { EXTRA_LABEL, WicketSheet, deliveryPayload, type Extra, type WicketInput } from "../cricket/sheets";
 import { Jersey, SIDE_KEYS, teamColor, type PadProps } from "./shared";
 
@@ -257,6 +257,7 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
         <BattersPanel inn={shown} ctx={ctx} onSwap={() => setSwapped((v) => !v)} />
         <BowlerPanel inn={{ ...shown, bowler: currentBowler || null }} ctx={ctx} rules={rules} />
       </div>
+      <LivePartnership inn={inn} ctx={ctx} rules={rules} compact />
 
       {!currentBowler ? (
         <>

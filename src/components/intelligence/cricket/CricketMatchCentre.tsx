@@ -12,11 +12,11 @@ import { isActionError } from "@/lib/actionError";
 import type { ContestIntelligence, ContestView, TimelineEntry } from "@/lib/intelligence/types";
 import type { CricketRules, CricketState } from "@/lib/intelligence/sports/cricket";
 import {
-  liveNumbers, latestInnings, openInnings, partnerships, playerMatchLine, sideScores, topPerformers, fmt,
+  liveNumbers, latestInnings, openInnings, playerMatchLine, sideScores, topPerformers, fmt,
 } from "@/lib/intelligence/sports/cricketView";
 import { useLiveContest } from "../useLiveContest";
 import { ChartView, StatTableView, StatusPill } from "../views";
-import { Balls, BattersPanel, BowlerPanel, Commentary, OversList, Scorecard, commentaryFrom } from "./parts";
+import { Balls, BattersPanel, BowlerPanel, Commentary, LivePartnership, OversList, Scorecard, commentaryFrom } from "./parts";
 import "../intelligence.css";
 
 const TABS = ["Overview", "Scorecard", "Commentary", "Stats", "Players"] as const;
@@ -145,7 +145,6 @@ function Overview({ contest, items, onAll }: { contest: ContestView; items: Retu
   const ctx = contest.context;
   const live = openInnings(s);
   const last = latestInnings(s);
-  const stand = live ? partnerships(live, ctx).find((p) => p.current) : null;
   const recent = last ? last.overs.slice(-2).flatMap((o) => o.balls) : [];
 
   if (!last) {
@@ -170,12 +169,7 @@ function Overview({ contest, items, onAll }: { contest: ContestView; items: Retu
         </div>
       ) : null}
       <div className="ck-pad-info">
-        {stand ? (
-          <section className="ck-panel">
-            <div className="ck-panel-head"><h3>Partnership</h3><span className="ck-total">{stand.runs} <span className="ck-muted">({stand.balls} ball{stand.balls === 1 ? "" : "s"})</span></span></div>
-            <div className="ck-stand-who">{stand.batters.map((b) => `${b.name} ${b.runs}*`).join("  ·  ")}</div>
-          </section>
-        ) : null}
+        {live ? <LivePartnership inn={live} ctx={ctx} rules={rules} /> : null}
         {recent.length ? (
           <section className="ck-panel">
             <div className="ck-panel-head"><h3>Recent balls</h3></div>

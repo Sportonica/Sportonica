@@ -99,7 +99,19 @@ export function cricketPlayers(
 
 // ── partnerships ────────────────────────────────────────────────
 
-export interface PartnershipRecord { wicket: number; runs: number; balls: number; batters: string[]; team: string; opponent: string }
+export interface PartnershipRecord {
+  wicket: number; runs: number; balls: number; batters: string[]; team: string; opponent: string;
+  /** each batter's runs and balls in it, when the match kept them */
+  shares?: { name: string; runs: number; balls: number }[];
+  unbroken?: boolean;
+}
+
+/** Highest partnership for each wicket, 1st to 10th, from a list of partnerships. */
+export function bestByWicket(list: PartnershipRecord[]): PartnershipRecord[] {
+  const best = new Map<number, PartnershipRecord>();
+  for (const p of list) { const cur = best.get(p.wicket); if (!cur || p.runs > cur.runs || (p.runs === cur.runs && p.balls < cur.balls)) best.set(p.wicket, p); }
+  return [...best.values()].sort((a, b) => a.wicket - b.wicket);
+}
 
 // ── teams ───────────────────────────────────────────────────────
 

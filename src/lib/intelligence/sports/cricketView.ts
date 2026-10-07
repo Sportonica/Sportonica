@@ -204,19 +204,47 @@ export function fallOfWickets(inn: CricketInnings, ctx: MatchContext, rules: Cri
 export interface PartnershipLine {
   wicket: number;
   runs: number;
+  /** legal balls: a wide or no-ball adds runs but no ball */
   balls: number;
-  batters: { id: string; name: string; runs: number | null }[];
+  /** each batter's own runs and balls faced in this partnership; null for a match scored before these were kept */
+  batters: { id: string; name: string; runs: number | null; balls: number | null }[];
+  /** the partnership's runs not off either bat: wides, no-balls, byes, leg byes */
+  extras: number | null;
+  fours: number | null;
+  sixes: number | null;
+  /** runs an over, from legal balls (32 balls is 5.33 overs, never "5.2") */
+  runRate: number | null;
+  /** "38/1" and "5.4" when it began and ended (end: so far, for the one in progress) */
+  from: { score: string; over: string } | null;
+  to: { score: string; over: string } | null;
   current: boolean;
+  /** ended without a wicket: retired, overs used up, target reached */
+  unbroken: boolean;
 }
 
-export function partnerships(inn: CricketInnings, ctx: MatchContext): PartnershipLine[] {
+export function partnerships(inn: CricketInnings, ctx: MatchContext, rules?: CricketRules): PartnershipLine[] {
+  const bpo = rules?.ballsPerOver ?? 6;
   const all = [...inn.partnerships.map((p) => ({ p, current: false })), ...(inn.closed ? [] : [{ p: inn.stand, current: true }])];
-  return all.filter(({ p }) => p.batters.length).map(({ p, current }) => ({
-    wicket: p.wicket, runs: p.runs, balls: p.balls, current,
-    // a batter's own score shows only for the stand in progress: the engine keeps innings totals, not per-stand ones
-    batters: p.batters.map((id) => ({ id, name: playerName(ctx, id), runs: current ? inn.batters[id]?.runs ?? 0 : null })),
-  }));
+  return all.filter(({ p }) => p.batters.length).map(({ p, current }) => {
+    const ids = [...new Set([...p.batters, ...Object.keys(p.contrib ?? {})])];
+    const kept = !!p.contrib;
+    const fromBat = kept ? Object.values(p.contrib!).reduce((t, c) => t + c.runs, 0) : null;
+    const end = current ? { runs: inn.runs, balls: inn.balls } : p.end;
+    const wktsAtEnd = current || p.unbroken ? p.wicket - 1 : p.wicket;
+    return {
+      wicket: p.wicket, runs: p.runs, balls: p.balls, current, unbroken: !current && !!p.unbroken,
+      batters: ids.map((id) => ({ id, name: playerName(ctx, id), runs: kept ? p.contrib![id]?.runs ?? 0 : null, balls: kept ? p.contrib![id]?.balls ?? 0 : null })),
+      extras: fromBat === null ? null : p.runs - fromBat,
+      fours: p.fours ?? null, sixes: p.sixes ?? null,
+      runRate: round(runRate(p.runs, p.balls, bpo), 2),
+      from: p.start ? { score: `${p.start.runs}/${p.wicket - 1}`, over: oversText(p.start.balls, bpo) } : null,
+      to: end ? { score: `${end.runs}/${wktsAtEnd}`, over: oversText(end.balls, bpo) } : null,
+    };
+  });
 }
+
+/** "1st", "2nd" … wicket, for "2nd wicket partnership". */
+export const wicketName = (n: number): string => `${ordinal(n)} wicket`;
 
 // ── a side's line in the header ─────────────────────────────────
 
