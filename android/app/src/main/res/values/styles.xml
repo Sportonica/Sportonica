@@ -13,6 +13,11 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Edge-to-edge (Android 15+): Capacitor's SystemBars pads the
+             WebView clear of the status/nav bars, and this window
+             background is what shows through behind them — paper, to
+             match the app (same value as layout.tsx's themeColor). -->
+        <item name="android:windowBackground">@color/paper</item>
     </style>
 
 
