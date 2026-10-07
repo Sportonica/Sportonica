@@ -11,13 +11,13 @@ import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS, tournamentPath } from "@/lib/tournaments/types";
 import type { TournamentStanding } from "@/lib/tournaments/types";
 import { telHref } from "@/lib/playTogether/types";
-import { sportColor } from "@/lib/sports";
+import { getSportKind, sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
 import { cricketPlayers, cricketTeams } from "@/lib/tournaments/cricketRecords";
 import type { CricketTournamentData } from "@/components/tournaments/public/CricketStats";
 import EventTabs from "@/components/tournaments/public/EventTabs";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
-import { getCricketMatchFacts, getCricketRecords, getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
+import { canScoreTournament, getCricketMatchFacts, getCricketRecords, getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
 import { computeBasketballStandings, computeCricketStandings, isBasketball, isCricket } from "@/lib/tournaments/standings";
@@ -67,13 +67,15 @@ export default async function TournamentDetailPage({
   const { data: { user } } = await sb.auth.getUser();
 
   const isLiveOrDone = tournament.status === "live" || tournament.status === "completed";
-  const [venueName, myTeam, matchesRes, teamsRes, playerStatsRes, awardsRes] = await Promise.all([
+  const [venueName, myTeam, matchesRes, teamsRes, playerStatsRes, awardsRes, canScore] = await Promise.all([
     getDisplayVenueName(tournament),
     user ? getMyTeamForTournament(id) : Promise.resolve(null),
     isLiveOrDone ? getTournamentMatches(id) : Promise.resolve([]),
     listTournamentTeams(id),
     isLiveOrDone ? getTournamentPlayerStats(id) : Promise.resolve([]),
     isLiveOrDone ? getTournamentAwards(id) : Promise.resolve({ winner: null, runnerUp: null, semifinalists: [] }),
+    // organisers and scorers get a Live scoring button in the Match centre tab
+    user ? canScoreTournament(id) : Promise.resolve(false),
   ]);
   const matches = isActionError(matchesRes) ? [] : matchesRes;
   // sport-aware scores for fixtures that are scored event by event
@@ -205,7 +207,8 @@ export default async function TournamentDetailPage({
           />
         </div>
 
-        <LiveScoringStrip tournamentId={tournament.id} sport={tournament.sport} />
+        {/* team sports list their matches in the Match centre tab; a race's events are not fixtures, so they keep this list */}
+        {getSportKind(tournament.sport) === "individual_race" ? <LiveScoringStrip tournamentId={tournament.id} sport={tournament.sport} /> : null}
 
         <div className="bk-layout">
           <div>
@@ -222,6 +225,7 @@ export default async function TournamentDetailPage({
               awards={awards}
               myTeam={isActionError(myTeam) ? null : myTeam}
               loggedIn={!!user}
+              canScore={canScore}
               initialTab={initialTab}
               intel={intel}
             />
