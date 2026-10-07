@@ -532,6 +532,9 @@ function MatchDetailModal({ match: m, team, onClose, intel: si, tournamentId }: 
 }
 
 // ── Fixtures (public, read-only, by date) ──────────────────────────
+// the unit under a top performer's figure
+const TP_UNIT: Record<string, string> = { runs: "runs", wickets: "wickets", sr: "strike rate", econ: "economy", sixes: "sixes" };
+
 // cricket and basketball tournaments draw their teams as crests (CricketArt,
 // BasketballArt) instead of letters; other sports keep the letter circle
 const SportLook = createContext<"cricket" | "basketball" | null>(null);
@@ -760,17 +763,32 @@ function SportBoard({ basketball, leaders, cricket, matches, teams, highlights, 
             <div className="ev2-card-t">Top performers</div>
             <button className="ev2-game-link" onClick={onAll}>All ›</button>
           </div>
-          <div className="ev2-performers">
-            {performers.map((g) => (
-              <div key={g.k} className="ev2-perf">
-                <div className="ev2-perf-t">{g.title}</div>
-                <ol>
-                  {g.top.map(({ p, shown }) => (
-                    <li key={p.id}><span className="who">{p.name}<small>{p.team}</small></span><b>{shown}</b></li>
-                  ))}
-                </ol>
-              </div>
-            ))}
+          <div className="ev2-tp">
+            {performers.map((g, gi) => {
+              const [lead, ...rest] = g.top;
+              const major = gi < 2;
+              return (
+                <section key={g.k} className={`ev2-tp-cat ${major ? "major" : "minor"}`}>
+                  <div className="ev2-tp-t">{g.title}</div>
+                  <div className="ev2-tp-lead">
+                    <PlayerAvatar sport="cricket" team={lead.p.team} size={major ? 52 : 40} />
+                    <div className="ev2-tp-who">
+                      <b>{lead.p.name}</b>
+                      <span><CricketCrest name={lead.p.team} size={14} />{lead.p.team}</span>
+                    </div>
+                    <div className="ev2-tp-val"><b>{lead.shown}</b><small>{TP_UNIT[g.k]}</small></div>
+                  </div>
+                  {major && lead.sub && lead.sub !== lead.p.team ? <div className="ev2-tp-sub">{lead.sub}</div> : null}
+                  {rest.length ? (
+                    <ol className="ev2-tp-rest">
+                      {rest.map(({ p, shown }, i) => (
+                        <li key={p.id}><span className="r">{i + 2}</span><span className="n">{p.name}<small>{p.team}</small></span><b>{shown}</b></li>
+                      ))}
+                    </ol>
+                  ) : null}
+                </section>
+              );
+            })}
           </div>
         </div>
       ) : null}
