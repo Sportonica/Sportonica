@@ -101,3 +101,16 @@ section("standings: cricket points and net run rate, a side bowled out counting 
   assert.equal(wo.find((r) => r.team_name === "Bears").goal_diff, t[1].goal_diff);
 });
 
+
+section("standings: in a match cut to 8 overs, a side bowled out is charged 8 overs, not the tournament's 20", () => {
+  const cteams = [team("Lions"), team("Tigers")];
+  const m = game("Lions", "Tigers", 80, 60, { wickets_a: 3, overs_a: 8, wickets_b: 10, overs_b: 6.2 });
+  const plain = computeCricketStandings([m], cteams, { preset: "t20" });
+  // without the match's overs: Tigers charged 20 overs, 60 from 120 balls
+  assert.equal(plain[0].goal_diff, Math.round(((80 / 48) * 6 - (60 / 120) * 6) * 1000) / 1000);
+  const cut = computeCricketStandings([m], cteams, { preset: "t20" }, null, { [m.id]: { a: 48, b: 48 } });
+  // with them: 60 from 48 balls
+  assert.equal(cut[0].goal_diff, Math.round(((80 / 48) * 6 - (60 / 48) * 6) * 1000) / 1000);
+  assert.equal(cut[0].goal_diff, 2.5);
+  assert.equal(cut[1].goal_diff, -2.5);
+});

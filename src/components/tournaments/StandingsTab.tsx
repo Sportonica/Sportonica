@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { getTournamentStandings } from "@/lib/tournaments/actions";
+import { getCricketOverQuotas } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
 import type { Tournament, TournamentMatch, TournamentTeam, TournamentStanding } from "@/lib/tournaments/types";
-import { basketballRulesOf, computeBasketballStandings, computeCricketStandings, diffText, isBasketball, isCricket, standingsScheme, type BasketballStanding } from "@/lib/tournaments/standings";
+import { basketballRulesOf, computeBasketballStandings, computeCricketStandings, diffText, type CricketOverQuotas, isBasketball, isCricket, standingsScheme, type BasketballStanding } from "@/lib/tournaments/standings";
 
 const ALL = "__all__";
 
@@ -29,6 +30,14 @@ export default function StandingsTab({ tournament, teams, matches }: {
   const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
   const [data, setData] = useState<Record<string, TournamentStanding[]>>({});
   const [loading, setLoading] = useState(!computed);
+  // cricket: each scored match's own overs, for net run rate when a side is bowled out
+  const [quotas, setQuotas] = useState<CricketOverQuotas>({});
+  useEffect(() => {
+    if (!cricket) return;
+    let cancelled = false;
+    void getCricketOverQuotas(tournament.id).then((res) => { if (!cancelled && !isActionError(res)) setQuotas(res); });
+    return () => { cancelled = true; };
+  }, [cricket, tournament.id]);
 
   useEffect(() => {
     if (computed) return;
@@ -53,7 +62,7 @@ export default function StandingsTab({ tournament, teams, matches }: {
 
   const rowsFor = (g: string | null): (TournamentStanding & Partial<BasketballStanding>)[] =>
     basketball ? computeBasketballStandings(matches!, teams, tournament.scoring_rules, g)
-    : cricket ? computeCricketStandings(matches!, teams, tournament.scoring_rules, g)
+    : cricket ? computeCricketStandings(matches!, teams, tournament.scoring_rules, g, quotas)
     : data[g ?? ALL] ?? [];
   const anyPlayed = groups.some((g) => rowsFor(g).some((r) => r.played > 0));
 

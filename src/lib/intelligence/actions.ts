@@ -1022,3 +1022,25 @@ export async function getMatchHighlights(tournamentId: string): Promise<Record<s
   return out;
 }
 
+
+/**
+ * Cricket: the balls each side was allowed in each scored match, from the
+ * innings themselves, so net run rate charges a side bowled out with the
+ * overs of that match (shortened before or during it), not the
+ * tournament's. Keyed by fixture; null where an innings had no limit.
+ */
+export async function getCricketOverQuotas(tournamentId: string): Promise<Record<string, { a: number | null; b: number | null }> | ActionError> {
+  const sb = await createClient();
+  const { data, error } = await sb.from("si_contests")
+    .select("match_id, i0:state->innings->0->>batting, m0:state->innings->0->maxBalls, i1:state->innings->1->>batting, m1:state->innings->1->maxBalls")
+    .eq("tournament_id", tournamentId).eq("sport", "cricket").not("match_id", "is", null);
+  if (error) return fail(error.message);
+  const out: Record<string, { a: number | null; b: number | null }> = {};
+  for (const r of (data ?? []) as unknown as { match_id: string; i0: string | null; m0: number | null; i1: string | null; m1: number | null }[]) {
+    const q = { a: null as number | null, b: null as number | null };
+    if (r.i0 === "a" || r.i0 === "b") q[r.i0] = typeof r.m0 === "number" ? r.m0 : null;
+    if (r.i1 === "a" || r.i1 === "b") q[r.i1] = typeof r.m1 === "number" ? r.m1 : null;
+    out[r.match_id] = q;
+  }
+  return out;
+}

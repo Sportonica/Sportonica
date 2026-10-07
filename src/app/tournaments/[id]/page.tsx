@@ -15,7 +15,7 @@ import { sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
 import EventTabs from "@/components/tournaments/public/EventTabs";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
-import { getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
+import { getCricketOverQuotas, getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
 import { computeBasketballStandings, computeCricketStandings, isBasketball, isCricket } from "@/lib/tournaments/standings";
@@ -105,8 +105,10 @@ export default async function TournamentDetailPage({
     // basketball tables follow the competition's own rules, from the fixtures
     for (const g of groups) standingsByGroup[g] = computeBasketballStandings(matches, teams, tournament.scoring_rules, g || null);
   } else if (hasStandings && matches.length > 0 && isCricket(tournament.sport)) {
-    // cricket tables: points then net run rate, from the fixtures' runs and overs
-    for (const g of groups) standingsByGroup[g] = computeCricketStandings(matches, teams, tournament.scoring_rules, g || null);
+    // cricket tables: points then net run rate, from the fixtures' runs and overs (and each scored match's own overs)
+    const quotasRes = await getCricketOverQuotas(id);
+    const quotas = isActionError(quotasRes) ? {} : quotasRes;
+    for (const g of groups) standingsByGroup[g] = computeCricketStandings(matches, teams, tournament.scoring_rules, g || null, quotas);
   } else if (hasStandings && matches.length > 0) {
     const entries = await Promise.all(groups.map(async (g) => {
       const res = await getTournamentStandings(id, g || undefined);

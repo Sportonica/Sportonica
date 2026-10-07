@@ -218,8 +218,11 @@ const ballsOf = (overs: number | null, ballsPerOver: number): number => {
   return whole * ballsPerOver + Math.round((overs - whole) * 10);
 };
 
+/** Balls each side was allowed in a scored match (getCricketOverQuotas), keyed by fixture. */
+export type CricketOverQuotas = Record<string, { a: number | null; b: number | null }>;
+
 export function computeCricketStandings(
-  matches: TournamentMatch[], teams: TeamRef[], scoringRules: unknown, group: string | null = null,
+  matches: TournamentMatch[], teams: TeamRef[], scoringRules: unknown, group: string | null = null, quotas: CricketOverQuotas = {},
 ): TournamentStanding[] {
   const rules = cricketRulesOf(scoringRules);
   const bpo = rules.ballsPerOver || 6;
@@ -237,9 +240,12 @@ export function computeCricketStandings(
     else { a.tied += 1; b.tied += 1; a.points += 1; b.points += 1; }
     // net run rate only counts games with both innings recorded; a walkover has none
     if (m.status === "walkover" || m.score_a === null || m.score_b === null) continue;
-    const faced = (overs: number | null, wickets: number | null) =>
-      wickets !== null && wickets >= rules.wicketsPerInnings && quota !== null ? quota : ballsOf(overs, bpo);
-    const fa = faced(m.overs_a, m.wickets_a), fb = faced(m.overs_b, m.wickets_b);
+    // a side bowled out is charged its full allowance: this match's, when its overs were changed
+    const faced = (overs: number | null, wickets: number | null, allowed: number | null | undefined) => {
+      const full = allowed ?? quota;
+      return wickets !== null && wickets >= rules.wicketsPerInnings && full !== null ? full : ballsOf(overs, bpo);
+    };
+    const fa = faced(m.overs_a, m.wickets_a, quotas[m.id]?.a), fb = faced(m.overs_b, m.wickets_b, quotas[m.id]?.b);
     if (!fa || !fb) continue;
     a.runsFor += m.score_a; a.ballsFaced += fa; a.runsAgainst += m.score_b; a.ballsBowled += fb;
     b.runsFor += m.score_b; b.ballsFaced += fb; b.runsAgainst += m.score_a; b.ballsBowled += fa;
