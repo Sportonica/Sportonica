@@ -133,16 +133,16 @@ export default function StandingsTab({ tournament, teams, matches }: {
               <div className="tc-empty">No results yet.</div>
             ) : (
               <div style={{ overflowX: "auto" }}>
-                <table className="tc-table">
+                <table className="tc-table tc-standings">
                   <thead>
                     <tr>
                       <th>Team</th><th>P</th><th>W</th><th>L</th>{scheme.draws && <th title={scheme.drawName}>{scheme.drawLabel ?? "D"}</th>}
-                      {basketball && <th title="Win percentage">Win %</th>}
-                      <th title={scheme.forName}>{scheme.forLabel}</th>
-                      <th title={scheme.againstName}>{scheme.againstLabel}</th>
+                      {basketball && <th className="tc-sm-hide" title="Win percentage">Win %</th>}
+                      <th className="tc-sm-hide" title={scheme.forName}>{scheme.forLabel}</th>
+                      <th className="tc-sm-hide" title={scheme.againstName}>{scheme.againstLabel}</th>
                       <th title={scheme.diffName}>{scheme.diffLabel}</th>
-                      {basketball && <th title="Current streak">Strk</th>}
-                      {basketball && <th title="Last five games, most recent last">Last 5</th>}
+                      {basketball && <th className="tc-sm-hide" title="Current streak">Strk</th>}
+                      {basketball && <th className="tc-sm-hide" title="Last five games, most recent last">Last 5</th>}
                       <th>Pts</th>
                     </tr>
                   </thead>
@@ -154,12 +154,12 @@ export default function StandingsTab({ tournament, teams, matches }: {
                         <td className="tc-num">{r.won}</td>
                         <td className="tc-num">{r.lost}</td>
                         {scheme.draws && <td className="tc-num">{r.drawn}</td>}
-                        {basketball && <td className="tc-num">{r.win_pct === null || r.win_pct === undefined ? "–" : r.win_pct.toFixed(1)}</td>}
-                        <td className="tc-num">{r.goals_for}</td>
-                        <td className="tc-num">{r.goals_against}</td>
+                        {basketball && <td className="tc-num tc-sm-hide">{r.win_pct === null || r.win_pct === undefined ? "–" : r.win_pct.toFixed(1)}</td>}
+                        <td className="tc-num tc-sm-hide">{r.goals_for}</td>
+                        <td className="tc-num tc-sm-hide">{r.goals_against}</td>
                         <td className="tc-num">{diffText(scheme, r.goal_diff)}</td>
-                        {basketball && <td className="tc-num">{r.streak || "–"}</td>}
-                        {basketball && <td className="tc-num" style={{ letterSpacing: 1 }}>{r.last5 || "–"}</td>}
+                        {basketball && <td className="tc-num tc-sm-hide">{r.streak || "–"}</td>}
+                        {basketball && <td className="tc-num tc-sm-hide" style={{ letterSpacing: 1 }}>{r.last5 || "–"}</td>}
                         <td className="tc-num" style={{ fontWeight: 700 }}>{r.points}</td>
                       </tr>
                     ))}
