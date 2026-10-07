@@ -55,7 +55,7 @@ function statusInfo(status: Tournament["status"]): { label: string; cls: string 
 }
 
 export default function EventTabs({
-  tournament, teams, matches, standingsByGroup, playerStats, leaders = null, cricket = null, highlights = {}, awards, myTeam, loggedIn, initialTab, intel = {},
+  tournament, teams, matches, standingsByGroup, playerStats, leaders = null, cricket = null, highlights = {}, awards, myTeam, loggedIn, initialTab, intel = {}, canScore = false,
 }: {
   // basketball: per-player figures from its scored games
   leaders?: TournamentLeaders | null;
@@ -68,6 +68,8 @@ export default function EventTabs({
   // match id -> its score in that sport's own terms, for matches scored
   // event by event. Empty for football.
   intel?: Record<string, MatchIntel>;
+  // organisers and scorers: a Live scoring button in the Match centre tab
+  canScore?: boolean;
   tournament: Tournament;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -110,7 +112,7 @@ export default function EventTabs({
     if (t === "Register" && !showRegister) return false;
     if (t === "Results" && !isIndividualRace) return false;
     // games between two sides: live scores, what is next, the latest results
-    if (t === "Match centre" && (isIndividualRace || !matches.some((m) => m.team_a_id && m.team_b_id))) return false;
+    if (t === "Match centre" && (isIndividualRace || (!canScore && !matches.some((m) => m.team_a_id && m.team_b_id)))) return false;
     return true;
   });
   // Always hydrate starting on Overview, then flip to the deep-linked tab
@@ -216,7 +218,7 @@ export default function EventTabs({
       </div>
 
       {activeTab === "Match centre" && (
-        <MatchCentreTab matches={matches} teams={teams} intel={intel} highlights={highlights} tournamentId={tournament.id} cricket={isCricketSport} />
+        <MatchCentreTab matches={matches} teams={teams} intel={intel} highlights={highlights} tournamentId={tournament.id} cricket={isCricketSport} canScore={canScore} />
       )}
       {activeTab === "Overview" && (
         <OverviewTab tournament={tournament} teams={teams} matches={matches} awards={awards}
@@ -1026,16 +1028,18 @@ function SquadModal({ team, onClose }: { team: TournamentTeam; onClose: () => vo
 }
 
 // ── Match centre: what is on now, what is next, how the last games ended ──
-function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, cricket }: {
+function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, cricket, canScore }: {
   matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>; highlights: Record<string, MatchHighlight>;
-  tournamentId: string; cricket: boolean;
+  tournamentId: string; cricket: boolean; canScore: boolean;
 }) {
+  const [allResults, setAllResults] = useState(false);
   const name = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "TBD";
   const at = (m: TournamentMatch) => m.starts_at ?? m.updated_at;
   const games = matches.filter((m) => m.team_a_id && m.team_b_id);
   const live = games.filter((m) => m.status === "live" || intel[m.id]?.status === "live" || intel[m.id]?.status === "paused");
   const next = games.filter((m) => m.status === "scheduled" && !live.includes(m)).sort((a, b) => at(a).localeCompare(at(b))).slice(0, 4);
-  const done = games.filter((m) => m.status === "completed" || m.status === "walkover").sort((a, b) => at(b).localeCompare(at(a))).slice(0, 8);
+  const finished = games.filter((m) => m.status === "completed" || m.status === "walkover").sort((a, b) => at(b).localeCompare(at(a)));
+  const done = allResults ? finished : finished.slice(0, 8);
   const centre = (m: TournamentMatch) => intel[m.id]?.contestId ?? highlights[m.id]?.contestId ?? null;
   const score = (m: TournamentMatch, side: "a" | "b") => intel[m.id]?.[side] || sideScore(m, side) || "";
 
@@ -1072,7 +1076,10 @@ function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, crick
   return (
     <div className="ev2-mc">
       <div className="ev2-card">
-        <div className="ev2-card-t">Live now</div>
+        <div className="ev2-mc-head">
+          <div className="ev2-card-t">Live now</div>
+          {canScore ? <Link className="ev2-mc-score" href={`/tournaments/${tournamentId}/score`}>Live scoring</Link> : null}
+        </div>
         {live.length ? <div className="ev2-mc-grid">{live.map((m) => <Row key={m.id} m={m} kind="live" />)}</div>
           : <div className="ev2-mc-none">No game in progress right now.{next[0] ? ` Next: ${name(next[0].team_a_id)} v ${name(next[0].team_b_id)}, ${matchWhen(next[0])}.` : ""}</div>}
       </div>
@@ -1084,8 +1091,11 @@ function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, crick
       ) : null}
       {done.length ? (
         <div className="ev2-card">
-          <div className="ev2-card-t">Latest results</div>
+          <div className="ev2-card-t">{allResults || finished.length <= 8 ? `All results (${finished.length})` : "Latest results"}</div>
           <div className="ev2-mc-grid">{done.map((m) => <Row key={m.id} m={m} kind="done" />)}</div>
+          {finished.length > 8 ? (
+            <button className="ev2-mc-more" onClick={() => setAllResults((v) => !v)}>{allResults ? "Show the latest only" : `Show all ${finished.length} results`}</button>
+          ) : null}
         </div>
       ) : null}
     </div>
