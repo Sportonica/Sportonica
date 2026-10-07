@@ -1495,18 +1495,46 @@ function CricketScoreEntry({ match, teamName, pending, onSave, confirmCascadeIfN
   const [tossWinner, setTossWinner] = useState(match.toss_winner_team_id ?? "");
   const [tossDecision, setTossDecision] = useState<"bat" | "bowl">(match.toss_decision ?? "bat");
   const [targetRuns, setTargetRuns] = useState(match.target_runs?.toString() ?? "");
-  const [winner, setWinner] = useState(match.winner_team_id ?? "");
+  // The result is picked, not worked out from the runs: a chase won early, a tie, a super over and a
+  // no result all need saying. Stored the way the table reads it (standings.ts cricketOutcome):
+  // a winner with level runs is a super over win; no winner with level runs a tie, otherwise no result.
+  type Result = "" | "a" | "b" | "tie" | "so_a" | "so_b" | "nr";
+  const [result, setResult] = useState<Result>(() => {
+    if (!DONE.has(match.status)) return "";
+    const level = match.score_a !== null && match.score_a === match.score_b;
+    if (match.winner_team_id) return (match.winner_team_id === match.team_a_id ? (level ? "so_a" : "a") : (level ? "so_b" : "b"));
+    return level && (match.overs_a || match.overs_b) ? "tie" : "nr";
+  });
+  // who batted first: kept as the target (first innings + 1), so records can tell a chase from a defence
+  const [battedFirst, setBattedFirst] = useState<"" | "a" | "b">(() => {
+    if (match.target_runs === null || match.score_a === null || match.score_b === null) return "";
+    if (match.score_a === match.target_runs - 1 && match.score_b !== match.target_runs - 1) return "a";
+    if (match.score_b === match.target_runs - 1 && match.score_a !== match.target_runs - 1) return "b";
+    return "";
+  });
   const done = DONE.has(match.status);
-  const canSave = runsA !== "" && runsB !== "";
+  const level = runsA !== "" && runsA === runsB;
+  const problem =
+    !result ? "Pick the result."
+    : result === "nr" ? null
+    : runsA === "" || runsB === "" ? "Enter both sides' runs."
+    : (result === "tie" || result === "so_a" || result === "so_b") && !level ? "A tie (or a super over) needs the two scores level."
+    : (result === "a" || result === "b") && level ? "Scores are level: pick Tie, or the team that won the super over."
+    : null;
 
   function save() {
-    if (!confirmCascadeIfNeeded(winner || null)) return;
+    const winner = result === "a" || result === "so_a" ? match.team_a_id : result === "b" || result === "so_b" ? match.team_b_id : null;
+    if (!confirmCascadeIfNeeded(winner)) return;
+    // no result with nothing entered: saved as no balls bowled
+    const nr = result === "nr";
+    const ra = runsA === "" && nr ? 0 : Number(runsA), rb = runsB === "" && nr ? 0 : Number(runsB);
+    const target = targetRuns !== "" ? Number(targetRuns) : battedFirst ? (battedFirst === "a" ? ra : rb) + 1 : undefined;
     onSave(
-      Number(runsA), wicketsA === "" ? null : Number(wicketsA), oversA === "" ? null : Number(oversA),
-      Number(runsB), wicketsB === "" ? null : Number(wicketsB), oversB === "" ? null : Number(oversB),
-      winner || undefined,
+      ra, wicketsA === "" ? null : Number(wicketsA), oversA === "" ? (nr && runsA === "" ? 0 : null) : Number(oversA),
+      rb, wicketsB === "" ? null : Number(wicketsB), oversB === "" ? (nr && runsB === "" ? 0 : null) : Number(oversB),
+      winner ?? undefined,
       tossWinner ? { winnerTeamId: tossWinner, decision: tossDecision } : undefined,
-      targetRuns === "" ? undefined : Number(targetRuns),
+      target,
       true,
     );
   }
@@ -1557,7 +1585,15 @@ function CricketScoreEntry({ match, teamName, pending, onSave, confirmCascadeIfN
           </select>
         </label>
         <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span className="tc-dim" style={{ fontSize: 10.5 }}>Target (optional)</span>
+          <span className="tc-dim" style={{ fontSize: 10.5 }}>Batted first</span>
+          <select value={battedFirst} onChange={(e) => setBattedFirst(e.target.value as "" | "a" | "b")} style={{ ...inputStyle, width: 140 }} aria-label="Batted first">
+            <option value="">Not recorded</option>
+            {match.team_a_id && <option value="a">{teamName(match.team_a_id)}</option>}
+            {match.team_b_id && <option value="b">{teamName(match.team_b_id)}</option>}
+          </select>
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <span className="tc-dim" style={{ fontSize: 10.5 }}>Target (optional, else first innings + 1)</span>
           <input
             type="number" placeholder="Runs" value={targetRuns} onChange={(e) => setTargetRuns(e.target.value)}
             style={{ ...inputStyle, width: 80 }} aria-label="Target runs"
@@ -1567,17 +1603,23 @@ function CricketScoreEntry({ match, teamName, pending, onSave, confirmCascadeIfN
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <span className="tc-dim" style={{ fontSize: 10.5 }}>Winner (or leave blank for no result / tie)</span>
-          <select value={winner} onChange={(e) => setWinner(e.target.value)} style={{ ...inputStyle, width: 200 }}>
-            <option value="">No result / tie</option>
-            {match.team_a_id && <option value={match.team_a_id}>{teamName(match.team_a_id)}</option>}
-            {match.team_b_id && <option value={match.team_b_id}>{teamName(match.team_b_id)}</option>}
+          <span className="tc-dim" style={{ fontSize: 10.5 }}>Result</span>
+          <select value={result} onChange={(e) => setResult(e.target.value as Result)} style={{ ...inputStyle, width: 240 }} aria-label="Result">
+            <option value="">Pick the result</option>
+            {match.team_a_id && <option value="a">{teamName(match.team_a_id)} won</option>}
+            {match.team_b_id && <option value="b">{teamName(match.team_b_id)} won</option>}
+            <option value="tie">Tie</option>
+            {match.team_a_id && <option value="so_a">Tie, {teamName(match.team_a_id)} won the super over</option>}
+            {match.team_b_id && <option value="so_b">Tie, {teamName(match.team_b_id)} won the super over</option>}
+            <option value="nr">No result (abandoned)</option>
           </select>
         </label>
-        <button className="tc-btn primary" disabled={pending || !canSave} style={{ padding: "6px 10px", alignSelf: "flex-end" }} onClick={save}>
+        <button className="tc-btn primary" disabled={pending || !!problem} style={{ padding: "6px 10px", alignSelf: "flex-end" }} onClick={save}>
           {done ? "Update score" : "Save score"}
         </button>
       </div>
+      {problem && result ? <div className="tc-dim" style={{ fontSize: 12, color: "#b3261e" }}>{problem}</div> : null}
+      {result === "nr" ? <div className="tc-dim" style={{ fontSize: 12 }}>Runs can be left empty for a match abandoned before a ball. Both teams get the no-result points.</div> : null}
     </div>
   );
 }

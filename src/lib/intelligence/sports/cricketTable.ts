@@ -22,9 +22,16 @@ export interface CricketTable {
   tiebreakers: CricketTiebreaker[];
   /** teams that go through from the table (each group); null when not set */
   qualifiers: number | null;
+  /**
+   * A bonus point for a convincing win: the winner's run rate at least
+   * this many times the loser's (1.25 is the usual). Null: no bonus points.
+   * Never for a super over win, a walkover or a match without both innings.
+   */
+  bonusRatio: number | null;
 }
 
-export const DEFAULT_CRICKET_TABLE: CricketTable = { win: 2, tie: 1, noResult: 1, loss: 0, tiebreakers: ["nrr", "wins"], qualifiers: null };
+export const DEFAULT_CRICKET_TABLE: CricketTable = { win: 2, tie: 1, noResult: 1, loss: 0, tiebreakers: ["nrr", "wins"], qualifiers: null, bonusRatio: null };
+const okRatio = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 1 && v <= 3;
 
 const points = (v: unknown, fallback: number): number => (typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 20 ? v : fallback);
 
@@ -41,6 +48,7 @@ export function cricketTableOf(input: unknown): CricketTable {
     loss: points(t.loss, DEFAULT_CRICKET_TABLE.loss),
     tiebreakers: tb,
     qualifiers: typeof t.qualifiers === "number" && Number.isInteger(t.qualifiers) && t.qualifiers > 0 && t.qualifiers <= 64 ? t.qualifiers : null,
+    bonusRatio: okRatio(t.bonusRatio) ? Math.round(t.bonusRatio * 100) / 100 : null,
   };
 }
 
@@ -54,6 +62,7 @@ export function cricketTableProblem(input: unknown): string | null {
   }
   if (typeof t.win === "number" && typeof t.loss === "number" && t.win <= t.loss) return "A win must be worth more points than a loss";
   if (t.tiebreakers !== undefined && (!Array.isArray(t.tiebreakers) || t.tiebreakers.some((x) => !(CRICKET_TIEBREAKERS as readonly unknown[]).includes(x)))) return "Unknown tiebreaker";
+  if (t.bonusRatio !== undefined && t.bonusRatio !== null && !okRatio(t.bonusRatio)) return "The bonus point run rate must be between 1 and 3 times the opponent's";
   if (t.qualifiers !== undefined && t.qualifiers !== null && !(typeof t.qualifiers === "number" && Number.isInteger(t.qualifiers) && t.qualifiers > 0 && t.qualifiers <= 64)) return "Teams going through must be a whole number";
   return null;
 }

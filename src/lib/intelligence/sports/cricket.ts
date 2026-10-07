@@ -87,6 +87,10 @@ export interface CricketInnings {
   maxBalls: number | null;
   freeHit: boolean;
   followOn: boolean;
+  /** a super over: which one (1, 2 … when the first is tied too); absent for the match's own innings */
+  superOver?: number;
+  /** wickets that end this innings when not the format's (a super over ends at 2) */
+  maxWickets?: number;
 }
 
 export interface CricketState {
@@ -98,6 +102,12 @@ export interface CricketState {
   log: { seq: number; text: string }[];
   /** overs per innings set for this match (OVERS_CHANGE), in place of the competition's; absent when unchanged */
   oversLimit?: number;
+  /**
+   * Super overs after a tie, in pairs (one each side). Kept apart from the
+   * match's innings: they decide the winner but add nothing to the match
+   * totals, net run rate or anyone's figures.
+   */
+  superOvers?: CricketInnings[];
 }
 
 // ── overs arithmetic ────────────────────────────────────────────────
@@ -122,7 +132,9 @@ export function runRate(runs: number, balls: number, ballsPerOver = 6): number |
 }
 
 const ordinal = (n: number): string => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
-const cur = (s: CricketState): CricketInnings | null => s.innings[s.innings.length - 1] ?? null;
+/** The match's innings, then any super overs: the one being played is always last. */
+const everyInnings = (s: CricketState): CricketInnings[] => [...s.innings, ...(s.superOvers ?? [])];
+const cur = (s: CricketState): CricketInnings | null => everyInnings(s).at(-1) ?? null;
 const open = (s: CricketState): CricketInnings | null => { const i = cur(s); return i && !i.closed ? i : null; };
 const total = (s: CricketState, side: Side): number => s.innings.filter((i) => i.batting === side).reduce((t, i) => t + i.runs, 0);
 const played = (s: CricketState, side: Side): number => s.innings.filter((i) => i.batting === side).length;
@@ -165,6 +177,7 @@ function closeStand(inn: CricketInnings): void {
 function evaluate(s: CricketState, ctx: MatchContext, rules: CricketRules, seq: number): void {
   const inn = cur(s);
   if (!inn || !inn.closed || s.result) return;
+  if (inn.superOver) { evaluateSuperOver(s, inn, ctx, seq); return; }
   const x = inn.batting, y = otherSide(x);
   const xDone = played(s, x) >= rules.inningsPerSide;
   const yDone = played(s, y) >= rules.inningsPerSide;
@@ -186,16 +199,34 @@ function evaluate(s: CricketState, ctx: MatchContext, rules: CricketRules, seq: 
   if (s.result) s.log.push({ seq, text: s.result.outcome === "tie" ? "Match tied" : `${sideName(ctx, s.result.winner!)} won ${s.result.margin}` });
 }
 
+/** The second half of a super over decides it: the chase made, short, or level (then another may be played). */
+function evaluateSuperOver(s: CricketState, inn: CricketInnings, ctx: MatchContext, seq: number): void {
+  if (inn.target === null) return; // the first half: the other side bats next
+  const x = inn.batting;
+  if (inn.runs >= inn.target) s.result = { outcome: "win", winner: x, method: "played", margin: "via super over" };
+  else if (inn.runs === inn.target - 1) s.result = { outcome: "tie", winner: null, method: "played", margin: "super over tied" };
+  else s.result = { outcome: "win", winner: otherSide(x), method: "played", margin: "via super over" };
+  s.log.push({ seq, text: s.result.outcome === "tie" ? "Super over tied" : `${sideName(ctx, s.result.winner!)} won the super over` });
+}
+
+/** Who bats next in a super over: after the match, the side that batted second; after a tied super over, the side that batted second in it. */
+export function superOverBatting(s: CricketState): Side | null {
+  const so = s.superOvers ?? [];
+  if (so.length % 2 === 1) return otherSide(so[so.length - 1].batting);
+  const prev = so.length ? so[so.length - 1] : s.innings[s.innings.length - 1];
+  return prev ? prev.batting : null;
+}
+
 function checkClose(s: CricketState, ctx: MatchContext, rules: CricketRules, seq: number): void {
   const inn = open(s);
   if (!inn) return;
   if (inn.target !== null && inn.runs >= inn.target) inn.closed = "target";
-  else if (inn.wickets >= rules.wicketsPerInnings) inn.closed = "all_out";
+  else if (inn.wickets >= (inn.maxWickets ?? rules.wicketsPerInnings)) inn.closed = "all_out";
   else if (inn.maxBalls !== null && inn.balls >= inn.maxBalls) inn.closed = "overs";
   if (inn.closed) {
     closeStand(inn);
     inn.striker = null; inn.nonStriker = null;
-    s.log.push({ seq, text: `${ordinal(inn.n)} innings closed: ${sideName(ctx, inn.batting)} ${inn.runs}/${inn.wickets} (${oversText(inn.balls, rules.ballsPerOver)} ov)` });
+    s.log.push({ seq, text: `${inn.superOver ? "Super over" : `${ordinal(inn.n)} innings`} closed: ${sideName(ctx, inn.batting)} ${inn.runs}/${inn.wickets} (${oversText(inn.balls, rules.ballsPerOver)} ov)` });
     evaluate(s, ctx, rules, seq);
   }
 }
@@ -301,7 +332,7 @@ const CAREER_DERIVED: StatColumn[] = [
 export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> = {
   sport: "cricket",
   label: "Cricket",
-  eventTypes: ["TOSS", "INNINGS_START", "DELIVERY", "NEW_BATTER", "RETIRE", "PENALTY_RUNS", "DECLARE", "INNINGS_END", "TARGET_REVISED", "OVERS_CHANGE"],
+  eventTypes: ["TOSS", "INNINGS_START", "DELIVERY", "NEW_BATTER", "RETIRE", "PENALTY_RUNS", "DECLARE", "INNINGS_END", "TARGET_REVISED", "OVERS_CHANGE", "SUPER_OVER_START"],
 
   answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, CRICKET_KNOWLEDGE); },
   rulesGuide: (rules) => CRICKET_KNOWLEDGE.guide(rules),
@@ -333,7 +364,8 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
   validateEvent(s, ev, ctx, rules) {
     const p = ev.payload;
     const inn = open(s);
-    if (s.result && ev.type !== "PENALTY_RUNS") return "The match is already decided";
+    if (s.result && ev.type !== "PENALTY_RUNS" && ev.type !== "SUPER_OVER_START") return "The match is already decided";
+    const inSuper = !!(s.superOvers && s.superOvers.length);
 
     switch (ev.type) {
       case "TOSS":
@@ -341,8 +373,24 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
         if (!isSide(p.winner)) return "Say which side won the toss";
         return p.decision === "bat" || p.decision === "bowl" ? null : "The toss decision is bat or bowl";
 
+      case "SUPER_OVER_START": {
+        if (rules.oversPerInnings === null) return "This format has no super over";
+        if (inn) return "The current innings is still in progress";
+        const so = s.superOvers ?? [];
+        // a new super over needs a tie (the match's or the last super over's); its second half needs none yet
+        if (so.length % 2 === 0 ? s.result?.outcome !== "tie" : s.result !== null) return "A super over is played only when the scores are level";
+        const expected = superOverBatting(s);
+        if (!isSide(p.batting)) return "Say which side is batting";
+        if (expected && p.batting !== expected) return `${sideName(ctx, expected)} bats this super over`;
+        if (typeof p.striker !== "string" || typeof p.nonStriker !== "string") return "Name the two batters";
+        if (p.striker === p.nonStriker) return "The two batters must be different players";
+        if (sideOfPlayer(ctx, p.striker) !== p.batting || sideOfPlayer(ctx, p.nonStriker) !== p.batting) return "Both batters must be in the batting side";
+        return null;
+      }
+
       case "INNINGS_START": {
         if (inn) return "The current innings is still in progress";
+        if (inSuper) return "The match's innings are over: this is a super over";
         if (!isSide(p.batting)) return "Say which side is batting";
         const followOn = p.followOn === true;
         if (followOn) {
@@ -424,6 +472,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
 
       case "DECLARE":
         if (!inn) return "There is no innings in progress";
+        if (inn.superOver) return "A super over cannot be declared";
         return rules.allowDeclaration ? null : "Declarations are not allowed in this format";
 
       case "INNINGS_END":
@@ -433,6 +482,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
         // Before the first ball, or during the first innings. In the chase, fewer overs
         // also mean a new target, which is what Revise target is for.
         if (rules.oversPerInnings === null) return "This format has no overs limit";
+        if (inSuper) return "A super over is always one over";
         if (!isPosInt(p.overs) || p.overs > 200) return "Overs must be a whole number between 1 and 200";
         if (inn && inn.target !== null) return "In the chase, change the overs with Revise target, which sets the new target too";
         if (!inn && s.innings.length) return "The overs can only be changed before the match or during the first innings";
@@ -442,6 +492,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
 
       case "TARGET_REVISED":
         if (!inn || inn.target === null) return "A target can only be revised during the chase";
+        if (inn.superOver) return "A super over target cannot be revised";
         if (!isPosInt(p.target)) return "The revised target must be a positive whole number";
         if (p.maxOvers != null && !isPosInt(p.maxOvers)) return "The revised overs must be a positive whole number";
         return null;
@@ -521,6 +572,27 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
         inn.striker = null; inn.nonStriker = null;
         s.log.push({ seq: ev.seq, text: `${ordinal(inn.n)} innings ${ev.type === "DECLARE" ? "declared" : "ended"}: ${sideName(ctx, inn.batting)} ${inn.runs}/${inn.wickets}` });
         evaluate(s, ctx, rules, ev.seq);
+        return s;
+      }
+
+      case "SUPER_OVER_START": {
+        const batting = p.batting as Side;
+        const so = (s.superOvers ??= []);
+        const striker = p.striker as string, nonStriker = p.nonStriker as string;
+        const first = so.length % 2 === 0;
+        s.result = null;
+        so.push({
+          n: s.innings.length + so.length + 1, batting, runs: 0, wickets: 0, balls: 0,
+          extras: { wides: 0, noBalls: 0, byes: 0, legByes: 0, penalty: 0 },
+          batters: { [striker]: newBat(1), [nonStriker]: newBat(2) }, bowlers: {}, fielding: {},
+          striker, nonStriker, bowler: null, lastOverBowler: null, overs: [], fow: [], partnerships: [],
+          stand: { wicket: 1, runs: 0, balls: 0, batters: [striker, nonStriker] },
+          closed: null, target: first ? null : so[so.length - 1].runs + 1,
+          maxBalls: rules.ballsPerOver, maxWickets: 2, freeHit: false, followOn: false,
+          superOver: Math.floor(so.length / 2) + 1,
+        });
+        const n = Math.floor((so.length - 1) / 2) + 1;
+        s.log.push({ seq: ev.seq, text: `Super over${n > 1 ? ` ${n}` : ""}: ${sideName(ctx, batting)} batting${first ? "" : `, target ${so[so.length - 1].target}`}` });
         return s;
       }
 
@@ -625,7 +697,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
 
   validateScore(s, _ctx, rules) {
     const issues: Issue[] = [];
-    for (const inn of s.innings) {
+    for (const inn of everyInnings(s)) {
       const fromBat = Object.values(inn.batters).reduce((t, b) => t + b.runs, 0);
       const ex = inn.extras;
       if (fromBat + ex.wides + ex.noBalls + ex.byes + ex.legByes + ex.penalty !== inn.runs) issues.push({ severity: "error", code: "IMPOSSIBLE_SCORE", message: `Innings ${inn.n}: batters' runs plus extras do not add up to the total` });
@@ -652,7 +724,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
       kind: "versus",
       score: { a: line("a"), b: line("b") },
       subScore: { a: sub("a"), b: sub("b") },
-      periodLabel: s.result ? "Final" : !inn ? "Not started" : inn.closed ? "Innings break" : `${ordinal(inn.n)} innings`,
+      periodLabel: s.result ? "Final" : !inn ? "Not started" : inn.closed ? (inn.superOver || s.result === null && s.superOvers?.length ? "Super over break" : "Innings break") : inn.superOver ? "Super over" : `${ordinal(inn.n)} innings`,
       brief: s.result ? (s.result.outcome === "tie" ? "Match tied" : `${sideName(ctx, s.result.winner!)} won ${s.result.margin}`)
         : !inn ? ""
         : [`${oversText(inn.balls, rules.ballsPerOver)} ov`, ...chaseLines(s, rules).slice(1).map((l) => l.replace("Required: ", "need "))].join(" · "),
@@ -667,6 +739,10 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
       if (inn.freeHit) view.notes.push("Free hit");
     }
     view.notes.push(...chaseLines(s, rules));
+    for (let k = 0; k < (s.superOvers?.length ?? 0); k += 2) {
+      const pair = s.superOvers!.slice(k, k + 2);
+      view.notes.push(`Super over${s.superOvers!.length > 2 ? ` ${k / 2 + 1}` : ""}: ${pair.map((i) => `${sideName(ctx, i.batting)} ${i.runs}/${i.wickets}`).join(", ")}`);
+    }
     return view;
   },
 
@@ -807,7 +883,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
     const ov = (i: CricketInnings | null) => (i ? Number(oversText(i.balls, rules.ballsPerOver)) : null);
     return {
       scoreA: total(s, "a"), scoreB: total(s, "b"),
-      cricket: { wicketsA: a?.wickets ?? null, wicketsB: b?.wickets ?? null, oversA: ov(a), oversB: ov(b), target: cur(s)?.target ?? null },
+      cricket: { wicketsA: a?.wickets ?? null, wicketsB: b?.wickets ?? null, oversA: ov(a), oversB: ov(b), target: s.innings[s.innings.length - 1]?.target ?? null },
     };
   },
 
@@ -853,6 +929,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
       case "DECLARE": return "Innings declared";
       case "INNINGS_END": return "Innings ended";
       case "TARGET_REVISED": return `Target revised to ${String(p.target)}`;
+      case "SUPER_OVER_START": return `Super over: ${isSide(p.batting) ? sideName(ctx, p.batting) : ""} batting`;
       case "OVERS_CHANGE": return `Overs changed to ${String(p.overs)} an innings${typeof p.reason === "string" && p.reason ? `. ${p.reason}` : ""}`;
       default: {
         const extra = str(p.extra);
@@ -871,7 +948,8 @@ export function cricketBallLabel(s: CricketState, ev: EngineEvent, rules: Cricke
   if (ev.type !== "DELIVERY") return null;
   const inn = open(s);
   if (!inn) return null;
-  return `${ordinal(inn.n)} innings ${Math.floor(inn.balls / rules.ballsPerOver)}.${(inn.balls % rules.ballsPerOver) + 1}`;
+  const ball = `${Math.floor(inn.balls / rules.ballsPerOver)}.${(inn.balls % rules.ballsPerOver) + 1}`;
+  return inn.superOver ? `Super over ${inn.n} ${ball}` : `${ordinal(inn.n)} innings ${ball}`;
 }
 
 function chaseNumbers(s: CricketState, rules: CricketRules): { target: number; need: number; ballsLeft: number | null; rrr: number | null } | null {

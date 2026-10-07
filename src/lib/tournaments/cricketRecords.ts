@@ -8,7 +8,7 @@
 // Nothing here is stored, so there is nothing to go stale.
 
 import type { TournamentCricketStatRow, TournamentMatch } from "./types";
-import { ballsOf, cricketRulesOf, oversOf, type CricketMatchFacts } from "./standings";
+import { ballsOf, cricketOutcome, cricketRulesOf, oversOf, type CricketMatchFacts } from "./standings";
 
 // ── players ─────────────────────────────────────────────────────
 
@@ -166,22 +166,25 @@ export function cricketTeams(
   const innings: TeamInnings[] = [];
   for (const m of matches) {
     if (!m.team_a_id || !m.team_b_id) continue;
-    const abandoned = !!facts[m.id]?.abandoned;
-    if (m.status !== "completed" && !abandoned) continue;
+    // the same reading of a result as the points table (walkovers have no innings to record)
+    const out = m.status === "walkover" ? null : cricketOutcome(m, facts);
+    if (out === null) continue;
     const A = stats.get(m.team_a_id), B = stats.get(m.team_b_id);
     for (const s of [A, B]) if (s) s.played += 1;
-    if (abandoned || (!m.winner_team_id && (m.score_a === null || m.score_b === null))) { for (const s of [A, B]) if (s) s.noResult += 1; continue; }
-    if (!m.winner_team_id) { for (const s of [A, B]) if (s) s.tied += 1; }
-    else for (const [s, id] of [[A, m.team_a_id], [B, m.team_b_id]] as const) if (s) { if (m.winner_team_id === id) s.won += 1; else s.lost += 1; }
+    if (out === "nr") { for (const s of [A, B]) if (s) s.noResult += 1; continue; }
+    if (out === "tie") { for (const s of [A, B]) if (s) s.tied += 1; }
+    else for (const [s, side] of [[A, "a"], [B, "b"]] as const) if (s) { if (out === side) s.won += 1; else s.lost += 1; }
     if (m.score_a === null || m.score_b === null) continue;
 
     const chase = chasingSide(m, rules.wicketsPerInnings, facts);
+    // won on a super over: the match itself was level, so it is no chase won and has no margin
+    const superOverWin = !!m.winner_team_id && m.score_a === m.score_b;
     for (const side of ["a", "b"] as const) {
       const id = side === "a" ? m.team_a_id : m.team_b_id, opp = side === "a" ? m.team_b_id : m.team_a_id;
       const inn: TeamInnings = {
         teamId: id, team: name(id), opponentId: opp, opponent: name(opp), matchId: m.id,
         runs: (side === "a" ? m.score_a : m.score_b)!, wickets: (side === "a" ? m.wickets_a : m.wickets_b) ?? 0,
-        balls: ballsOf(side === "a" ? m.overs_a : m.overs_b, bpo), chasing: chase === side, won: m.winner_team_id === id,
+        balls: ballsOf(side === "a" ? m.overs_a : m.overs_b, bpo), chasing: chase === side, won: m.winner_team_id === id && !superOverWin,
       };
       innings.push(inn);
       const s = stats.get(id);
@@ -193,7 +196,7 @@ export function cricketTeams(
       if (inn.chasing && inn.won && (!s.bestChase || inn.runs > s.bestChase.runs)) s.bestChase = inn;
     }
     // margins: by runs when the side batting first won, by wickets when the chase did
-    if (m.winner_team_id && chase) {
+    if (m.winner_team_id && chase && !superOverWin) {
       const winnerSide = m.winner_team_id === m.team_a_id ? "a" : "b";
       const s = stats.get(m.winner_team_id);
       if (s && winnerSide === chase) {

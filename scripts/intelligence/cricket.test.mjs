@@ -439,3 +439,68 @@ section("cricket: setting the overs to those already bowled ends the innings; un
   m.correct("void", change.id, "Wrong button");
   assert.deepEqual([inn().closed, inn().maxBalls, m.env.sport.oversLimit], [null, 30, undefined], "undoing the change reopens the innings at 5 overs");
 });
+
+// a 1-over-a-side match, tied on 6
+function tiedMatch() {
+  const m = openMatch(E, ctx, { preset: "custom", oversPerInnings: 1 });
+  m.push("MATCH_START");
+  m.push("INNINGS_START", { batting: "a", striker: "a1", nonStriker: "a2" });
+  for (let i = 0; i < 6; i++) { const inn = m.env.sport.innings[0]; ball(m, inn.striker, inn.nonStriker, "b1", { runsBat: 1 }); }
+  m.push("INNINGS_START", { batting: "b", striker: "b1", nonStriker: "b2" });
+  for (let i = 0; i < 6; i++) { const inn = m.env.sport.innings[1]; ball(m, inn.striker, inn.nonStriker, "a1", { runsBat: 1 }); }
+  return m;
+}
+const soBall = (m, bowler, extra) => { const inn = m.env.sport.superOvers.at(-1); return ball(m, inn.striker, inn.nonStriker, bowler, extra); };
+
+section("cricket: a tied match goes to a super over, which decides the winner without touching the match totals", () => {
+  const m = tiedMatch();
+  assert.equal(m.env.sport.result.outcome, "tie");
+  m.refuses("SUPER_OVER_START", { batting: "a", striker: "a3", nonStriker: "a4" }, /Bravo bats this super over/, "the side that batted second goes first");
+  m.push("SUPER_OVER_START", { batting: "b", striker: "b3", nonStriker: "b4" });
+  assert.equal(m.env.sport.result, null, "the tie is reopened while the super over is played");
+  m.refuses("INNINGS_START", { batting: "a", striker: "a1", nonStriker: "a2" }, null, "no more ordinary innings");
+  m.refuses("OVERS_CHANGE", { overs: 3 }, /always one over/, "a super over is one over");
+  soBall(m, "a2", { runsBat: 6 });
+  soBall(m, "a2", { wicket: { type: "bowled" } });
+  m.push("NEW_BATTER", { player: "b5" });
+  soBall(m, "a2", { wicket: { type: "caught", fielder: "a3" } });
+  const first = m.env.sport.superOvers[0];
+  assert.deepEqual([first.closed, first.runs, first.wickets], ["all_out", 6, 2], "two wickets end a super over");
+  m.push("SUPER_OVER_START", { batting: "a", striker: "a1", nonStriker: "a2" });
+  assert.equal(m.env.sport.superOvers[1].target, 7);
+  soBall(m, "b2", { runsBat: 4 });
+  soBall(m, "b2", { runsBat: 4 });
+  assert.deepEqual(m.env.sport.result, { outcome: "win", winner: "a", method: "played", margin: "via super over" });
+  assert.deepEqual([m.env.sport.innings[0].runs, m.env.sport.innings[1].runs], [6, 6], "the match's own scores are untouched");
+  assert.deepEqual([m.summary().view.score.a, m.summary().view.score.b], ["6/0", "6/0"]);
+  assert.ok(m.summary().view.notes.some((n) => n === "Super over: Bravo 6/2, Alpha 8/0"));
+  const mirror = E.mirrorScore(m.env.sport, ctx, m.rules);
+  assert.deepEqual([mirror.scoreA, mirror.scoreB, mirror.cricket.target], [6, 6, 7], "the fixture keeps the match's runs and target");
+  const a1 = m.stats().lines.find((l) => l.subjectKey === "a1");
+  assert.equal(a1.raw.batRuns, 3, "a super over adds nothing to anyone's figures");
+  m.assertReconstructs("a super over rebuilds from the log");
+});
+
+section("cricket: a tied super over leads to another, the other way round", () => {
+  const m = tiedMatch();
+  m.push("SUPER_OVER_START", { batting: "b", striker: "b3", nonStriker: "b4" });
+  for (let i = 0; i < 6; i++) soBall(m, "a2", { runsBat: 1 });
+  m.push("SUPER_OVER_START", { batting: "a", striker: "a1", nonStriker: "a2" });
+  for (let i = 0; i < 6; i++) soBall(m, "b2", { runsBat: 1 });
+  assert.deepEqual([m.env.sport.result.outcome, m.env.sport.result.margin], ["tie", "super over tied"]);
+  m.refuses("SUPER_OVER_START", { batting: "b", striker: "b1", nonStriker: "b2" }, /Alpha bats this super over/, "the side that batted second in the last one goes first");
+  m.push("SUPER_OVER_START", { batting: "a", striker: "a3", nonStriker: "a4" });
+  assert.equal(m.env.sport.superOvers[2].superOver, 2);
+  const c = E.calculateAdvancedAnalytics(m.env.sport, ctx, m.rules);
+  assert.ok(c, "analytics still work during a super over");
+});
+
+section("cricket: no super over unless the scores are level", () => {
+  const m = openMatch(E, ctx, { preset: "custom", oversPerInnings: 1 });
+  m.push("MATCH_START");
+  m.push("INNINGS_START", { batting: "a", striker: "a1", nonStriker: "a2" });
+  m.refuses("SUPER_OVER_START", { batting: "b", striker: "b1", nonStriker: "b2" }, null, "mid-match");
+  const t = openMatch(E, ctx, { preset: "test" });
+  t.push("MATCH_START");
+  t.refuses("SUPER_OVER_START", { batting: "b", striker: "b1", nonStriker: "b2" }, /no super over/, "a two-innings match");
+});

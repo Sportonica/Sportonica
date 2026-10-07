@@ -7,7 +7,7 @@ import { cricketPlayers, cricketTeams } from "@/lib/tournaments/cricketRecords";
 import { CricketOverview, CricketTablePublic, type CricketTournamentData } from "./public/CricketStats";
 import { isActionError } from "@/lib/actionError";
 import type { Tournament, TournamentMatch, TournamentTeam, TournamentStanding } from "@/lib/tournaments/types";
-import { basketballRulesOf, computeBasketballStandings, computeCricketStandings, cricketRulesOf, diffText, type CricketMatchFacts, type CricketStanding, isBasketball, isCricket, standingsScheme, type BasketballStanding } from "@/lib/tournaments/standings";
+import { basketballRulesOf, computeBasketballStandings, computeCricketStandings, cricketOutcome, cricketRulesOf, diffText, type CricketMatchFacts, type CricketStanding, isBasketball, isCricket, standingsScheme, type BasketballStanding } from "@/lib/tournaments/standings";
 
 const ALL = "__all__";
 
@@ -94,7 +94,7 @@ export default function StandingsTab({ tournament, teams, matches }: {
       .sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 4)
       .map((m) => ({
         text: `${name(m.team_a_id)} ${m.score_a ?? "–"}/${m.wickets_a ?? 0} v ${name(m.team_b_id)} ${m.score_b ?? "–"}/${m.wickets_b ?? 0}`,
-        result: m.winner_team_id ? `${name(m.winner_team_id)} won` : m.score_a === null ? "No result" : "Tied",
+        result: ((o) => (o === "a" || o === "b" ? `${name(o === "a" ? m.team_a_id : m.team_b_id)} won${m.score_a === m.score_b ? " the super over" : ""}` : o === "tie" ? "Tied" : "No result"))(cricketOutcome(m, quotas)),
       }));
     return (
       <div className="tc-card" style={{ display: "grid", gap: 16 }}>

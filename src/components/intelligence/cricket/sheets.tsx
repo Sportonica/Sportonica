@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import type { MatchContext, Participant, Side } from "@/lib/intelligence/core/types";
 import type { TimelineEntry } from "@/lib/intelligence/types";
-import { describeDelivery, participant, type DeliveryPayload } from "@/lib/intelligence/sports/cricketView";
+import { describeDelivery, parseBallLabel, participant, type DeliveryPayload } from "@/lib/intelligence/sports/cricketView";
 import { Jersey, teamColor } from "../pads/shared";
 
 export type Extra = "wide" | "no_ball" | "bye" | "leg_bye";
@@ -163,7 +163,7 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
     d ? { type: d.key, player: d.anyBatter ? out : striker, fielder: d.fielder ? fielder : "" } : null, p.commentary);
   const preview = describeDelivery(payload as DeliveryPayload, ctx);
   return (
-    <Sheet title={`Edit ball ${entry.label?.replace(/^\w+ innings /, "") ?? ""}`} onClose={onClose}>
+    <Sheet title={`Edit ${parseBallLabel(entry.label)?.superOver ? "super over " : ""}ball ${parseBallLabel(entry.label)?.ball ?? ""}`} onClose={onClose}>
       <div className="ck-muted" style={{ fontSize: 13 }}>{nm(bowler)} to {nm(striker)}</div>
       <Field label="Extra">
         <Choice value={extra} onChange={(v) => { setExtra(v); if ((v === "bye" || v === "leg_bye") && runs === 0) setRuns(1); }}

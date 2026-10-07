@@ -11,9 +11,21 @@ type Over = CricketInnings["overs"][number];
 
 export const ordinal = (n: number): string => (n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`);
 
-/** The innings being played, or the last one played. */
+/** The match's innings then any super overs (CricketState.superOvers). */
+export function allInnings(s: CricketState): CricketInnings[] {
+  return [...s.innings, ...(s.superOvers ?? [])];
+}
+
+/** The innings being played, or the last one played (a super over once one starts). */
 export function latestInnings(s: CricketState): CricketInnings | null {
-  return s.innings[s.innings.length - 1] ?? null;
+  return allInnings(s).at(-1) ?? null;
+}
+
+/** "Super over", "Super over 2", or "2nd innings". */
+export function inningsName(inn: CricketInnings, s?: CricketState): string {
+  if (!inn.superOver) return `${ordinal(inn.n)} innings`;
+  const many = s ? (s.superOvers?.length ?? 0) > 2 : inn.superOver > 1;
+  return many ? `Super over ${inn.superOver}` : "Super over";
 }
 
 /** The innings being played, if one is open. */
@@ -246,9 +258,12 @@ const HOW: Record<string, string> = {
   hit_wicket: "hit wicket", obstructing_field: "obstructing the field", hit_ball_twice: "hit the ball twice",
 };
 
-/** "1st innings 6.2" -> { innings: 1, ball: "6.2" } */
-export function parseBallLabel(label: string | null): { innings: number; ball: string } | null {
-  const m = label ? /^(\d+)\w*\s+innings\s+(\d+\.\d+)$/.exec(label) : null;
+/** "1st innings 6.2" -> { innings: 1, ball: "6.2" }; "Super over 3 0.4" -> { innings: 3, ball: "0.4", superOver: true } */
+export function parseBallLabel(label: string | null): { innings: number; ball: string; superOver?: boolean } | null {
+  if (!label) return null;
+  const so = /^Super over (\d+) (\d+\.\d+)$/.exec(label);
+  if (so) return { innings: Number(so[1]), ball: so[2], superOver: true };
+  const m = /^(\d+)\w*\s+innings\s+(\d+\.\d+)$/.exec(label);
   return m ? { innings: Number(m[1]), ball: m[2] } : null;
 }
 
