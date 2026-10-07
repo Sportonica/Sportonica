@@ -650,3 +650,16 @@
   .ev2-tp.bb .ev2-tp-rest .n small { display: inline; }
 }
 .ev2-tp.bb .ev2-tp-rest .n { white-space: normal; overflow: visible; font-size: 13px; line-height: 1.25; }
+
+/* standings on a phone: the team's full name on its own line, the figures in a full-width row under it */
+@media (max-width: 560px) {
+  .ev2-standings .ev2-srow:has(.ev2-srow-stats) {
+    display: grid; grid-template-columns: 18px auto minmax(0, 1fr); grid-template-areas: "rank badge name" "stats stats stats";
+    row-gap: 10px; column-gap: 10px;
+  }
+  .ev2-srow:has(.ev2-srow-stats) .ev2-srow-rank { grid-area: rank; }
+  .ev2-srow:has(.ev2-srow-stats) .ev2-srow-badge { grid-area: badge; }
+  .ev2-srow:has(.ev2-srow-stats) .ev2-srow-name { grid-area: name; max-width: none; white-space: normal; overflow: visible; font-size: 15px; line-height: 1.25; }
+  .ev2-srow-stats { grid-area: stats; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; overflow: visible; }
+  .ev2-srow-stats .ev2-schip { min-width: 0; }
+}
