@@ -524,3 +524,19 @@
 .ev2-latest { display: grid; gap: 4px; padding: 8px 0; border-bottom: 1px solid rgba(242,237,230,0.06); font-size: 13.5px; }
 .ev2-latest:last-child { border-bottom: 0; }
 .ev2-latest a { color: inherit; text-decoration: none; }
+
+/* Match centre tab */
+.ev2-mc { display: grid; gap: 14px; }
+.ev2-mc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.ev2-mc-row { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid rgba(20,23,30,0.08); border-radius: 12px; background: rgba(20,23,30,0.015); }
+.ev2-mc-row.live { border-color: rgba(229,72,77,0.35); }
+.ev2-mc-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; font-weight: 700; opacity: .65; }
+.ev2-mc-live { color: #d6343a; opacity: 1; font-weight: 800; }
+.ev2-mc-row.live .ev2-mc-meta { opacity: 1; }
+.ev2-mc-side { display: flex; justify-content: space-between; gap: 10px; font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ev2-mc-side b { font-weight: 800; }
+.ev2-mc-side.won { font-weight: 800; }
+.ev2-mc-side.won b { color: #006241; }
+.ev2-mc-brief { font-size: 12.5px; opacity: .75; font-weight: 600; }
+.ev2-mc-none { font-size: 13.5px; opacity: .7; }
+.ev2-mc-row .ev2-game-link { justify-self: start; margin-top: 2px; }

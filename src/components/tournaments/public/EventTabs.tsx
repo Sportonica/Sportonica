@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ComponentType } from
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutGrid, Table2, GitBranch, CalendarDays, BarChart3, Users, X, Star, ChevronRight, LogIn, Phone, ClipboardList, ListOrdered,
+  LayoutGrid, Radio, Table2, GitBranch, CalendarDays, BarChart3, Users, X, Star, ChevronRight, LogIn, Phone, ClipboardList, ListOrdered,
 } from "lucide-react";
 import { getTeamRosterPublic, getRaceResults } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
@@ -29,12 +29,12 @@ import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
 import "./event-tabs.css";
 
 const KTM = "Asia/Kathmandu";
-const NOT_FOR_SINGLE_EVENT = new Set(["Table", "Knockout", "Fixtures", "Player Stats"]);
-const TABS = ["Overview", "Register", "Table", "Knockout", "Fixtures", "Player Stats", "Results", "Teams"] as const;
+const NOT_FOR_SINGLE_EVENT = new Set(["Match centre", "Table", "Knockout", "Fixtures", "Player Stats"]);
+const TABS = ["Match centre", "Overview", "Register", "Table", "Knockout", "Fixtures", "Player Stats", "Results", "Teams"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_ICON: Record<Tab, ComponentType<{ size?: number }>> = {
-  Overview: LayoutGrid, Register: ClipboardList, Table: Table2, Knockout: GitBranch, Fixtures: CalendarDays,
+  "Match centre": Radio, Overview: LayoutGrid, Register: ClipboardList, Table: Table2, Knockout: GitBranch, Fixtures: CalendarDays,
   "Player Stats": BarChart3, Results: ListOrdered, Teams: Users,
 };
 
@@ -109,6 +109,8 @@ export default function EventTabs({
     if (t === "Knockout" && !hasKnockout) return false;
     if (t === "Register" && !showRegister) return false;
     if (t === "Results" && !isIndividualRace) return false;
+    // games between two sides: live scores, what is next, the latest results
+    if (t === "Match centre" && (isIndividualRace || !matches.some((m) => m.team_a_id && m.team_b_id))) return false;
     return true;
   });
   // Always hydrate starting on Overview, then flip to the deep-linked tab
@@ -213,6 +215,9 @@ export default function EventTabs({
         )}
       </div>
 
+      {activeTab === "Match centre" && (
+        <MatchCentreTab matches={matches} teams={teams} intel={intel} highlights={highlights} tournamentId={tournament.id} cricket={isCricketSport} />
+      )}
       {activeTab === "Overview" && (
         <OverviewTab tournament={tournament} teams={teams} matches={matches} awards={awards}
           sportBoard={isBasketballSport || isCricketSport ? (
@@ -1016,6 +1021,73 @@ function SquadModal({ team, onClose }: { team: TournamentTeam; onClose: () => vo
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Match centre: what is on now, what is next, how the last games ended ──
+function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, cricket }: {
+  matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>; highlights: Record<string, MatchHighlight>;
+  tournamentId: string; cricket: boolean;
+}) {
+  const name = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "TBD";
+  const at = (m: TournamentMatch) => m.starts_at ?? m.updated_at;
+  const games = matches.filter((m) => m.team_a_id && m.team_b_id);
+  const live = games.filter((m) => m.status === "live" || intel[m.id]?.status === "live" || intel[m.id]?.status === "paused");
+  const next = games.filter((m) => m.status === "scheduled" && !live.includes(m)).sort((a, b) => at(a).localeCompare(at(b))).slice(0, 4);
+  const done = games.filter((m) => m.status === "completed" || m.status === "walkover").sort((a, b) => at(b).localeCompare(at(a))).slice(0, 8);
+  const centre = (m: TournamentMatch) => intel[m.id]?.contestId ?? highlights[m.id]?.contestId ?? null;
+  const score = (m: TournamentMatch, side: "a" | "b") => intel[m.id]?.[side] || sideScore(m, side) || "";
+
+  const Row = ({ m, kind }: { m: TournamentMatch; kind: "live" | "next" | "done" }) => {
+    const id = centre(m);
+    const mi = intel[m.id];
+    const result = kind === "done" ? (highlights[m.id]?.result ?? mi?.result ?? (m.winner_team_id ? `${name(m.winner_team_id)} won` : null)) : null;
+    return (
+      <div className={`ev2-mc-row ${kind}`}>
+        <div className="ev2-mc-meta">
+          {kind === "live" ? <span className="ev2-mc-live">● Live{mi?.period ? ` · ${mi.period}` : ""}</span> : <span>{matchWhen(m)}</span>}
+          {m.round_label ? <span>{m.round_label}</span> : null}
+        </div>
+        {(["a", "b"] as const).map((side) => {
+          const team = side === "a" ? m.team_a_id : m.team_b_id;
+          return (
+            <div key={side} className={`ev2-mc-side${kind === "done" && m.winner_team_id === team ? " won" : ""}`}>
+              <span>{name(team)}</span>
+              {kind !== "next" ? <b>{score(m, side)}</b> : null}
+            </div>
+          );
+        })}
+        {kind === "live" && mi?.brief ? <div className="ev2-mc-brief">{mi.brief}</div> : null}
+        {result ? <div className="ev2-mc-brief">{result}</div> : null}
+        {id ? (
+          <Link className="ev2-game-link" href={`/tournaments/${tournamentId}/live/${id}`}>
+            {kind === "live" ? "Follow live ›" : kind === "done" ? (cricket ? "Scorecard ›" : "Box score ›") : "Match page ›"}
+          </Link>
+        ) : null}
+      </div>
+    );
+  };
+
+  return (
+    <div className="ev2-mc">
+      <div className="ev2-card">
+        <div className="ev2-card-t">Live now</div>
+        {live.length ? <div className="ev2-mc-grid">{live.map((m) => <Row key={m.id} m={m} kind="live" />)}</div>
+          : <div className="ev2-mc-none">No game in progress right now.{next[0] ? ` Next: ${name(next[0].team_a_id)} v ${name(next[0].team_b_id)}, ${matchWhen(next[0])}.` : ""}</div>}
+      </div>
+      {next.length ? (
+        <div className="ev2-card">
+          <div className="ev2-card-t">Up next</div>
+          <div className="ev2-mc-grid">{next.map((m) => <Row key={m.id} m={m} kind="next" />)}</div>
+        </div>
+      ) : null}
+      {done.length ? (
+        <div className="ev2-card">
+          <div className="ev2-card-t">Latest results</div>
+          <div className="ev2-mc-grid">{done.map((m) => <Row key={m.id} m={m} kind="done" />)}</div>
+        </div>
+      ) : null}
     </div>
   );
 }
