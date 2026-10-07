@@ -58,8 +58,8 @@ export default function RallyPad({ contest, send, config }: PadProps & { config:
     <div className="si-pad">
       <div className="si-keys two">
         {SIDE_KEYS.map((s) => (
-          <button type="button" key={s} className="si-key-btn score big" onClick={() => point(s)}>
-            {word} {sides[s].name}{state.serving === s ? " (serving)" : ""}
+          <button type="button" key={s} className="si-key-btn score big si-point" onClick={() => point(s)} aria-label={`${word} ${sides[s].name}${state.serving === s ? ", serving" : ""}`}>
+            <small>{word}</small><b>{sides[s].name}</b>{state.serving === s ? <i>Serving</i> : null}
           </button>
         ))}
       </div>

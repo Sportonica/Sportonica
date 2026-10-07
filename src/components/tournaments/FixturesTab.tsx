@@ -25,6 +25,21 @@ const inputStyle: React.CSSProperties = {
   background: "transparent", color: "inherit", fontFamily: "inherit",
 };
 
+/** A score box with − and + either side: one tap per goal, no keyboard needed on a phone. */
+function ScoreStepper({ label, value, onChange, aria }: { label: string; value: string; onChange: (v: string) => void; aria: string }) {
+  const n = value === "" ? null : Number(value);
+  return (
+    <label className="tc-step">
+      <span className="tc-dim tc-step-label">{label}</span>
+      <span className="tc-step-row">
+        <button type="button" className="tc-step-btn" aria-label={`${aria}: one less`} disabled={!n} onClick={() => onChange(String(Math.max(0, (n ?? 0) - 1)))}>−</button>
+        <input type="number" inputMode="numeric" min={0} placeholder="0" value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, width: 50 }} aria-label={aria} />
+        <button type="button" className="tc-step-btn" aria-label={`${aria}: one more`} onClick={() => onChange(String((n ?? 0) + 1))}>+</button>
+      </span>
+    </label>
+  );
+}
+
 const KTM_TZ = "Asia/Kathmandu";
 // Fixed +05:45 offset (no DST) — same convention as BookingFlow.tsx.
 function ktmIso(dateStr: string, timeStr: string) {
@@ -297,6 +312,7 @@ export default function FixturesTab({
   const [err, setErr] = useState<string | null>(null);
   const [recordingStats, setRecordingStats] = useState<TournamentMatch | null>(null);
   const [mode, setMode] = useState<"choose" | "manual" | "auto">("choose");
+  const [addOpen, setAddOpen] = useState(false);
   const [regenMsg, setRegenMsg] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [editingRound, setEditingRound] = useState<string | null>(null);
@@ -581,10 +597,14 @@ export default function FixturesTab({
 
           {canAddMatches && (!canGenerateBracket || mode === "manual") && (
             <>
+              {/* on a phone the form waits behind a button, so the matches come first */}
+              <button className="tc-btn tc-fx-add-toggle" onClick={() => setAddOpen((v) => !v)}>{addOpen ? "Close" : "+ Add a match"}</button>
+              <div className={`tc-fx-addwrap${addOpen ? " open" : ""}`}>
               <AddMatchForm
                 tournament={tournament} teams={teams} matches={matches} teamName={teamName} pending={pending}
                 onAdd={(input) => run(() => createMatch(input))}
               />
+              </div>
               {canGenerateBracket && (
                 <button className="tc-btn" disabled={pending} style={{ padding: "6px 10px", fontSize: 12, marginTop: -8, marginBottom: 16 }} onClick={() => setMode("choose")}>
                   ‹ Choose a different way to build this
@@ -644,7 +664,7 @@ export default function FixturesTab({
                 onAdd={(input) => run(() => createMatch(input))}
               />
             )}
-            <table className="tc-table">
+            <table className="tc-table tc-fx">
               <thead>
                 <tr>
                   <th>
@@ -1091,11 +1111,11 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   }
 
   return (
-    <tr>
-      <td>
+    <tr className="tc-fx-row">
+      <td className="tc-fx-sel">
         <input type="checkbox" aria-label={`Select ${teamName(match.team_a_id)} vs ${teamName(match.team_b_id)}`} checked={selected} onChange={onToggleSelect} />
       </td>
-      <td>
+      <td className="tc-fx-match">
         {editingTeams ? (
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <TeamSelect
@@ -1139,7 +1159,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
             : <span className="tc-badge neutral">Draw</span>
         )}
       </td>
-      <td className="tc-dim" style={{ fontSize: 12.5 }}>
+      <td className="tc-dim tc-fx-when" style={{ fontSize: 12.5 }}>
         {editingTime ? (
           <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", maxWidth: 300 }}>
             <input type="date" value={dateStr} onChange={(e) => setDateStr(e.target.value)} style={{ ...inputStyle, width: 130 }} />
@@ -1179,11 +1199,12 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           </button>
         )}
       </td>
-      <td className="tc-num">
+      <td className="tc-num tc-fx-score">
         {(match.status === "completed" || match.status === "live") && match.score_a !== null && match.score_b !== null ? (
           <>
             {match.status === "live" && <span className="tc-badge live" style={{ marginRight: 6 }}>Live</span>}
-            {match.score_a} – {match.score_b}
+            {/* cricket shows wickets too: 180/4 – 156/2 */}
+            {match.score_a}{match.wickets_a != null ? `/${match.wickets_a}` : ""} – {match.score_b}{match.wickets_b != null ? `/${match.wickets_b}` : ""}
             {match.score_a_pens !== null && match.score_b_pens !== null && (
               <div className="tc-dim" style={{ fontSize: 11, fontWeight: 400 }}>pens {match.score_a_pens}–{match.score_b_pens}</div>
             )}
@@ -1193,7 +1214,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           </>
         ) : "—"}
       </td>
-      <td>
+      <td className="tc-fx-act">
         {!liveScoringHref && match.status === "completed" && match.team_a_id && match.team_b_id && match.score_a !== null && match.score_b !== null && (
           <button className="tc-btn" disabled={pending} onClick={onRecordStats} style={{ padding: "6px 10px", marginRight: 6 }}>Player stats</button>
         )}
@@ -1350,21 +1371,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
               </button>
             ))}
             <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_a_id)}</span>
-                <input
-                  type="number" placeholder="0" value={scoreA} onChange={(e) => setScoreA(e.target.value)}
-                  style={{ ...inputStyle, width: 50 }} aria-label={`${teamName(match.team_a_id)} score`}
-                />
-              </label>
+              <ScoreStepper label={`${teamName(match.team_a_id)}`} value={scoreA} onChange={setScoreA} aria={`${teamName(match.team_a_id)} score`} />
               <span className="tc-dim" style={{ alignSelf: "flex-end", marginBottom: 8 }}>–</span>
-              <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_b_id)}</span>
-                <input
-                  type="number" placeholder="0" value={scoreB} onChange={(e) => setScoreB(e.target.value)}
-                  style={{ ...inputStyle, width: 50 }} aria-label={`${teamName(match.team_b_id)} score`}
-                />
-              </label>
+              <ScoreStepper label={`${teamName(match.team_b_id)}`} value={scoreB} onChange={setScoreB} aria={`${teamName(match.team_b_id)} score`} />
               {live && (
                 <button
                   className="tc-btn" disabled={pending || scoreA === "" || scoreB === ""} style={{ padding: "6px 10px", alignSelf: "flex-end" }}
@@ -1391,21 +1400,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
             {showEt && (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 <span className="tc-dim" style={{ fontSize: 11, width: "100%" }}>Level after regulation. Extra time score:</span>
-                <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_a_id)} (ET)</span>
-                  <input
-                    type="number" placeholder="0" value={scoreAEt} onChange={(e) => setScoreAEt(e.target.value)}
-                    style={{ ...inputStyle, width: 50 }} aria-label={`${teamName(match.team_a_id)} extra time score`}
-                  />
-                </label>
+                <ScoreStepper label={`${teamName(match.team_a_id)} (ET)`} value={scoreAEt} onChange={setScoreAEt} aria={`${teamName(match.team_a_id)} extra time score`} />
                 <span className="tc-dim" style={{ alignSelf: "flex-end", marginBottom: 8 }}>–</span>
-                <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_b_id)} (ET)</span>
-                  <input
-                    type="number" placeholder="0" value={scoreBEt} onChange={(e) => setScoreBEt(e.target.value)}
-                    style={{ ...inputStyle, width: 50 }} aria-label={`${teamName(match.team_b_id)} extra time score`}
-                  />
-                </label>
+                <ScoreStepper label={`${teamName(match.team_b_id)} (ET)`} value={scoreBEt} onChange={setScoreBEt} aria={`${teamName(match.team_b_id)} extra time score`} />
                 {!showPens && (
                   <button className="tc-btn primary" disabled={pending || !canSave} style={{ padding: "6px 10px", alignSelf: "flex-end" }} onClick={save}>
                     {saveLabel}
@@ -1417,21 +1414,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
             {showPens && (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
                 <span className="tc-dim" style={{ fontSize: 11, width: "100%" }}>Still level. Penalty shootout score:</span>
-                <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_a_id)} (pens)</span>
-                  <input
-                    type="number" placeholder="0" value={scoreAPens} onChange={(e) => setScoreAPens(e.target.value)}
-                    style={{ ...inputStyle, width: 50 }} aria-label={`${teamName(match.team_a_id)} penalty score`}
-                  />
-                </label>
+                <ScoreStepper label={`${teamName(match.team_a_id)} (pens)`} value={scoreAPens} onChange={setScoreAPens} aria={`${teamName(match.team_a_id)} penalty score`} />
                 <span className="tc-dim" style={{ alignSelf: "flex-end", marginBottom: 8 }}>–</span>
-                <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span className="tc-dim" style={{ fontSize: 10.5 }}>{teamName(match.team_b_id)} (pens)</span>
-                  <input
-                    type="number" placeholder="0" value={scoreBPens} onChange={(e) => setScoreBPens(e.target.value)}
-                    style={{ ...inputStyle, width: 50 }} aria-label={`${teamName(match.team_b_id)} penalty score`}
-                  />
-                </label>
+                <ScoreStepper label={`${teamName(match.team_b_id)} (pens)`} value={scoreBPens} onChange={setScoreBPens} aria={`${teamName(match.team_b_id)} penalty score`} />
                 <button className="tc-btn primary" disabled={pending || !canSave} style={{ padding: "6px 10px", alignSelf: "flex-end" }} onClick={save}>
                   {saveLabel}
                 </button>
@@ -1540,8 +1525,8 @@ function CricketScoreEntry({ match, teamName, pending, onSave, confirmCascadeIfN
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+    <div className="tc-ck-entry" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="tc-ck-sides" style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
         {[
           { label: teamName(match.team_a_id), runs: runsA, setRuns: setRunsA, wickets: wicketsA, setWickets: setWicketsA, overs: oversA, setOvers: setOversA },
           { label: teamName(match.team_b_id), runs: runsB, setRuns: setRunsB, wickets: wicketsB, setWickets: setWicketsB, overs: oversB, setOvers: setOversB },
@@ -1759,35 +1744,35 @@ function MatchPlayerStatsModal({
                 </button>
               </div>
             )}
-            <div style={{ display: "grid", gridTemplateColumns: `1.4fr 55px 55px 55px 45px 45px${trackingFines ? " 70px" : ""}`, gap: 8, fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6, minWidth: 470 }}>
+            <div className="tc-sheet-head" style={{ display: "grid", gridTemplateColumns: `1.4fr 55px 55px 55px 45px 45px${trackingFines ? " 70px" : ""}`, gap: 8, fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6, minWidth: 470 }}>
               <div>Player</div><div>Goals</div><div>Assists</div><div>Yellow</div><div>Red</div><div>MOM</div>{trackingFines && <div>Fine</div>}
             </div>
             {roster.filter((p) => !match.team_b_id || p.team === teamTab).map((p) => (
-              <div key={p.id} style={{ display: "grid", gridTemplateColumns: `1.4fr 55px 55px 55px 45px 45px${trackingFines ? " 70px" : ""}`, gap: 8, alignItems: "center", padding: "6px 0", minWidth: 470 }}>
-                <div style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.jersey_number} /><span>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</span></div>
-                <input
+              <div key={p.id} className="tc-sheet-row" style={{ display: "grid", gridTemplateColumns: `1.4fr 55px 55px 55px 45px 45px${trackingFines ? " 70px" : ""}`, gap: 8, alignItems: "center", padding: "6px 0", minWidth: 470 }}>
+                <div className="tc-cell-name" style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.jersey_number} /><span>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</span></div>
+                <label className="tc-cell"><span className="tc-cell-l">Goals</span><input
                   type="number" min={0} value={goals[p.id] ?? ""}
                   onChange={(e) => setGoals((g) => ({ ...g, [p.id]: e.target.value }))}
                   style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} goals`}
-                />
-                <input
+                /></label>
+                <label className="tc-cell"><span className="tc-cell-l">Assists</span><input
                   type="number" min={0} value={assists[p.id] ?? ""}
                   onChange={(e) => setAssists((a) => ({ ...a, [p.id]: e.target.value }))}
                   style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} assists`}
-                />
-                <input
+                /></label>
+                <label className="tc-cell"><span className="tc-cell-l">Yellow</span><input
                   type="number" min={0} max={2} value={yellows[p.id] ?? ""}
                   onChange={(e) => setYellows((y) => ({ ...y, [p.id]: e.target.value }))}
                   style={{ ...inputStyle, width: 45 }} aria-label={`${p.name} yellow cards`}
-                />
-                <input
+                /></label>
+                <label className="tc-cell"><span className="tc-cell-l">Red</span><input
                   type="checkbox" checked={!!reds[p.id]} onChange={(e) => setReds((r) => ({ ...r, [p.id]: e.target.checked }))}
                   style={{ justifySelf: "start", width: 18, height: 18 }} aria-label={`${p.name} red card`}
-                />
-                <input
+                /></label>
+                <label className="tc-cell"><span className="tc-cell-l">Player of match</span><input
                   type="radio" name="mom" checked={mom === p.id} onChange={() => setMom(p.id)}
                   style={{ justifySelf: "start", width: 18, height: 18 }} aria-label={`${p.name} is man of the match`}
-                />
+                /></label>
                 {trackingFines && <div className="tc-num" style={{ fontSize: 12.5 }}>{fineFor(p) > 0 ? money(fineFor(p)) : "—"}</div>}
               </div>
             ))}
@@ -1934,33 +1919,33 @@ function CricketPlayerStatsModal({
 
             {statTab === "bat" ? (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 55px 50px 50px 50px 45px", gap: 8, fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6, minWidth: 470 }}>
+                <div className="tc-sheet-head" style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 55px 50px 50px 50px 45px", gap: 8, fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6, minWidth: 470 }}>
                   <div>Player</div><div>Runs</div><div>Balls</div><div>4s</div><div>6s</div><div>Out</div><div>MOM</div>
                 </div>
                 {roster.filter((p) => !match.team_b_id || p.team === teamTab).map((p) => (
-                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 55px 50px 50px 50px 45px", gap: 8, alignItems: "center", padding: "6px 0", minWidth: 470 }}>
-                    <div style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.jersey_number} /><span>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</span></div>
-                    <input type="number" min={0} value={runs[p.id] ?? ""} onChange={(e) => setRuns((r) => ({ ...r, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} runs`} />
-                    <input type="number" min={0} value={balls[p.id] ?? ""} onChange={(e) => setBalls((b) => ({ ...b, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} balls faced`} />
-                    <input type="number" min={0} value={fours[p.id] ?? ""} onChange={(e) => setFours((f) => ({ ...f, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 45 }} aria-label={`${p.name} fours`} />
-                    <input type="number" min={0} value={sixes[p.id] ?? ""} onChange={(e) => setSixes((s) => ({ ...s, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 45 }} aria-label={`${p.name} sixes`} />
-                    <input type="checkbox" checked={!!isOut[p.id]} onChange={(e) => setIsOut((o) => ({ ...o, [p.id]: e.target.checked }))} style={{ justifySelf: "start", width: 18, height: 18 }} aria-label={`${p.name} is out`} />
-                    <input type="radio" name="mom" checked={mom === p.id} onChange={() => setMom(p.id)} style={{ justifySelf: "start", width: 18, height: 18 }} aria-label={`${p.name} is man of the match`} />
+                  <div key={p.id} className="tc-sheet-row" style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 55px 50px 50px 50px 45px", gap: 8, alignItems: "center", padding: "6px 0", minWidth: 470 }}>
+                    <div className="tc-cell-name" style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.jersey_number} /><span>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</span></div>
+                    <label className="tc-cell"><span className="tc-cell-l">Runs</span><input type="number" min={0} value={runs[p.id] ?? ""} onChange={(e) => setRuns((r) => ({ ...r, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} runs`} /></label>
+                    <label className="tc-cell"><span className="tc-cell-l">Balls</span><input type="number" min={0} value={balls[p.id] ?? ""} onChange={(e) => setBalls((b) => ({ ...b, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} balls faced`} /></label>
+                    <label className="tc-cell"><span className="tc-cell-l">4s</span><input type="number" min={0} value={fours[p.id] ?? ""} onChange={(e) => setFours((f) => ({ ...f, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 45 }} aria-label={`${p.name} fours`} /></label>
+                    <label className="tc-cell"><span className="tc-cell-l">6s</span><input type="number" min={0} value={sixes[p.id] ?? ""} onChange={(e) => setSixes((s) => ({ ...s, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 45 }} aria-label={`${p.name} sixes`} /></label>
+                    <label className="tc-cell"><span className="tc-cell-l">Out</span><input type="checkbox" checked={!!isOut[p.id]} onChange={(e) => setIsOut((o) => ({ ...o, [p.id]: e.target.checked }))} style={{ justifySelf: "start", width: 18, height: 18 }} aria-label={`${p.name} is out`} /></label>
+                    <label className="tc-cell"><span className="tc-cell-l">Player of match</span><input type="radio" name="mom" checked={mom === p.id} onChange={() => setMom(p.id)} style={{ justifySelf: "start", width: 18, height: 18 }} aria-label={`${p.name} is man of the match`} /></label>
                   </div>
                 ))}
               </>
             ) : (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 60px 55px 55px", gap: 8, fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6, minWidth: 400 }}>
+                <div className="tc-sheet-head" style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 60px 55px 55px", gap: 8, fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 6, minWidth: 400 }}>
                   <div>Player</div><div>Overs</div><div>Runs</div><div>Wkts</div><div>Maidens</div>
                 </div>
                 {roster.filter((p) => !match.team_b_id || p.team === teamTab).map((p) => (
-                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 60px 55px 55px", gap: 8, alignItems: "center", padding: "6px 0", minWidth: 400 }}>
-                    <div style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.jersey_number} /><span>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</span></div>
-                    <input type="number" min={0} step={0.1} value={oversBowled[p.id] ?? ""} onChange={(e) => setOversBowled((o) => ({ ...o, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} overs bowled`} />
-                    <input type="number" min={0} value={runsConceded[p.id] ?? ""} onChange={(e) => setRunsConceded((r) => ({ ...r, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 55 }} aria-label={`${p.name} runs conceded`} />
-                    <input type="number" min={0} value={wickets[p.id] ?? ""} onChange={(e) => setWickets((w) => ({ ...w, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} wickets`} />
-                    <input type="number" min={0} value={maidens[p.id] ?? ""} onChange={(e) => setMaidens((m) => ({ ...m, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} maidens`} />
+                  <div key={p.id} className="tc-sheet-row" style={{ display: "grid", gridTemplateColumns: "1.4fr 55px 60px 55px 55px", gap: 8, alignItems: "center", padding: "6px 0", minWidth: 400 }}>
+                    <div className="tc-cell-name" style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.jersey_number} /><span>{p.name}{!p.user_id && <span style={{ opacity: 0.55, fontSize: 11, marginLeft: 6 }}>Walk-in</span>}</span></div>
+                    <label className="tc-cell"><span className="tc-cell-l">Overs</span><input type="number" min={0} step={0.1} value={oversBowled[p.id] ?? ""} onChange={(e) => setOversBowled((o) => ({ ...o, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} overs bowled`} /></label>
+                    <label className="tc-cell"><span className="tc-cell-l">Runs given</span><input type="number" min={0} value={runsConceded[p.id] ?? ""} onChange={(e) => setRunsConceded((r) => ({ ...r, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 55 }} aria-label={`${p.name} runs conceded`} /></label>
+                    <label className="tc-cell"><span className="tc-cell-l">Wickets</span><input type="number" min={0} value={wickets[p.id] ?? ""} onChange={(e) => setWickets((w) => ({ ...w, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} wickets`} /></label>
+                    <label className="tc-cell"><span className="tc-cell-l">Maidens</span><input type="number" min={0} value={maidens[p.id] ?? ""} onChange={(e) => setMaidens((m) => ({ ...m, [p.id]: e.target.value }))} style={{ ...inputStyle, width: 50 }} aria-label={`${p.name} maidens`} /></label>
                   </div>
                 ))}
               </>
@@ -2143,20 +2128,20 @@ function BasketballBoxScoreModal({ match, teamName, prefill, onClose, onSaved }:
               ))}
             </div>
             <div style={{ overflowX: "auto" }}>
-              <div style={{ display: "grid", gridTemplateColumns: cols, gap: 6, fontSize: 11, fontWeight: 700, opacity: 0.6, letterSpacing: ".04em", marginBottom: 6, minWidth: 720 }}>
+              <div className="tc-sheet-head" style={{ display: "grid", gridTemplateColumns: cols, gap: 6, fontSize: 11, fontWeight: 700, opacity: 0.6, letterSpacing: ".04em", marginBottom: 6, minWidth: 720 }}>
                 <div>PLAYER</div>{BOX_COLS.map((c) => <div key={c.key} title={c.title}>{c.label}</div>)}<div title="Points">PTS</div>
               </div>
               {view.sides[side].players.map((p) => {
                 const l = draft[side][p.id] ?? {};
                 const pts = num(l.twos) * view.rules.twoPointValue + num(l.threes) * view.rules.threePointValue + num(l.ftm) * view.rules.freeThrowValue;
                 return (
-                  <div key={p.id} style={{ display: "grid", gridTemplateColumns: cols, gap: 6, alignItems: "center", padding: "4px 0", minWidth: 720 }}>
-                    <div style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.number ?? null} /><span>{p.name}</span></div>
+                  <div key={p.id} className="tc-sheet-row" style={{ display: "grid", gridTemplateColumns: cols, gap: 6, alignItems: "center", padding: "4px 0", minWidth: 720 }}>
+                    <div className="tc-cell-name" style={{ fontSize: 13.5, display: "flex", alignItems: "baseline" }}><JerseyNo n={p.number ?? null} /><span>{p.name}</span></div>
                     {BOX_COLS.map((c) => (
-                      <input key={c.key} type="number" min={0} inputMode="numeric" value={l[c.key] ?? ""} onChange={(e) => set(side, p.id, c.key, e.target.value)}
-                        style={{ ...inputStyle, width: 44, padding: "5px 4px" }} aria-label={`${p.name} ${c.title}`} />
+                      <label className="tc-cell" key={c.key}><span className="tc-cell-l">{c.label}</span><input type="number" min={0} inputMode="numeric" value={l[c.key] ?? ""} onChange={(e) => set(side, p.id, c.key, e.target.value)}
+                        style={{ ...inputStyle, width: 44, padding: "5px 4px" }} aria-label={`${p.name} ${c.title}`} /></label>
                     ))}
-                    <div className="tc-num" style={{ fontWeight: 800 }}>{pts || ""}</div>
+                    <div className="tc-num tc-cell-pts" style={{ fontWeight: 800 }}>{pts || ""}</div>
                   </div>
                 );
               })}

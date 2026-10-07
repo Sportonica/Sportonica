@@ -265,3 +265,23 @@ details.si-more[open] > summary::after { content: " -"; }
 .si-cricket-crease { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
 .si-cricket-crease > div { display: grid; gap: 1px; font-size: 13.5px; }
 .si-cricket-crease .si-muted { font-size: 11.5px; }
+
+/* rally sports: a point button is the label, the team (wrapping, never cut off) and who serves */
+.si-key-btn.si-point { display: grid; align-content: center; justify-items: center; gap: 4px; min-height: 104px; min-width: 0; padding: 10px 8px; font-size: clamp(15px, 4.4vw, 19px); line-height: 1.15; overflow-wrap: break-word; hyphens: auto; }
+.si-key-btn.si-point small { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .85; }
+.si-key-btn.si-point b { font-weight: 900; }
+.si-key-btn.si-point i { font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.22); }
+
+/* scoring on a phone: every chip and small button a thumb-sized target */
+@media (max-width: 640px) {
+  .si-chip { min-height: 44px; padding: 8px 14px; font-size: 13.5px; }
+  .si-btn.small { min-height: 44px; padding: 8px 12px; font-size: 13.5px; }
+  .si-btn { min-height: 46px; }
+  .si-link-btn { padding: 10px 0; }
+  details.si-more > summary { padding: 12px 0; font-size: 14px; }
+}
+/* a pad is never wider than its card: long team names wrap instead of pushing the second button off screen */
+.si-pad { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+  .si-chips { flex-wrap: wrap; overflow: visible; }
+}
