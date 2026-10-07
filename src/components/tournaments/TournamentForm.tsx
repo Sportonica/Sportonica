@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Trophy, Upload, X, Users, User, Handshake, MapPin } from "lucide-react";
 import { SPORT_NAMES as SPORTS, normalizeSport, sportTeamSize } from "@/lib/sports";
 import { saveScoringRules } from "@/lib/intelligence/actions";
+import { CRICKET_TIEBREAKERS, TIEBREAKER_LABEL, cricketTableOf, type CricketTiebreaker } from "@/lib/intelligence/sports/cricketTable";
 import { BASKETBALL_PRESETS, type BasketballPreset } from "@/lib/intelligence/sports/basketball/rules";
 import { createTournament, updateTournamentDraft, publishTournament, uploadTournamentBanner, uploadTournamentQr } from "@/lib/tournaments/actions";
 import { parseMapsUrl } from "@/lib/admin/location";
@@ -156,9 +157,9 @@ export default function TournamentForm({
   // cricket: the format and overs (saved as the tournament's scoring rules)
   const isCricketSport = sport === "Cricket";
   const [ck, setCk] = useState(() => {
-    const saved = (existing?.scoring_rules ?? {}) as { preset?: string; oversPerInnings?: number | null; maxOversPerBowler?: number | null };
+    const saved = (existing?.scoring_rules ?? {}) as { preset?: string; oversPerInnings?: number | null; maxOversPerBowler?: number | null; table?: unknown };
     const preset = (saved.preset && saved.preset in CRICKET_FORMATS ? saved.preset : "t20") as keyof typeof CRICKET_FORMATS;
-    return { preset, oversPerInnings: saved.oversPerInnings ?? CRICKET_FORMATS[preset].overs, maxOversPerBowler: saved.maxOversPerBowler ?? CRICKET_FORMATS[preset].perBowler };
+    return { preset, oversPerInnings: saved.oversPerInnings ?? CRICKET_FORMATS[preset].overs, maxOversPerBowler: saved.maxOversPerBowler ?? CRICKET_FORMATS[preset].perBowler, table: cricketTableOf(saved.table) };
   });
   // scoring rules are saved next to the tournament, once it exists
   async function saveGameRules(id: string): Promise<string | null> {
@@ -772,7 +773,7 @@ export default function TournamentForm({
               <label>Format</label>
               <select value={ck.preset} onChange={(e) => {
                 const p = e.target.value as keyof typeof CRICKET_FORMATS;
-                setCk({ preset: p, oversPerInnings: CRICKET_FORMATS[p].overs, maxOversPerBowler: CRICKET_FORMATS[p].perBowler });
+                setCk({ ...ck, preset: p, oversPerInnings: CRICKET_FORMATS[p].overs, maxOversPerBowler: CRICKET_FORMATS[p].perBowler });
               }}>
                 {Object.entries(CRICKET_FORMATS).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
               </select>
@@ -797,6 +798,44 @@ export default function TournamentForm({
           <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
             Wides, no-balls, free hits and the rest follow the format. They can be fine-tuned in Live scoring before the first match.
           </p>
+          {format !== "knockout" && (
+            <>
+              <SectionTitle>Points table</SectionTitle>
+              <div className="ev-row">
+                {([["win", "Win"], ["tie", "Tie"], ["noResult", "No result"], ["loss", "Loss"]] as const).map(([k, label]) => (
+                  <div className="ev-field" key={k}>
+                    <label>{label} (points)</label>
+                    <input type="number" min={0} max={20} value={ck.table[k]}
+                      onChange={(e) => setCk({ ...ck, table: { ...ck.table, [k]: Math.min(20, Math.max(0, Math.round(Number(e.target.value) || 0))) } })} />
+                  </div>
+                ))}
+              </div>
+              <div className="ev-row">
+                {[0, 1].map((i) => (
+                  <div className="ev-field" key={i}>
+                    <label>{i === 0 ? "Level on points: first" : "Then"}</label>
+                    <select value={ck.table.tiebreakers[i] ?? ""} onChange={(e) => {
+                      const tb = [...ck.table.tiebreakers];
+                      if (e.target.value) tb[i] = e.target.value as CricketTiebreaker; else tb.splice(i);
+                      setCk({ ...ck, table: { ...ck.table, tiebreakers: [...new Set(tb.filter(Boolean))] } });
+                    }}>
+                      {i === 1 ? <option value="">Nothing else</option> : null}
+                      {CRICKET_TIEBREAKERS.filter((x) => i === 0 || x !== ck.table.tiebreakers[0]).map((x) => <option key={x} value={x}>{TIEBREAKER_LABEL[x].charAt(0).toUpperCase() + TIEBREAKER_LABEL[x].slice(1)}</option>)}
+                    </select>
+                  </div>
+                ))}
+                <div className="ev-field">
+                  <label>Teams going through{format === "group_knockout" ? " (each group)" : ""}</label>
+                  <input type="number" min={1} value={ck.table.qualifiers ?? ""} placeholder="Not set"
+                    onChange={(e) => setCk({ ...ck, table: { ...ck.table, qualifiers: e.target.value.trim() === "" ? null : Math.max(1, Math.round(Number(e.target.value) || 1)) } })} />
+                </div>
+              </div>
+              <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
+                {ck.table.win <= ck.table.loss ? "A win must be worth more than a loss. " : ""}
+                With teams going through set, the table marks each team Qualified, In contention or Eliminated, but only once it is mathematically certain.
+              </p>
+            </>
+          )}
         </>
       )}
 

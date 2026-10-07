@@ -27,6 +27,8 @@ import {
 } from "./core/types";
 import { getEngine, isSportKey, listIntelligenceSportsSync, sportKeyFor } from "./registry";
 import { aggregate } from "./aggregate";
+import type { CricketMatchFacts } from "@/lib/tournaments/standings";
+import type { CricketLine, PartnershipRecord } from "@/lib/tournaments/cricketRecords";
 import { toView, type ContestRow } from "./view";
 import { swimEventKey, swimEventName, swimPerformance, type SwimEntry, type SwimmingRules } from "./sports/swimming";
 import { isBoxScore, type BasketballState, type BoxScoreLine } from "./sports/basketball";
@@ -1024,23 +1026,65 @@ export async function getMatchHighlights(tournamentId: string): Promise<Record<s
 
 
 /**
- * Cricket: the balls each side was allowed in each scored match, from the
- * innings themselves, so net run rate charges a side bowled out with the
- * overs of that match (shortened before or during it), not the
- * tournament's. Keyed by fixture; null where an innings had no limit.
+ * Cricket, per scored fixture, what the league table needs beyond the
+ * fixture row: the balls each side was allowed (so net run rate charges a
+ * side bowled out with that match's overs, shortened before or during it,
+ * not the tournament's), and whether the match was abandoned (no result:
+ * the fixture itself only shows "cancelled"). Null where an innings had
+ * no limit.
  */
-export async function getCricketOverQuotas(tournamentId: string): Promise<Record<string, { a: number | null; b: number | null }> | ActionError> {
+export async function getCricketMatchFacts(tournamentId: string): Promise<CricketMatchFacts | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.from("si_contests")
-    .select("match_id, i0:state->innings->0->>batting, m0:state->innings->0->maxBalls, i1:state->innings->1->>batting, m1:state->innings->1->maxBalls")
+    .select("match_id, status, i0:state->innings->0->>batting, m0:state->innings->0->maxBalls, i1:state->innings->1->>batting, m1:state->innings->1->maxBalls")
     .eq("tournament_id", tournamentId).eq("sport", "cricket").not("match_id", "is", null);
   if (error) return fail(error.message);
-  const out: Record<string, { a: number | null; b: number | null }> = {};
-  for (const r of (data ?? []) as unknown as { match_id: string; i0: string | null; m0: number | null; i1: string | null; m1: number | null }[]) {
-    const q = { a: null as number | null, b: null as number | null };
-    if (r.i0 === "a" || r.i0 === "b") q[r.i0] = typeof r.m0 === "number" ? r.m0 : null;
-    if (r.i1 === "a" || r.i1 === "b") q[r.i1] = typeof r.m1 === "number" ? r.m1 : null;
-    out[r.match_id] = q;
+  const out: CricketMatchFacts = {};
+  for (const r of (data ?? []) as unknown as { match_id: string; status: string; i0: string | null; m0: number | null; i1: string | null; m1: number | null }[]) {
+    const f = { a: null as number | null, b: null as number | null, abandoned: r.status === "abandoned", first: (r.i0 === "a" || r.i0 === "b" ? r.i0 : null) as "a" | "b" | null };
+    if (r.i0 === "a" || r.i0 === "b") f[r.i0] = typeof r.m0 === "number" ? r.m0 : null;
+    if (r.i1 === "a" || r.i1 === "b") f[r.i1] = typeof r.m1 === "number" ? r.m1 : null;
+    out[r.match_id] = f;
   }
   return out;
+}
+
+/**
+ * Cricket tournament records: every player's figures across the scored
+ * matches (one stat line per player per match, so highest scores, best
+ * bowling, fifties and hauls can be found), with names from the rosters
+ * frozen into each match, and every partnership from the innings.
+ * Recomputed on read, so a corrected ball is reflected at once.
+ */
+export async function getCricketRecords(tournamentId: string): Promise<{ lines: CricketLine[]; names: Record<string, { name: string; team: string }>; partnerships: PartnershipRecord[] } | ActionError> {
+  const sb = await createClient();
+  const [{ data: lineRows, error }, { data: contests, error: cErr }] = await Promise.all([
+    sb.from("si_stat_lines").select("contest_id, team_player_id, subject_key, team_id, raw").eq("tournament_id", tournamentId).eq("subject", "player").eq("sport", "cricket").limit(5000),
+    sb.from("si_contests").select("id, status, context, b0:state->innings->0->>batting, p0:state->innings->0->partnerships, s0:state->innings->0->stand, c0:state->innings->0->closed, b1:state->innings->1->>batting, p1:state->innings->1->partnerships, s1:state->innings->1->stand, c1:state->innings->1->closed")
+      .eq("tournament_id", tournamentId).eq("sport", "cricket"),
+  ]);
+  if (error || cErr) return fail((error ?? cErr)!.message);
+  const names: Record<string, { name: string; team: string }> = {};
+  const partnerships: PartnershipRecord[] = [];
+  type Stand = { wicket: number; runs: number; balls: number; batters: string[] };
+  for (const c of (contests ?? []) as unknown as { context: MatchContext; b0: string | null; p0: Stand[] | null; s0: Stand | null; c0: string | null; b1: string | null; p1: Stand[] | null; s1: Stand | null; c1: string | null }[]) {
+    const sides = c.context?.sides;
+    if (!sides) continue;
+    for (const side of [sides.a, sides.b]) for (const pl of side.players) names[pl.id] = { name: pl.name, team: side.name };
+    for (const [bat, list, stand, closed] of [[c.b0, c.p0, c.s0, c.c0], [c.b1, c.p1, c.s1, c.c1]] as const) {
+      if (bat !== "a" && bat !== "b") continue;
+      // the stand in progress counts too, so a big live partnership shows as it happens
+      const all = [...(list ?? []), ...(!closed && stand && (stand.runs || stand.balls) ? [stand] : [])];
+      for (const st of all) {
+        partnerships.push({
+          wicket: st.wicket, runs: st.runs, balls: st.balls, batters: st.batters.map((id) => names[id]?.name ?? "Player"),
+          team: sides[bat].name, opponent: sides[bat === "a" ? "b" : "a"].name,
+        });
+      }
+    }
+  }
+  const lines: CricketLine[] = ((lineRows ?? []) as { contest_id: string; team_player_id: string | null; subject_key: string; team_id: string | null; raw: Record<string, number> }[])
+    .map((l) => ({ contestId: l.contest_id, playerId: l.team_player_id ?? l.subject_key, teamId: l.team_id, raw: l.raw ?? {} }));
+  partnerships.sort((x, y) => y.runs - x.runs || x.balls - y.balls);
+  return { lines, names, partnerships: partnerships.slice(0, 10) };
 }

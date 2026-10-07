@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getTournamentStandings } from "@/lib/tournaments/actions";
-import { getCricketOverQuotas } from "@/lib/intelligence/actions";
+import { getTournamentCricketStats, getTournamentStandings } from "@/lib/tournaments/actions";
+import { getCricketMatchFacts, getCricketRecords } from "@/lib/intelligence/actions";
+import { cricketPlayers, cricketTeams } from "@/lib/tournaments/cricketRecords";
+import { CricketOverview, CricketTablePublic, type CricketTournamentData } from "./public/CricketStats";
 import { isActionError } from "@/lib/actionError";
 import type { Tournament, TournamentMatch, TournamentTeam, TournamentStanding } from "@/lib/tournaments/types";
-import { basketballRulesOf, computeBasketballStandings, computeCricketStandings, diffText, type CricketOverQuotas, isBasketball, isCricket, standingsScheme, type BasketballStanding } from "@/lib/tournaments/standings";
+import { basketballRulesOf, computeBasketballStandings, computeCricketStandings, cricketRulesOf, diffText, type CricketMatchFacts, type CricketStanding, isBasketball, isCricket, standingsScheme, type BasketballStanding } from "@/lib/tournaments/standings";
 
 const ALL = "__all__";
 
@@ -30,14 +32,31 @@ export default function StandingsTab({ tournament, teams, matches }: {
   const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
   const [data, setData] = useState<Record<string, TournamentStanding[]>>({});
   const [loading, setLoading] = useState(!computed);
-  // cricket: each scored match's own overs, for net run rate when a side is bowled out
-  const [quotas, setQuotas] = useState<CricketOverQuotas>({});
+  // cricket: what the scored matches add (each match's overs, abandoned matches, who batted first),
+  // and the player lines behind the overview: the same calculations as the public page
+  const matchesKey = (matches ?? []).map((m) => `${m.id}:${m.updated_at}`).join("|");
+  const teamsKey = teams.map((t) => `${t.id}:${t.name}:${t.status}`).join("|");
+  const [quotas, setQuotas] = useState<CricketMatchFacts>({});
+  const [cricketData, setCricketData] = useState<CricketTournamentData | null>(null);
   useEffect(() => {
     if (!cricket) return;
     let cancelled = false;
-    void getCricketOverQuotas(tournament.id).then((res) => { if (!cancelled && !isActionError(res)) setQuotas(res); });
+    void (async () => {
+      const [f, rec, hand] = await Promise.all([getCricketMatchFacts(tournament.id), getCricketRecords(tournament.id), getTournamentCricketStats(tournament.id)]);
+      if (cancelled) return;
+      const facts = isActionError(f) ? {} : f;
+      setQuotas(facts);
+      const r = isActionError(rec) ? { lines: [], names: {}, partnerships: [] } : rec;
+      const teamName = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "";
+      setCricketData({
+        players: cricketPlayers(r.lines, (pid, tid) => ({ name: r.names[pid]?.name ?? "Player", team: r.names[pid]?.team ?? teamName(tid) }), isActionError(hand) ? [] : hand),
+        partnerships: r.partnerships, ...cricketTeams(matches!, teams, tournament.scoring_rules, facts),
+      });
+    })();
     return () => { cancelled = true; };
-  }, [cricket, tournament.id]);
+    // keyed on what the fixtures and teams contain, not on array identity, so a re-render never refetches
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cricket, tournament.id, matchesKey, teamsKey, JSON.stringify(tournament.scoring_rules ?? null)]);
 
   useEffect(() => {
     if (computed) return;
@@ -65,6 +84,33 @@ export default function StandingsTab({ tournament, teams, matches }: {
     : cricket ? computeCricketStandings(matches!, teams, tournament.scoring_rules, g, quotas)
     : data[g ?? ALL] ?? [];
   const anyPlayed = groups.some((g) => rowsFor(g).some((r) => r.played > 0));
+
+  if (cricket) {
+    const all = computeCricketStandings(matches!, teams, tournament.scoring_rules, null, quotas);
+    const league = matches!.filter((m) => m.stage === "league" || m.stage === "group");
+    const done = (m: (typeof league)[number]) => m.status === "completed" || m.status === "walkover" || !!quotas[m.id]?.abandoned;
+    const name = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "TBD";
+    const recent = matches!.filter((m) => m.status === "completed" && m.team_a_id && m.team_b_id)
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 4)
+      .map((m) => ({
+        text: `${name(m.team_a_id)} ${m.score_a ?? "–"}/${m.wickets_a ?? 0} v ${name(m.team_b_id)} ${m.score_b ?? "–"}/${m.wickets_b ?? 0}`,
+        result: m.winner_team_id ? `${name(m.winner_team_id)} won` : m.score_a === null ? "No result" : "Tied",
+      }));
+    return (
+      <div className="tc-card" style={{ display: "grid", gap: 16 }}>
+        <div className="tc-card-t">Overview</div>
+        {cricketData ? (
+          <CricketOverview data={cricketData} standings={all} played={league.filter(done).length}
+            remaining={league.filter((m) => !done(m) && m.status !== "cancelled").length} recent={recent} />
+        ) : <div className="tc-empty">Loading…</div>}
+        <div className="tc-card-t">Standings</div>
+        {anyPlayed ? (
+          <CricketTablePublic table={cricketRulesOf(tournament.scoring_rules).table} logo={() => null}
+            groups={groups.map((g) => ({ name: g, rows: rowsFor(g) as CricketStanding[] }))} />
+        ) : <div className="tc-empty">No results yet.</div>}
+      </div>
+    );
+  }
 
   return (
     <div className="tc-card">
