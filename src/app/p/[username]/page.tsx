@@ -9,6 +9,8 @@ import {
 import { getRelationship } from "@/lib/friends/queries";
 import { haveIBlocked } from "@/lib/blocking/queries";
 import { getPlayerScorecard } from "@/lib/tournaments/actions";
+import { getPlayerHistory } from "@/lib/intelligence/actions";
+import { cricketCareer } from "@/lib/intelligence/sports/cricketView";
 import { isActionError } from "@/lib/actionError";
 import { createClient } from "@/lib/supabase/server";
 import ShareButton from "./ShareButton";
@@ -60,7 +62,7 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
     );
   }
 
-  const [stats, sports, recent, relationship, blocked, scorecardRes, sb] = await Promise.all([
+  const [stats, sports, recent, relationship, blocked, scorecardRes, sb, cricketRes] = await Promise.all([
     getPlayerStats(profile.id),
     getPlayerSports(profile.id),
     getRecentGames(profile.id),
@@ -68,7 +70,10 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
     haveIBlocked(profile.id),
     getPlayerScorecard(profile.id),
     createClient(),
+    // matches scored ball by ball, linked to this account through the team roster
+    getPlayerHistory(profile.id, "cricket"),
   ]);
+  const cricket = !isActionError(cricketRes) && cricketRes.contests > 0 ? cricketCareer(cricketRes.values, cricketRes.rows) : null;
   const scorecard = isActionError(scorecardRes) ? null : scorecardRes;
   const { data: { user: viewer } } = await sb.auth.getUser();
   const isOwnProfile = viewer?.id === profile.id;
@@ -166,6 +171,29 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
             ))}
           </section>
         )}
+
+        {/* ── Cricket ── */}
+        {cricket ? (
+          <section className="pf-sec">
+            <div className="pf-sec-head">
+              <span className="pf-sec-num">{num()}</span>
+              <h2 className="pf-sec-t">Cricket</h2>
+              <span className="pf-sec-count">{cricket.matches} match{cricket.matches !== 1 ? "es" : ""}</span>
+            </div>
+            <div className="pf-stats">
+              <div className="pf-stat"><div className="pf-stat-v">{cricket.runs}</div><div className="pf-stat-l">Runs</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{cricket.best ?? "–"}</div><div className="pf-stat-l">Best</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{cricket.average?.toFixed(2) ?? "–"}</div><div className="pf-stat-l">Average</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{cricket.strikeRate?.toFixed(2) ?? "–"}</div><div className="pf-stat-l">Strike rate</div></div>
+            </div>
+            <div className="pf-stats" style={{ marginTop: 0 }}>
+              <div className="pf-stat"><div className="pf-stat-v">{cricket.fours}</div><div className="pf-stat-l">4s</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{cricket.sixes}</div><div className="pf-stat-l">6s</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{cricket.wickets}</div><div className="pf-stat-l">Wickets</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{cricket.bestBowling ?? "–"}</div><div className="pf-stat-l">Best bowling{cricket.economy !== null ? ` · econ ${cricket.economy.toFixed(2)}` : ""}</div></div>
+            </div>
+          </section>
+        ) : null}
 
         {/* ── Tournament stats ── */}
         {scorecard && scorecard.matches_played > 0 ? (

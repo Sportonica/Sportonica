@@ -1,0 +1,199 @@
+/* ================================================================
+   Cricket: scorer console and match centre. Built on the .si tokens
+   (intelligence.css), so the brand green and paper background follow.
+   Flat panels, thin rules, tabular numbers; the score is the loudest
+   thing on screen and nothing else competes with it.
+   ================================================================ */
+
+.si {
+  --ck-four: #1f6fd1;
+  --ck-six: #6b3fc4;
+  --ck-wicket: #d6343a;
+  --ck-extra: #b7791f;
+}
+
+.ck-muted { color: var(--si-text-3); }
+.ck-label { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--si-text-3); }
+.ck-strong { font-weight: 800; color: var(--si-text); }
+.ck-link { background: none; border: 0; padding: 4px 0; font: inherit; font-size: 12.5px; font-weight: 700; color: var(--si-accent); cursor: pointer; }
+.ck-link.danger { color: var(--ck-wicket); }
+.ck-empty { padding: 18px; border: 1px dashed var(--si-line); border-radius: 12px; color: var(--si-text-3); font-size: 13.5px; text-align: center; }
+.ck-grid { display: grid; gap: 12px; }
+.ck-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--si-accent); margin-right: 7px; vertical-align: 2px; flex: none; }
+
+/* ── panels and stat rows ── */
+.ck-panel { background: var(--si-surface); border: 1px solid var(--si-line); border-radius: 12px; padding: 12px 14px; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.ck-panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ck-panel-head h3 { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--si-text-2); }
+.ck-total { font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.ck-rows { display: grid; font-variant-numeric: tabular-nums; }
+.ck-row { display: grid; grid-template-columns: minmax(0, 1fr) 36px 30px 28px 28px 60px; gap: 4px; align-items: center; padding: 7px 0; border-top: 1px solid var(--si-line); font-size: 13.5px; }
+.ck-rows.wide .ck-row { grid-template-columns: minmax(0, 1fr) 36px 26px 30px 26px 44px 26px 26px 34px; }
+.ck-row > span:not(:first-child) { text-align: right; }
+.ck-row.head { border-top: 0; padding: 0 0 4px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--si-text-3); }
+.ck-row.strike { background: linear-gradient(90deg, color-mix(in srgb, var(--si-accent) 8%, transparent), transparent 70%); }
+.ck-name { min-width: 0; display: flex; align-items: center; flex-wrap: wrap; font-weight: 700; overflow-wrap: anywhere; }
+.ck-name small { flex-basis: 100%; font-size: 11.5px; font-weight: 500; color: var(--si-text-3); margin-top: 1px; }
+.ck-name small.notout { color: var(--si-accent); font-weight: 700; }
+
+/* ── ball badges ── */
+.ck-balls { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.ck-ball { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 5px; border-radius: 13px; font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; border: 1px solid var(--si-line); color: var(--si-text); background: var(--si-solid); box-sizing: border-box; flex: none; }
+.ck-ball.dot { color: var(--si-text-3); }
+.ck-ball.four { background: var(--ck-four); border-color: var(--ck-four); color: #fff; }
+.ck-ball.six { background: var(--ck-six); border-color: var(--ck-six); color: #fff; }
+.ck-ball.wicket { background: var(--ck-wicket); border-color: var(--ck-wicket); color: #fff; }
+.ck-ball.extra { color: var(--ck-extra); border-color: color-mix(in srgb, var(--ck-extra) 45%, transparent); }
+
+/* ── live score ── */
+.ck-head, .ck-match { background: var(--si-surface); border: 1px solid var(--si-line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
+.ck-head-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ck-sport { font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--si-accent); }
+.ck-head-other { margin-left: auto; font-size: 13px; color: var(--si-text-2); font-variant-numeric: tabular-nums; }
+.ck-period { font-size: 12.5px; font-weight: 700; margin-left: auto; }
+.ck-live { display: grid; gap: 6px; }
+.ck-live-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "team overs" "score overs"; align-items: end; column-gap: 12px; }
+.ck-live-team { grid-area: team; font-size: 14px; font-weight: 800; display: flex; gap: 8px; align-items: baseline; min-width: 0; overflow-wrap: anywhere; }
+.ck-live-team span { font-size: 11.5px; font-weight: 700; color: var(--si-text-3); }
+.ck-live-score { grid-area: score; font-size: clamp(42px, 12vw, 64px); font-weight: 900; letter-spacing: -.04em; line-height: .95; font-variant-numeric: tabular-nums; }
+.ck-live-score span { color: var(--si-text-2); font-weight: 800; }
+.ck-live-overs { grid-area: overs; align-self: end; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; padding-bottom: 4px; }
+.ck-live-overs span { font-size: 14px; color: var(--si-text-3); }
+.ck-live.compact .ck-live-score { font-size: clamp(36px, 10vw, 52px); }
+.ck-live-rates { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ck-live-rates i { font-style: normal; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; color: var(--si-text-3); margin-right: 6px; }
+.ck-free { color: var(--ck-wicket); font-size: 12px; letter-spacing: .08em; }
+.ck-need { font-size: 14px; font-weight: 800; color: var(--si-accent); }
+.ck-result-line, .ck-result { font-size: 15px; font-weight: 900; color: var(--si-accent); text-transform: uppercase; letter-spacing: .02em; }
+.ck-result { font-size: 17px; padding-top: 4px; border-top: 1px solid var(--si-line); }
+
+/* public header: both sides on their own line */
+.ck-match-sides { display: grid; gap: 4px; }
+.ck-match-side { display: grid; grid-template-columns: minmax(0, 1fr) auto 64px; align-items: baseline; gap: 10px; color: var(--si-text-2); }
+.ck-match-name { font-size: 16px; font-weight: 700; display: flex; align-items: center; min-width: 0; overflow-wrap: anywhere; }
+.ck-match-score { font-size: 26px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; text-align: right; }
+.ck-match-score .ck-muted { font-size: 14px; font-weight: 700; }
+.ck-match-overs { font-size: 13px; font-weight: 700; color: var(--si-text-3); text-align: right; font-variant-numeric: tabular-nums; }
+.ck-match-side.batting, .ck-match-side.won { color: var(--si-text); }
+.ck-match-side.batting .ck-match-score { font-size: clamp(34px, 10vw, 46px); }
+
+/* ── scorer pad ── */
+.ck-pad { gap: 12px; }
+/* side by side only when there is room for both (the scorer's pad column is narrow on a desktop) */
+.ck-pad-info { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.ck-thisover { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--si-line); }
+.ck-over-runs { margin-left: auto; font-size: 12.5px; font-weight: 800; color: var(--si-text-2); font-variant-numeric: tabular-nums; }
+
+.ck-runs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.ck-runs-label { grid-column: 1 / -1; font-size: 12.5px; font-weight: 800; color: var(--ck-extra); }
+.ck-key { min-height: 64px; border-radius: 12px; border: 1px solid var(--si-line); background: var(--si-solid); color: var(--si-text); font: inherit; font-size: 24px; font-weight: 900; font-variant-numeric: tabular-nums; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; display: grid; place-items: center; align-content: center; gap: 0; line-height: 1; padding: 4px 2px; }
+.ck-key small { font-size: 11px; font-weight: 800; color: var(--ck-extra); }
+.ck-key:active:not(:disabled) { transform: scale(.96); }
+.ck-key:disabled { opacity: .35; cursor: not-allowed; }
+.ck-key.r4 { background: var(--ck-four); border-color: var(--ck-four); color: #fff; }
+.ck-key.r6 { background: var(--ck-six); border-color: var(--ck-six); color: #fff; }
+.ck-key.r4 small, .ck-key.r6 small { color: #fff; }
+.ck-runs.with-extra .ck-key { border-color: color-mix(in srgb, var(--ck-extra) 55%, transparent); }
+.ck-extras-keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.3fr); gap: 6px; }
+.ck-key.small { min-height: 48px; font-size: 13px; font-weight: 800; }
+.ck-key.small.on { background: var(--ck-extra); border-color: var(--ck-extra); color: #fff; }
+.ck-key.wicket { background: var(--ck-wicket); border-color: var(--ck-wicket); color: #fff; letter-spacing: .04em; text-transform: uppercase; }
+@media (max-width: 420px) {
+  .ck-runs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ck-key { min-height: 58px; }
+  .ck-extras-keys { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ck-extras-keys .wicket { grid-column: 1 / -1; }
+}
+
+.ck-pad-foot { display: flex; gap: 8px; align-items: center; }
+.ck-undo { min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--si-line); background: transparent; color: var(--si-text); font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
+.ck-undo:disabled { opacity: .45; cursor: not-allowed; }
+.ck-undo.on { background: var(--si-text); color: var(--si-solid); border-color: var(--si-text); }
+.ck-undo-confirm { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+.ck-endover { border: 1px solid var(--si-line); border-left: 3px solid var(--si-accent); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; background: var(--si-surface-2); }
+.ck-endover-row { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* ── segmented tabs ── */
+.ck-seg { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--si-line); border-radius: 10px; overflow-x: auto; scrollbar-width: none; }
+.ck-seg button { flex: 1 0 auto; border: 0; background: none; border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 700; color: var(--si-text-2); cursor: pointer; display: grid; gap: 1px; justify-items: center; }
+.ck-seg button b { font-size: 12px; font-variant-numeric: tabular-nums; }
+.ck-seg button.on { background: var(--si-accent); color: #fff; }
+.ck-seg.small button { padding: 6px 10px; }
+
+/* ── overs list ── */
+.ck-overs { list-style: none; margin: 0; padding: 0; display: grid; }
+.ck-overs li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--si-line); }
+.ck-overs li:first-child { border-top: 0; }
+.ck-over-n { font-size: 12px; font-weight: 800; color: var(--si-text-2); }
+.ck-over-mid { display: grid; gap: 3px; min-width: 0; font-size: 12px; }
+.ck-over-tot { display: grid; justify-items: end; font-variant-numeric: tabular-nums; font-size: 11.5px; }
+.ck-over-tot b { font-size: 16px; }
+.ck-over-tot em { font-style: normal; font-weight: 800; color: var(--ck-wicket); }
+
+/* ── commentary: a vertical timeline ── */
+.ck-comm { list-style: none; margin: 0; padding: 0; display: grid; }
+.ck-comm-ball { display: grid; grid-template-columns: 38px 30px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 0; position: relative; }
+.ck-comm-ball + .ck-comm-ball { border-top: 1px solid var(--si-line); }
+.ck-comm-at { font-size: 12.5px; font-weight: 800; color: var(--si-text-2); font-variant-numeric: tabular-nums; padding-top: 4px; }
+.ck-comm-body { min-width: 0; }
+.ck-comm-body b { display: block; font-size: 12px; font-weight: 900; letter-spacing: .06em; }
+.ck-comm-body p { margin: 2px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--si-text-2); overflow-wrap: anywhere; }
+.ck-comm-ball.four .ck-comm-body b { color: var(--ck-four); }
+.ck-comm-ball.six .ck-comm-body b { color: var(--ck-six); }
+.ck-comm-ball.wicket .ck-comm-body b { color: var(--ck-wicket); }
+.ck-comm-ball.wicket { background: color-mix(in srgb, var(--ck-wicket) 6%, transparent); }
+.ck-comm-tools { display: flex; gap: 10px; }
+.ck-comm-over { margin: 6px 0 2px; padding: 7px 10px; border-radius: 8px; background: var(--si-surface-2); font-size: 12px; font-weight: 800; color: var(--si-text-2); font-variant-numeric: tabular-nums; }
+.ck-comm-event { padding: 6px 0; font-size: 12.5px; font-weight: 800; color: var(--si-accent); }
+.ck-comm-break { margin-top: 10px; padding: 6px 0; border-top: 2px solid var(--si-text); font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.ck-comm.compact .ck-comm-ball { grid-template-columns: 34px 28px minmax(0, 1fr) auto; padding: 8px 0; }
+.ck-comm.compact .ck-comm-body p { font-size: 12.5px; }
+
+/* ── scorecard extras ── */
+.ck-extras { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 8px 0 0; border-top: 1px solid var(--si-line); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ck-extras > span:first-child { font-weight: 800; }
+.ck-extras b { font-size: 14px; }
+.ck-extras.total { border-top: 2px solid var(--si-text); }
+.ck-extras.total b { font-size: 18px; }
+.ck-dnb { font-size: 12.5px; color: var(--si-text-2); line-height: 1.5; }
+.ck-fow { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ck-stands { display: grid; }
+.ck-stand { display: grid; grid-template-columns: 70px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--si-line); font-size: 13px; font-variant-numeric: tabular-nums; }
+.ck-stand:first-child { border-top: 0; }
+.ck-stand.current .ck-label { color: var(--si-accent); }
+.ck-stand-who { font-weight: 600; overflow-wrap: anywhere; font-size: 13.5px; }
+
+/* ── overview ── */
+.ck-overview { display: grid; gap: 12px; }
+.ck-performers { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+.ck-performers > div { display: grid; gap: 2px; }
+.ck-performers b { font-size: 16px; }
+.ck-big { font-size: 26px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.ck-resultcard { border-left: 3px solid var(--si-accent); }
+
+.ck-squad { list-style: none; margin: 0; padding: 0; display: grid; }
+.ck-squad li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 0; border-top: 1px solid var(--si-line); font-size: 13.5px; }
+.ck-squad li:first-child { border-top: 0; }
+.ck-squad-no { font-weight: 900; color: var(--si-text-3); font-variant-numeric: tabular-nums; text-align: right; }
+.ck-squad-name { display: grid; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.ck-squad-name small { font-size: 11.5px; font-weight: 500; color: var(--si-text-3); }
+.ck-squad-figs { display: grid; justify-items: end; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.ck-side { display: grid; gap: 10px; align-content: start; }
+
+/* ── sheets (wicket, edit a ball) ── */
+.ck-sheet-bg { position: fixed; inset: 0; z-index: 900; background: rgba(10, 12, 16, .45); display: grid; align-items: end; justify-items: center; }
+.ck-sheet { width: min(560px, 100%); max-height: 92dvh; overflow-y: auto; background: var(--bg, #F2EDE6); color: var(--si-text); border-radius: 16px 16px 0 0; padding: 14px 16px calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 14px; box-sizing: border-box; }
+@media (min-width: 620px) { .ck-sheet-bg { align-items: center; } .ck-sheet { border-radius: 16px; } }
+.ck-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; position: sticky; top: -14px; background: inherit; padding: 4px 0; }
+.ck-sheet-head h2 { margin: 0; font-size: 17px; font-weight: 900; letter-spacing: -.01em; }
+.ck-field { display: grid; gap: 6px; }
+.ck-choice { display: flex; flex-wrap: wrap; gap: 6px; }
+.ck-choice button { min-height: 44px; min-width: 44px; padding: 6px 14px; border-radius: 10px; border: 1px solid var(--si-line); background: var(--si-solid); color: var(--si-text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.ck-choice button.on { background: var(--si-text); border-color: var(--si-text); color: var(--si-solid); }
+.ck-choice button:disabled { opacity: .35; cursor: not-allowed; }
+.ck-cta { min-height: 52px; border-radius: 12px; border: 0; background: var(--si-accent); color: #fff; font: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
+.ck-cta.danger { background: var(--ck-wicket); }
+.ck-preview { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--si-text-2); padding: 8px 10px; border-radius: 10px; background: var(--si-surface-2); }

@@ -5,6 +5,7 @@ import { canScoreTournament, getContest } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
 import { tournamentPath } from "@/lib/tournaments/types";
 import MatchCentre from "@/components/intelligence/MatchCentre";
+import CricketMatchCentre from "@/components/intelligence/cricket/CricketMatchCentre";
 
 export const dynamic = "force-dynamic";
 
@@ -24,5 +25,7 @@ export default async function MatchCentrePage({ params }: { params: Params }) {
   const id = tournament.id;
   const [contest, canScore] = await Promise.all([getContest(contestId), canScoreTournament(id)]);
   if (isActionError(contest) || contest.tournamentId !== id) notFound();
+  // cricket has its own match centre: scorecard, commentary and the chase
+  if (contest.sport === "cricket") return <CricketMatchCentre initial={contest} tournamentName={tournament.name} canScore={canScore} />;
   return <MatchCentre initial={contest} tournamentName={tournament.name} canScore={canScore} />;
 }

@@ -1,26 +1,22 @@
 "use client";
 
-// Cricket scoring, ball by ball, with taps instead of lists: players are
-// jersey tiles (openers, the bowler, the next batter, who was out), and
-// a ball is one tap on its runs. Extras and wickets are chips that apply
-// to the next ball only.
+// Cricket scoring, ball by ball. The batters and bowler are always on
+// screen, a ball is one tap on its runs, extras apply to the next tap,
+// and a wicket opens a sheet. Players are jersey tiles, not lists.
 
 import { useState } from "react";
-import type { Participant, Side } from "@/lib/intelligence/core/types";
-import { oversText, type CricketRules, type CricketState } from "@/lib/intelligence/sports/cricket";
+import type { MatchContext, Participant, Side } from "@/lib/intelligence/core/types";
+import type { TimelineEntry } from "@/lib/intelligence/types";
+import type { CricketRules, CricketState } from "@/lib/intelligence/sports/cricket";
+import { bowlerLine, describeDelivery, overComplete, parseBallLabel, thisOver, type DeliveryPayload } from "@/lib/intelligence/sports/cricketView";
+import { Balls, BattersPanel, BowlerPanel } from "../cricket/parts";
+import { EXTRA_LABEL, WicketSheet, deliveryPayload, type Extra, type WicketInput } from "../cricket/sheets";
 import { Jersey, SIDE_KEYS, teamColor, type PadProps } from "./shared";
 
-type Extra = "wide" | "no_ball" | "bye" | "leg_bye";
-const EXTRAS: { key: Extra; label: string }[] = [
-  { key: "wide", label: "Wide" }, { key: "no_ball", label: "No ball" }, { key: "bye", label: "Bye" }, { key: "leg_bye", label: "Leg bye" },
-];
-// the common ways out first; the rare ones under More
-const WICKETS: { key: string; label: string; fielder?: boolean; rare?: boolean }[] = [
-  { key: "bowled", label: "Bowled" }, { key: "caught", label: "Caught", fielder: true }, { key: "lbw", label: "LBW" },
-  { key: "run_out", label: "Run out", fielder: true }, { key: "stumped", label: "Stumped", fielder: true },
-  { key: "hit_wicket", label: "Hit wicket", rare: true }, { key: "obstructing_field", label: "Obstructing the field", rare: true }, { key: "hit_ball_twice", label: "Hit the ball twice", rare: true },
-];
 const other = (s: Side): Side => (s === "a" ? "b" : "a");
+const EXTRA_KEYS: { key: Extra; short: string }[] = [
+  { key: "wide", short: "WD" }, { key: "no_ball", short: "NB" }, { key: "bye", short: "B" }, { key: "leg_bye", short: "LB" },
+];
 
 /** Jersey tiles to pick one player (or several, in order). */
 function Pick({ players, side, picked, onPick, note }: {
@@ -35,10 +31,33 @@ function Pick({ players, side, picked, onPick, note }: {
   );
 }
 
-export default function CricketPad({ contest, send }: PadProps) {
+/** "Undo last ball", with the ball named on a second tap instead of a pop-up. */
+function UndoButton({ undo, ctx }: { undo: NonNullable<PadProps["undo"]>; ctx: MatchContext }) {
+  const [pending, setPending] = useState<TimelineEntry | null>(null);
+  const [looking, setLooking] = useState(false);
+  if (pending) {
+    const at = parseBallLabel(pending.label);
+    const what = pending.type === "DELIVERY" ? `${at ? `${at.ball} ` : ""}${describeDelivery(pending.payload as DeliveryPayload, ctx).headline.toLowerCase()}` : pending.text;
+    return (
+      <div className="ck-undo-confirm">
+        <button type="button" className="ck-undo on" onClick={() => { undo.run(pending); setPending(null); }}>Undo {what}</button>
+        <button type="button" className="ck-link" onClick={() => setPending(null)}>Keep</button>
+      </div>
+    );
+  }
+  return (
+    <button type="button" className="ck-undo" disabled={undo.disabled || looking}
+      onClick={async () => { setLooking(true); try { setPending(await undo.last()); } finally { setLooking(false); } }}>
+      {looking ? "Finding last ball…" : "Undo last ball"}
+    </button>
+  );
+}
+
+export default function CricketPad({ contest, send, undo }: PadProps) {
   const s = contest.state as CricketState;
   const rules = contest.rules as unknown as CricketRules;
-  const sides = contest.context.sides!;
+  const ctx = contest.context;
+  const sides = ctx.sides!;
   const inn = s.innings.length && !s.innings[s.innings.length - 1].closed ? s.innings[s.innings.length - 1] : null;
 
   const [batting, setBatting] = useState<Side | null>(null);
@@ -47,11 +66,12 @@ export default function CricketPad({ contest, send }: PadProps) {
   const [bowler, setBowler] = useState("");
   const [swapped, setSwapped] = useState(false);
   const [extra, setExtra] = useState<Extra | null>(null);
-  const [wicket, setWicket] = useState<{ type: string; player: string; fielder: string } | null>(null);
-  const [moreOut, setMoreOut] = useState(false);
+  const [wicketOpen, setWicketOpen] = useState(false);
   const [note, setNote] = useState("");
 
-  if (s.result) return <div className="si-info">The match is decided. Tap Complete match, or correct a ball below if the result is wrong.</div>;
+  const undoRow = undo ? <div className="ck-pad-foot"><UndoButton undo={undo} ctx={ctx} /></div> : null;
+
+  if (s.result) return <><div className="si-info">The match is decided. Tap Complete match, or edit a ball in the commentary if the result is wrong.</div>{undoRow}</>;
 
   // ── between innings: who bats, and the two openers ──
   if (!inn) {
@@ -90,126 +110,126 @@ export default function CricketPad({ contest, send }: PadProps) {
             {sides[bat].players.length < 2 ? <div className="si-error">{sides[bat].name} needs at least two players on its roster to bat.</div> : null}
           </div>
         ) : null}
+        {undoRow}
       </div>
     );
   }
 
   const bat = sides[inn.batting].players, field = sides[other(inn.batting)].players;
   const name = (id: string | null) => [...bat, ...field].find((p) => p.id === id)?.name ?? "";
-  // the score card above has the score; this adds what the scorer needs next to it
-  const scoreboard = inn.target !== null || inn.freeHit || rules.oversPerInnings ? (
-    <div className="si-pad-name">
-      {oversText(inn.balls, rules.ballsPerOver)}{rules.oversPerInnings ? ` of ${rules.oversPerInnings}` : ""} overs
-      {inn.target !== null ? ` · need ${Math.max(0, inn.target - inn.runs)} to win` : ""}
-      {inn.freeHit ? <span style={{ color: "var(--si-live)" }}> · FREE HIT</span> : null}
-    </div>
-  ) : null;
+  const available = bat.filter((p) => !inn.batters[p.id]?.out && p.id !== inn.striker && p.id !== inn.nonStriker);
 
   // ── a batter is needed ──
   if (!inn.striker || !inn.nonStriker) {
-    const available = bat.filter((p) => !inn.batters[p.id]?.out && p.id !== inn.striker && p.id !== inn.nonStriker);
     return (
       <div className="si-pad">
-        {scoreboard}
         <div className="si-ask">
           <div className="si-pad-name">Who comes in? Tap the next batter</div>
           <Pick players={available} side={inn.batting} picked={[]} onPick={(id) => send("NEW_BATTER", { player: id })}
             note={(id) => (inn.batters[id]?.retiredHurt ? "returning" : null)} />
           <button type="button" className="si-btn" style={{ justifySelf: "start" }} onClick={() => send("INNINGS_END", { reason: "No batters left" })}>No batters left: end innings</button>
         </div>
+        {undoRow}
       </div>
     );
   }
 
-  // the engine suggests who is on strike; the scorer can swap before the ball
-  const striker = swapped ? inn.nonStriker : inn.striker;
-  const nonStriker = swapped ? inn.striker : inn.nonStriker;
-  const over = inn.overs[inn.overs.length - 1];
-  const midOver = !!over && over.legal < rules.ballsPerOver;
+  // the engine says who is on strike; the scorer can swap before the ball
+  const striker = (swapped ? inn.nonStriker : inn.striker)!;
+  const nonStriker = (swapped ? inn.striker : inn.nonStriker)!;
+  const shown = { ...inn, striker, nonStriker };
+  const over = thisOver(inn);
+  const midOver = !!over && !overComplete(over, rules);
   const currentBowler = midOver ? over.bowler : bowler;
-  const wk = WICKETS.find((w) => w.key === wicket?.type);
+  const base = { striker, nonStriker, bowler: currentBowler };
 
-  const deliver = (runs: number) => {
-    const payload: Record<string, unknown> = { striker, nonStriker, bowler: currentBowler };
-    if (extra === "wide" || extra === "bye" || extra === "leg_bye") payload.extraRuns = runs; else payload.runsBat = runs;
-    if (extra) payload.extra = extra;
-    if (wicket) payload.wicket = { type: wicket.type, player: wicket.player || striker, ...(wicket.fielder ? { fielder: wicket.fielder } : {}) };
-    if (note.trim()) payload.commentary = note.trim();
-    send("DELIVERY", payload);
-    setExtra(null); setWicket(null); setNote(""); setSwapped(false); setMoreOut(false);
+  const reset = () => { setExtra(null); setNote(""); setSwapped(false); };
+  const deliver = (runs: number) => { send("DELIVERY", deliveryPayload(base, runs, extra, null, note)); reset(); };
+  const recordWicket = (w: WicketInput) => {
+    send("DELIVERY", deliveryPayload(base, w.runs, extra, { type: w.type, player: w.player, fielder: w.fielder }, note));
+    if (w.newBatter) send("NEW_BATTER", { player: w.newBatter });
+    setWicketOpen(false); reset();
+  };
+  // a new batter is asked for only when this ball cannot end the innings
+  const canBringIn = (w: WicketInput) => {
+    if (inn.wickets + 1 >= rules.wicketsPerInnings) return false;
+    const legal = !((extra === "wide" && rules.wideRebowled) || (extra === "no_ball" && rules.noBallRebowled));
+    if (legal && inn.maxBalls !== null && inn.balls + 1 >= inn.maxBalls) return false;
+    const penalty = extra === "wide" ? rules.wideRuns : extra === "no_ball" ? rules.noBallRuns : 0;
+    if (inn.target !== null && inn.runs + w.runs + penalty >= inn.target) return false;
+    return true;
   };
 
-  return (
-    <div className="si-pad">
-      {scoreboard}
+  const maxBalls = rules.maxOversPerBowler === null ? null : rules.maxOversPerBowler * rules.ballsPerOver;
+  const canBowl = field.filter((p) => p.id !== inn.lastOverBowler && (maxBalls === null || (inn.bowlers[p.id]?.balls ?? 0) < maxBalls));
+  const runLabel = extra === "wide" ? "Runs run on the wide" : extra === "bye" || extra === "leg_bye" ? `Runs run (${EXTRA_LABEL[extra].toLowerCase()}s)` : extra === "no_ball" ? "Runs off the bat on the no ball" : null;
 
-      <div className="si-cricket-crease">
-        <div><span className="si-muted">On strike</span><b>{name(striker)}{inn.batters[striker!] ? ` ${inn.batters[striker!].runs} (${inn.batters[striker!].balls})` : ""}</b></div>
-        <div><span className="si-muted">Non-striker</span><b>{name(nonStriker)}{inn.batters[nonStriker!] ? ` ${inn.batters[nonStriker!].runs} (${inn.batters[nonStriker!].balls})` : ""}</b></div>
-        <button type="button" className="si-btn small" onClick={() => setSwapped((v) => !v)}>Swap strike</button>
+  return (
+    <div className="si-pad ck-pad">
+      <div className="ck-pad-info">
+        <BattersPanel inn={shown} ctx={ctx} onSwap={() => setSwapped((v) => !v)} />
+        <BowlerPanel inn={{ ...shown, bowler: currentBowler || null }} ctx={ctx} rules={rules} />
       </div>
 
       {!currentBowler ? (
-        <div className="si-ask">
-          <div className="si-pad-name">Who bowls this over? Tap the bowler</div>
-          <Pick players={field.filter((p) => p.id !== inn.lastOverBowler)} side={other(inn.batting)} picked={[]} onPick={setBowler} />
-        </div>
+        <>
+          {over && overComplete(over, rules) ? (
+            <section className="ck-endover">
+              <div className="ck-label">End of over {over.n}</div>
+              <div className="ck-endover-row">
+                <span className="ck-endover-score">{sides[inn.batting].name} <b>{inn.runs}/{inn.wickets}</b> <span className="ck-muted">after {inn.overs.length} ov</span></span>
+                <span><b>{over.runs}</b> run{over.runs === 1 ? "" : "s"}{over.wickets ? `, ${over.wickets} wkt` : ""}</span>
+              </div>
+              <Balls balls={over.balls} />
+            </section>
+          ) : null}
+          <div className="si-ask">
+            <div className="si-pad-name">Who bowls {over && overComplete(over, rules) ? `over ${over.n + 1}` : "this over"}? Tap the bowler</div>
+            <Pick players={canBowl} side={other(inn.batting)} picked={[]} onPick={setBowler}
+              note={(id) => { const b = bowlerLine(inn, id, ctx, rules); return b ? `${b.overs}-${b.runs}-${b.wickets}` : null; }} />
+            {canBowl.length < field.length ? (
+              <div className="ck-muted" style={{ fontSize: 12.5 }}>
+                Not shown: {field.filter((p) => !canBowl.includes(p)).map((p) => `${p.name} (${p.id === inn.lastOverBowler ? "bowled the last over" : "no overs left"})`).join(", ")}
+              </div>
+            ) : null}
+          </div>
+        </>
       ) : (
         <>
-          <div className="si-row" style={{ fontSize: 13.5 }}>
-            Bowling: <b>{name(currentBowler)}</b>
-            {!midOver ? <button type="button" className="si-link-btn" onClick={() => setBowler("")}>change</button> : null}
-          </div>
-
-          <div className="si-chips wrap">
-            {EXTRAS.map((x) => <button type="button" key={x.key} className={`si-chip${extra === x.key ? " on" : ""}`} onClick={() => setExtra(extra === x.key ? null : x.key)}>{x.label}</button>)}
-            <button type="button" className={`si-chip${wicket ? " on" : ""}`} style={{ color: wicket ? undefined : "var(--si-live)" }} onClick={() => setWicket(wicket ? null : { type: "bowled", player: "", fielder: "" })}>Wicket</button>
-          </div>
-
-          {wicket ? (
-            <div className="si-ask">
-              <div className="si-pad-name">How out?</div>
-              <div className="si-chips wrap">
-                {WICKETS.filter((w) => moreOut || !w.rare).map((w) => (
-                  <button type="button" key={w.key} className={`si-chip${wicket.type === w.key ? " on" : ""}`} onClick={() => setWicket({ ...wicket, type: w.key, fielder: w.fielder ? wicket.fielder : "" })}>{w.label}</button>
-                ))}
-                {!moreOut ? <button type="button" className="si-chip" onClick={() => setMoreOut(true)}>More…</button> : null}
-              </div>
-              <div className="si-pad-name">Who is out?</div>
-              <div className="si-keys two">
-                {[striker!, nonStriker!].map((id) => (
-                  <button type="button" key={id} className={`si-key-btn${(wicket.player || striker) === id ? " on" : ""}`} onClick={() => setWicket({ ...wicket, player: id === striker ? "" : id })}>{name(id)}</button>
-                ))}
-              </div>
-              {wk?.fielder ? (
-                <>
-                  <div className="si-pad-name">{wicket.type === "caught" ? "Caught by" : wicket.type === "stumped" ? "Stumped by" : "Run out by"} (optional)</div>
-                  <Pick players={field} side={other(inn.batting)} picked={wicket.fielder ? [wicket.fielder] : []}
-                    onPick={(id) => setWicket({ ...wicket, fielder: wicket.fielder === id ? "" : id })} />
-                </>
-              ) : null}
-              <div className="si-muted" style={{ fontSize: 12.5 }}>Then tap the runs completed on this ball (usually 0).</div>
+          {!midOver ? (
+            <div className="ck-muted" style={{ fontSize: 13 }}>
+              New over from <b>{name(currentBowler)}</b> <button type="button" className="ck-link" onClick={() => setBowler("")}>change</button>
             </div>
           ) : null}
 
-          <div className="si-pad-name">
-            {extra === "wide" ? "Runs run on the wide (as well as the penalty)" : extra === "bye" || extra === "leg_bye" ? "Runs run" : extra === "no_ball" ? "Runs off the bat on the no-ball" : "Runs off the bat"}
-          </div>
-          <div className="si-keys three">
+          <div className={`ck-runs${extra ? " with-extra" : ""}`}>
+            {runLabel ? <div className="ck-runs-label">{runLabel}</div> : null}
             {[0, 1, 2, 3, 4, 6].map((r) => (
-              <button type="button" key={r} className={`si-key-btn big ${wicket ? "warn" : "score"}`} disabled={(extra === "bye" || extra === "leg_bye") && r === 0} onClick={() => deliver(r)}>
-                {wicket ? (r ? `OUT +${r}` : "OUT") : r}
+              <button type="button" key={r} className={`ck-key r${r}`} disabled={(extra === "bye" || extra === "leg_bye") && r === 0} onClick={() => deliver(r)}>
+                {extra ? <small>{EXTRA_KEYS.find((x) => x.key === extra)!.short}{r ? "+" : ""}</small> : null}{extra && r === 0 ? "" : r}
               </button>
             ))}
           </div>
+
+          <div className="ck-extras-keys">
+            {EXTRA_KEYS.map((x) => (
+              <button type="button" key={x.key} aria-pressed={extra === x.key} className={`ck-key small${extra === x.key ? " on" : ""}`} onClick={() => setExtra(extra === x.key ? null : x.key)}>
+                {EXTRA_LABEL[x.key]}
+              </button>
+            ))}
+            <button type="button" className="ck-key small wicket" onClick={() => setWicketOpen(true)}>Wicket</button>
+          </div>
+          {extra ? <div className="ck-muted" style={{ fontSize: 12.5 }}>{EXTRA_LABEL[extra]} applies to the next tap. Tap it again to cancel.</div> : null}
         </>
       )}
 
+      {undoRow}
+
       <details className="si-more">
-        <summary>Commentary, retirements, penalties and innings</summary>
+        <summary>Commentary note, retirements, penalties and innings</summary>
         <div className="si-grid" style={{ gap: 10 }}>
           <label className="si-label">Commentary for the next ball
-            <input className="si-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
+            <input className="si-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional: driven through the covers" />
           </label>
           <div className="si-keys two">
             <button type="button" className="si-key-btn" onClick={() => send("RETIRE", { player: striker, kind: "hurt" })}>{name(striker)} retired hurt</button>
@@ -230,6 +250,12 @@ export default function CricketPad({ contest, send }: PadProps) {
           </div>
         </div>
       </details>
+
+      {wicketOpen ? (
+        <WicketSheet striker={striker} nonStriker={nonStriker} extra={extra}
+          fielders={field} fieldingSide={other(inn.batting)} battingSide={inn.batting} available={available}
+          name={name} canBringIn={canBringIn} onRecord={recordWicket} onClose={() => setWicketOpen(false)} />
+      ) : null}
     </div>
   );
 }

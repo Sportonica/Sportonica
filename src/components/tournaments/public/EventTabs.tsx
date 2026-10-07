@@ -709,18 +709,36 @@ function SportBoard({ basketball, leaders, cricketStats, matches, teams, highlig
       const top = [...(leaders?.rows ?? [])].sort((a, b) => num(b.values[avg]) - num(a.values[avg]))[0];
       if (top && num(top.values[avg]) > 0) leads.push({ label, who: top.name, team: top.teamName, value: `${num(top.values[avg]).toFixed(1)} per game` });
     }
-  } else {
-    const board = cricketBoard(cricketStats, leaders);
-    for (const [k, label, unit] of [["runs", "Most runs", "runs"], ["wickets", "Most wickets", "wickets"], ["sixes", "Most sixes", "sixes"]] as const) {
-      const top = [...board.values()].sort((a, b) => b[k] - a[k])[0];
-      if (top && top[k] > 0) leads.push({ label, who: top.name, team: top.team, value: `${top[k]} ${unit}` });
-    }
   }
+  const board = basketball ? null : cricketBoard(cricketStats, leaders);
+  const performers = board ? ([
+    ["runs", "Top run scorers"], ["wickets", "Top wicket takers"], ["sr", "Best strike rate"], ["econ", "Best economy"], ["sixes", "Most sixes"],
+  ] as const).map(([k, title]) => ({ k, title, top: cricketRanked(board, k).slice(0, 3) })).filter((x) => x.top.length) : [];
   const latest = matches.filter((m) => m.status === "completed" && m.team_a_id && m.team_b_id)
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 3);
-  if (!leads.length && !latest.length) return null;
+  if (!leads.length && !performers.length && !latest.length) return null;
   return (
     <>
+      {performers.length ? (
+        <div className="ev2-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <div className="ev2-card-t">Top performers</div>
+            <button className="ev2-game-link" onClick={onAll}>All ›</button>
+          </div>
+          <div className="ev2-performers">
+            {performers.map((g) => (
+              <div key={g.k} className="ev2-perf">
+                <div className="ev2-perf-t">{g.title}</div>
+                <ol>
+                  {g.top.map(({ id, p, shown }) => (
+                    <li key={id}><span className="who">{p.name}<small>{p.team}</small></span><b>{shown}</b></li>
+                  ))}
+                </ol>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {leads.length ? (
         <div className="ev2-card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -808,28 +826,53 @@ function BasketballLeadersTab({ leaders }: { leaders: TournamentLeaders | null }
 const CRICKET_STATS = [
   { key: "runs", label: "Runs" },
   { key: "wickets", label: "Wickets" },
+  { key: "sr", label: "Strike rate" },
+  { key: "econ", label: "Economy" },
   { key: "sixes", label: "Sixes" },
   { key: "fours", label: "Fours" },
   { key: "catches", label: "Catches" },
   { key: "mom", label: "Player of the match" },
 ] as const;
 type CricketKey = (typeof CRICKET_STATS)[number]["key"];
+type CricketCount = Exclude<CricketKey, "sr" | "econ">;
+// a rate needs enough of a sample to mean anything
+const SR_MIN_BALLS = 10, ECON_MIN_BALLS = 12;
+
+type CricketLine = { name: string; team: string; balls: number; bowlBalls: number; bowlRuns: number } & Record<CricketCount, number>;
+
+/** Strike rate and economy, or null below the minimum sample (economy only from ball-by-ball, where runs conceded are known). */
+function cricketRate(p: CricketLine, k: "sr" | "econ"): number | null {
+  if (k === "sr") return p.balls >= SR_MIN_BALLS ? (p.runs * 100) / p.balls : null;
+  return p.bowlBalls >= ECON_MIN_BALLS ? (p.bowlRuns * 6) / p.bowlBalls : null;
+}
+
+/** Players ranked on one figure: counts high to low, economy low to high. */
+function cricketRanked(players: Map<string, CricketLine>, k: CricketKey): { id: string; p: CricketLine; v: number; shown: string }[] {
+  const out = [...players.entries()].map(([id, p]) => {
+    const v = k === "sr" || k === "econ" ? cricketRate(p, k) : p[k] > 0 ? p[k] : null;
+    return { id, p, v };
+  }).filter((x): x is { id: string; p: CricketLine; v: number } => x.v !== null);
+  out.sort((a, b) => (k === "econ" ? a.v - b.v : b.v - a.v));
+  return out.map((x) => ({ ...x, shown: k === "sr" || k === "econ" ? x.v.toFixed(2) : String(x.v) }));
+}
 
 /** One line per player: figures entered from the fixtures and from ball-by-ball scoring added together. */
 function cricketBoard(rows: TournamentCricketStatRow[], leaders: TournamentLeaders | null) {
   const num = (v: unknown) => (typeof v === "number" ? v : 0);
-  const players = new Map<string, { name: string; team: string } & Record<CricketKey, number>>();
+  const players = new Map<string, CricketLine>();
   const line = (id: string, name: string, team: string) => {
-    if (!players.has(id)) players.set(id, { name, team, runs: 0, wickets: 0, sixes: 0, fours: 0, catches: 0, mom: 0 });
+    if (!players.has(id)) players.set(id, { name, team, runs: 0, wickets: 0, sixes: 0, fours: 0, catches: 0, mom: 0, balls: 0, bowlBalls: 0, bowlRuns: 0 });
     return players.get(id)!;
   };
   for (const r of rows) {
     const p = line(r.team_player_id, r.player_name, r.team_name);
     p.runs += r.runs; p.wickets += r.wickets; p.sixes += r.sixes; p.fours += r.fours; p.catches += r.catches; p.mom += r.mom_count;
+    p.balls += r.balls_faced;
   }
   for (const r of leaders?.rows ?? []) {
     const p = line(r.subjectKey, r.name, r.teamName);
     p.runs += num(r.values.batRuns); p.wickets += num(r.values.wickets); p.sixes += num(r.values.sixes); p.fours += num(r.values.fours); p.catches += num(r.values.catches);
+    p.balls += num(r.values.batBalls); p.bowlBalls += num(r.values.bowlBalls); p.bowlRuns += num(r.values.bowlRuns);
   }
   return players;
 }
@@ -839,23 +882,31 @@ function CricketLeadersTab({ rows, leaders }: { rows: TournamentCricketStatRow[]
   const players = cricketBoard(rows, leaders);
   if (!players.size) return <div className="ev2-empty">Player stats appear here once match figures are entered.</div>;
   const label = CRICKET_STATS.find((t) => t.key === stat)!.label;
-  const sorted = [...players.entries()].filter(([, p]) => p[stat] > 0).sort(([, a], [, b]) => b[stat] - a[stat]);
+  const sorted = cricketRanked(players, stat);
   return (
     <div>
       <div className="ev2-subtabs">
         {CRICKET_STATS.map((t) => <button key={t.key} className={`ev2-subtab ${stat === t.key ? "on" : ""}`} onClick={() => setStat(t.key)}>{t.label}</button>)}
       </div>
+      {stat === "sr" || stat === "econ" ? (
+        <div className="ev2-empty" style={{ padding: "8px 0", textAlign: "left" }}>
+          {stat === "sr" ? `Runs per 100 balls, for batters who have faced ${SR_MIN_BALLS} or more.` : `Runs per over, for bowlers with ${ECON_MIN_BALLS / 6} or more overs scored ball by ball. Lowest first.`}
+        </div>
+      ) : null}
       {sorted.length === 0 ? <div className="ev2-empty">No {label.toLowerCase()} recorded yet.</div> : (
         <div className="ev2-standings">
           <div className="ev2-srow-head">
             <span className="ev2-srow-head-rank" /><span className="ev2-srow-head-badge" /><span>Player</span><span className="ev2-srow-head-stat">{label}</span>
           </div>
-          {sorted.map(([id, p], i) => (
+          {sorted.map(({ id, p, shown }, i) => (
             <div key={id} className={`ev2-srow${i < 2 ? " top3" : ""}`}>
               <span className="ev2-srow-rank">{i + 1}</span>
               <TeamCrest name={p.name} />
-              <div className="ev2-prow-id"><span className="ev2-srow-name">{p.name}</span><span className="ev2-prow-team">{p.team}</span></div>
-              <span className="ev2-srow-stat">{p[stat]}</span>
+              <div className="ev2-prow-id">
+                <span className="ev2-srow-name">{p.name}</span>
+                <span className="ev2-prow-team">{p.team}{stat === "sr" ? ` · ${p.runs} off ${p.balls}` : stat === "econ" ? ` · ${p.wickets} wkts` : ""}</span>
+              </div>
+              <span className="ev2-srow-stat">{shown}</span>
             </div>
           ))}
         </div>

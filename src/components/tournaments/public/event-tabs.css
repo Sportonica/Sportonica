@@ -511,6 +511,16 @@
 .ev2-lead .l { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
 .ev2-lead .who { font-weight: 800; font-size: 14.5px; }
 .ev2-lead .v { font-size: 12px; opacity: .75; }
+.ev2-performers { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 18px; }
+.ev2-perf-t { font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; opacity: .6; margin-bottom: 4px; }
+.ev2-perf ol { list-style: none; margin: 0; padding: 0; counter-reset: perf; }
+.ev2-perf li { counter-increment: perf; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 6px 0; border-top: 1px solid rgba(20,23,30,0.08); font-variant-numeric: tabular-nums; }
+.ev2-perf li:first-child { border-top: 0; }
+.ev2-perf li::before { content: counter(perf); font-size: 12px; font-weight: 800; opacity: .5; }
+.ev2-perf li:first-child b { color: #006241; }
+.ev2-perf .who { display: grid; font-weight: 700; font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
+.ev2-perf .who small { font-size: 11.5px; font-weight: 500; opacity: .65; }
+.ev2-perf b { font-size: 16px; font-weight: 900; }
 .ev2-latest { display: grid; gap: 4px; padding: 8px 0; border-bottom: 1px solid rgba(242,237,230,0.06); font-size: 13.5px; }
 .ev2-latest:last-child { border-bottom: 0; }
 .ev2-latest a { color: inherit; text-decoration: none; }

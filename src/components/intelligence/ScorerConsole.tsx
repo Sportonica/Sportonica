@@ -18,6 +18,7 @@ import type { ContestView, TimelineEntry } from "@/lib/intelligence/types";
 import { useLiveContest } from "./useLiveContest";
 import { ScoreCard, Timeline } from "./views";
 import { PADS } from "./pads";
+import { CricketScorerHeader, CricketScorerSide } from "./cricket/scorer";
 import { SIDE_KEYS } from "./pads/shared";
 import "./intelligence.css";
 
@@ -60,9 +61,10 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
   }, [queue, storageKey]);
 
   const refreshTimeline = useCallback(async () => {
-    const res = await getContestEvents(initial.id, { limit: 30 });
+    // cricket's commentary lists the balls, so it reads further back
+    const res = await getContestEvents(initial.id, { limit: initial.sport === "cricket" ? 120 : 30 });
     if (!isActionError(res)) setEntries(res.entries);
-  }, [initial.id]);
+  }, [initial.id, initial.sport]);
   // Server actions from one tab run one at a time, so a timeline fetch
   // after every tap would queue in front of the next tap. Refresh once
   // the scorer pauses, and never while taps are still waiting to send.
@@ -137,13 +139,17 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
     send(type, { ...extra, ...(reason.trim() ? { reason: reason.trim() } : {}) });
   };
 
-  const undo = async () => {
-    // never from the list on screen: it may be a tap behind, and undoing
-    // the wrong event is worse than waiting for a fresh read
+  // never from the list on screen: it may be a tap behind, and undoing
+  // the wrong event is worse than waiting for a fresh read
+  const findLast = async (): Promise<TimelineEntry | null> => {
     const fresh = await getContestEvents(initial.id, { limit: 30 });
-    if (isActionError(fresh)) { setError(fresh.message); return; }
+    if (isActionError(fresh)) { setError(fresh.message); return null; }
     setEntries(fresh.entries);
-    const last = fresh.entries.find((e) => !e.superseded && !e.correction && e.type !== "CORRECTION_VOID");
+    return fresh.entries.find((e) => !e.superseded && !e.correction && e.type !== "CORRECTION_VOID") ?? null;
+  };
+
+  const undo = async () => {
+    const last = await findLast();
     if (!last) return;
     if (!window.confirm(`Undo "${last.text}"?`)) return;
     void correct(last, "Undone by the scorer");
@@ -176,6 +182,8 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
   const st = contest.status;
   const sides = contest.context.sides;
   const inPlay = st === "live" || st === "paused";
+  const cricket = contest.sport === "cricket";
+  const padUndo = { last: findLast, run: (e: TimelineEntry) => void correct(e, "Undone by the scorer"), disabled: busy || queue.length > 0 || contest.lastSeq === 0 };
 
   return (
     <div className="si">
@@ -185,7 +193,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
           <h1 className="si-h1">{contest.label ?? "Scorer"}</h1>
         </div>
 
-        <div className="si-sticky"><ScoreCard summary={contest.summary} context={contest.context} /></div>
+        <div className="si-sticky">{cricket ? <CricketScorerHeader contest={contest} /> : <ScoreCard summary={contest.summary} context={contest.context} />}</div>
 
         {offline ? <div className="si-error">No connection. {queue.length} event{queue.length === 1 ? "" : "s"} waiting. They will be sent in order when the connection returns.</div>
           : queue.length > 1 ? <div className="si-info">Sending {queue.length} events…</div> : null}
@@ -212,10 +220,11 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
               {st === "paused" ? <button type="button" className="si-btn primary" onClick={() => send("MATCH_RESUME")}>Resume</button> : null}
               {/* basketball finishes from its pad ("Finish game"), which appears once the last quarter is over */}
               {inPlay && contest.sport !== "basketball" ? <button type="button" className="si-btn primary" onClick={() => { if (window.confirm("Complete the match? The result becomes final.")) send("MATCH_COMPLETE"); }}>Complete match</button> : null}
-              <button type="button" className="si-btn" disabled={busy || queue.length > 0 || contest.lastSeq === 0} onClick={() => void undo()}>Undo last</button>
+              {/* cricket's pad has its own "Undo last ball" by the run keys */}
+              {cricket && st === "live" ? null : <button type="button" className="si-btn" disabled={busy || queue.length > 0 || contest.lastSeq === 0} onClick={() => void undo()}>Undo last</button>}
             </div>
 
-            {st === "live" || (replacing && inPlay) ? <Pad contest={contest} send={send} />
+            {st === "live" || (replacing && inPlay) ? <Pad contest={contest} send={send} undo={padUndo} />
               : st === "paused" ? <div className="si-info">The match is paused. Resume it to keep scoring.</div>
               : st === "scheduled" ? <div className="si-info">Start the match to begin scoring.</div>
               : st === "postponed" ? <div className="si-info">This match is postponed. Start it when it is played.</div>
@@ -246,6 +255,20 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
             </details>
           </div>
 
+          {cricket ? (
+            <CricketScorerSide contest={contest} entries={entries} busy={busy}
+              onEdit={(e, payload, reason) => void correct(e, reason, { type: "DELIVERY", payload })}
+              onRemove={(e) => { if (window.confirm(`Remove "${e.text}" from the match? It stays in the record as removed.`)) void correct(e, "Removed by the scorer"); }}>
+              <details className="si-more">
+                <summary>Full event log and recalculation</summary>
+                <Timeline entries={entries} onCorrect={busy ? undefined : onCorrect} />
+                <div className="si-row" style={{ marginTop: 12 }}>
+                  <button type="button" className="si-btn small" disabled={busy} onClick={recalc}>Recalculate from events</button>
+                </div>
+                {report ? <RecalcReport report={report} /> : null}
+              </details>
+            </CricketScorerSide>
+          ) : (
           <div className="si-card">
             <div className="si-chart-head">
               <h2 className="si-h2" style={{ margin: 0 }}>Recent events</h2>
@@ -255,17 +278,22 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
             <div className="si-row" style={{ marginTop: 12 }}>
               <button type="button" className="si-btn small" disabled={busy} onClick={recalc}>Recalculate from events</button>
             </div>
-            {report ? (
-              <div className="si-info" style={{ marginTop: 10 }}>
-                Rebuilt from {report.events} events. {report.drift ? "The stored score did not match and has been corrected." : "The stored score matched."}
-                {report.issues.length ? (
-                  <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>{report.issues.map((i, k) => <li key={k}>{i.severity === "error" ? "Error" : "Note"}: {i.message}</li>)}</ul>
-                ) : " No problems found in the event log."}
-              </div>
-            ) : null}
+            {report ? <RecalcReport report={report} /> : null}
           </div>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function RecalcReport({ report }: { report: { issues: Issue[]; drift: boolean; events: number } }) {
+  return (
+    <div className="si-info" style={{ marginTop: 10 }}>
+      Rebuilt from {report.events} events. {report.drift ? "The stored score did not match and has been corrected." : "The stored score matched."}
+      {report.issues.length ? (
+        <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>{report.issues.map((i, k) => <li key={k}>{i.severity === "error" ? "Error" : "Note"}: {i.message}</li>)}</ul>
+      ) : " No problems found in the event log."}
     </div>
   );
 }
