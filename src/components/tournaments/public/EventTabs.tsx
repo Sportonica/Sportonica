@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type ComponentType } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,6 +14,9 @@ import type { MatchIntel } from "@/lib/intelligence/matchIntel";
 import type { TournamentLeaders } from "@/lib/intelligence/types";
 import { cricketRulesOf, type CricketStanding } from "@/lib/tournaments/standings";
 import { CricketLeaders, CricketTablePublic, rankPlayers, type CricketTournamentData } from "./CricketStats";
+import { CricketCrest, CricketStatus } from "./CricketArt";
+import { BasketballCrest, BasketballStatus } from "./BasketballArt";
+import { BracketIcon, ClipboardIcon, HoopIcon, PlayerAvatar, StumpsIcon } from "./SportIcons";
 import type { MatchHighlight } from "@/lib/intelligence/actions";
 import { diffText, standingsScheme } from "@/lib/tournaments/standings";
 import {
@@ -194,12 +197,14 @@ export default function EventTabs({
   }, [activeTab]);
 
   return (
-    <div>
+    <SportLook.Provider value={isCricketSport ? "cricket" : isBasketballSport ? "basketball" : null}>
+    <div className={isBasketballSport ? "ev2-bb" : undefined}>
       <div className="ev2-tabbar-wrap">
         <div className="ev2-tabbar" ref={barRef}>
           {indicator && <div className="ev2-tab-indicator" style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }} />}
           {visibleTabs.map((t) => {
-            const Icon = TAB_ICON[t];
+            // cricket and basketball draw the bracket with their own icon set
+            const Icon = t === "Knockout" && (isCricketSport || isBasketballSport) ? BracketIcon : TAB_ICON[t];
             return (
               <button
                 key={t} ref={(el) => { if (el) tabRefs.current[t] = el; }}
@@ -241,7 +246,7 @@ export default function EventTabs({
         : <TableTab tournament={tournament} standingsByGroup={standingsByGroup} teams={teams} />)}
       {activeTab === "Knockout" && <KnockoutTab matches={matches} teams={teams} intel={intel} tournamentId={tournament.id} />}
       {activeTab === "Fixtures" && (
-        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} />
+        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} stacked={isCricketSport || isBasketballSport} />
       )}
       {activeTab === "Player Stats" && (
         authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
@@ -259,6 +264,7 @@ export default function EventTabs({
           your bracket match, they're just noise below the fold. */}
       {(activeTab === "Overview" || activeTab === "Register") && <RulesPanel tournament={tournament} />}
     </div>
+    </SportLook.Provider>
   );
 }
 
@@ -378,6 +384,7 @@ function TableTab({
   standingsByGroup: Record<string, TournamentStanding[]>;
   teams: TournamentTeam[];
 }) {
+  const look = useContext(SportLook);
   const groups = Object.keys(standingsByGroup).sort();
   if (groups.length === 0 || groups.every((g) => standingsByGroup[g].length === 0)) {
     return <div className="ev2-empty">No results yet.</div>;
@@ -401,7 +408,7 @@ function TableTab({
                     {logo
                       // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={logo} alt="" />
-                      : r.team_name.charAt(0).toUpperCase()}
+                      : look ? <SportCrest name={r.team_name} px={34} /> : r.team_name.charAt(0).toUpperCase()}
                   </span>
                   <span className="ev2-srow-name">{r.team_name}</span>
                   <div className="ev2-srow-stats">
@@ -525,7 +532,65 @@ function MatchDetailModal({ match: m, team, onClose, intel: si, tournamentId }: 
 }
 
 // ── Fixtures (public, read-only, by date) ──────────────────────────
+type TPRow = { id: string; name: string; team: string; shown: string; sub?: string };
+type TPGroup = { k: string; title: string; unit: string; major: boolean; rows: TPRow[] };
+const BB_SHORT: Record<string, string> = { pts: "Pts", reb: "Reb", ast: "Ast", stl: "Stl", blk: "Blk", tpm: "3PM" };
+
+/**
+ * Each category's leader featured (avatar in team colours, crest, the
+ * figure with its unit and, for the headline row, its context), then
+ * second and third. The headline categories share one row; the rest share
+ * the next, so the grid is always complete.
+ */
+function TopPerformers({ groups, sport }: { groups: TPGroup[]; sport: "cricket" | "basketball" }) {
+  const majors = groups.filter((g) => g.major).length || 1;
+  return (
+    <div className={`ev2-tp ${sport === "basketball" ? "bb" : "ck"}`}>
+      {groups.map((g) => {
+        const [lead, ...rest] = g.rows;
+        return (
+          <section key={g.k} className={`ev2-tp-cat ${g.major ? "major" : "minor"}`} style={{ gridColumn: `span ${g.major ? 6 / majors : 2}` }}>
+            <div className="ev2-tp-t">{g.title}</div>
+            <div className="ev2-tp-lead">
+              <PlayerAvatar sport={sport} team={lead.team} size={g.major ? 52 : 40} />
+              <div className="ev2-tp-who">
+                <b>{lead.name}</b>
+                <span>{sport === "cricket" ? <CricketCrest name={lead.team} size={14} /> : <BasketballCrest name={lead.team} size={14} />}{lead.team}</span>
+              </div>
+              <div className="ev2-tp-val"><b>{lead.shown}</b><small>{g.unit}</small></div>
+            </div>
+            {g.major && lead.sub && lead.sub !== lead.team ? <div className="ev2-tp-sub">{lead.sub}</div> : null}
+            {rest.length ? (
+              <ol className="ev2-tp-rest">
+                {rest.map((r, i) => <li key={r.id}><span className="r">{i + 2}</span><span className="n">{r.name}<small>{r.team}</small></span><b>{r.shown}</b></li>)}
+              </ol>
+            ) : null}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+// the unit under a top performer's figure
+const TP_UNIT: Record<string, string> = { runs: "runs", wickets: "wickets", sr: "strike rate", econ: "economy", sixes: "sixes" };
+
+// cricket and basketball tournaments draw their teams as crests (CricketArt,
+// BasketballArt) instead of letters; other sports keep the letter circle
+const SportLook = createContext<"cricket" | "basketball" | null>(null);
+
+/** A team's crest in its sport's artwork, or null where the sport has none (or the slot is empty). */
+function SportCrest({ name, px }: { name: string; px: number }) {
+  const look = useContext(SportLook);
+  if (!look || ["?", "TBD", "Bye"].includes(name)) return null;
+  return look === "cricket" ? <CricketCrest name={name} size={px} /> : <BasketballCrest name={name} size={px} />;
+}
+
 function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: string | null; size?: "sm" | "md" }) {
+  const look = useContext(SportLook);
+  if (look && !logoUrl && !["?", "TBD", "Bye"].includes(name)) {
+    return <span className={`ev2-crest ck${size === "sm" ? " sm" : ""}`}><SportCrest name={name} px={size === "sm" ? 26 : 40} /></span>;
+  }
   return (
     <span className={`ev2-crest${size === "sm" ? " sm" : ""}`}>
       {logoUrl
@@ -536,10 +601,15 @@ function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: str
   );
 }
 
-function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {} }: {
+function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {}, stacked = false }: {
   tournamentId: string; matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>;
   highlights?: Record<string, MatchHighlight>;
+  // cricket's and basketball's scores ("180/4 – 156/2", "114 – 113") are too wide to share a phone's line with two names: there the teams stack
+  stacked?: boolean;
 }) {
+  // a played game's detail (innings, result, top performers) opens on tap, one game at a time or several
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setOpen((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   if (matches.length === 0) return <div className="ev2-empty">Fixtures haven&apos;t been generated yet.</div>;
   const team = (id: string | null) => (id ? teams.find((t) => t.id === id) : undefined);
   const teamName = (id: string | null) => team(id)?.name ?? "Unknown";
@@ -581,8 +651,15 @@ function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {
             const teamBName = m.team_b_id ? teamName(m.team_b_id) : m.status === "completed" ? "Bye" : "TBD";
             const live = m.status === "live";
             const si = intel[m.id];
+            const h = highlights[m.id];
+            const canOpen = !!h && (!!h.periods || !!h.stars.length || !!h.result);
+            const isOpen = canOpen && open.has(m.id);
             return (
-              <div key={m.id} className="ev2-fixture">
+              <div key={m.id} className={`ev2-fixture${stacked ? " stack" : ""}${canOpen ? " expandable" : ""}${isOpen ? " open" : ""}`}
+                {...(canOpen ? {
+                  role: "button", tabIndex: 0, "aria-expanded": isOpen, onClick: () => toggle(m.id),
+                  onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(m.id); } },
+                } : {})}>
                 <div className="ev2-fixture-time">
                   {m.starts_at ? new Date(m.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: KTM }) : "TBD"}
                 </div>
@@ -613,13 +690,17 @@ function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {
                   <TeamCrest name={teamBName} logoUrl={team(m.team_b_id)?.logo_url} size="sm" />
                 </span>
                 <div className="ev2-fixture-round">
-                  {si ? (
-                    <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "inherit", fontWeight: 700 }}>
-                      {live ? si.period : si.brief || "Match centre"} ›
+                  {si && live ? (
+                    <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "inherit", fontWeight: 700 }} onClick={(e) => e.stopPropagation()}>
+                      {si.period} ›
                     </Link>
+                  ) : canOpen ? (
+                    <span className="ev2-fixture-more">{m.round_label ? <span className="lbl">{m.round_label}</span> : null}<i aria-hidden="true">▾</i></span>
+                  ) : si ? (
+                    <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "inherit", fontWeight: 700 }} onClick={(e) => e.stopPropagation()}>Match centre ›</Link>
                   ) : m.round_label}
                 </div>
-                {highlights[m.id] ? <GameDetail h={highlights[m.id]} tournamentId={tournamentId} /> : null}
+                {isOpen ? <GameDetail h={h!} tournamentId={tournamentId} names={[teamAName, teamBName]} /> : null}
               </div>
             );
           })}
@@ -689,13 +770,16 @@ function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; team
 }
 
 /** Under a game card: the period scores, the result and the top performers, then the full box score. */
-function GameDetail({ h, tournamentId }: { h: MatchHighlight; tournamentId: string }) {
+function GameDetail({ h, tournamentId, names }: { h: MatchHighlight; tournamentId: string; names?: [string, string] }) {
   if (!h.periods && !h.stars.length && !h.result) return null;
   return (
     <div className="ev2-fixture-extra">
       {h.periods ? (
         <div className="ev2-periods">
-          {h.periods.map((p) => <span key={p.label}><b>{p.label}</b> {p.a}–{p.b}</span>)}
+          {/* a quarter has both sides' points; an innings only the batting side's runs, so it names the side */}
+          {h.periods.map((p) => (
+            <span key={p.label}><b>{p.label}</b> {p.a && p.b ? `${p.a}–${p.b}` : `${names ? `${names[p.a ? 0 : 1]} ` : ""}${p.a || p.b}`}</span>
+          ))}
         </div>
       ) : null}
       {h.result ? <div className="ev2-game-result">{h.result}</div> : null}
@@ -704,7 +788,8 @@ function GameDetail({ h, tournamentId }: { h: MatchHighlight; tournamentId: stri
           {h.stars.map((st, i) => <span key={i} className={`side-${st.side}`}>{st.text}</span>)}
         </div>
       ) : null}
-      <Link className="ev2-game-link" href={`/tournaments/${tournamentId}/live/${h.contestId}`}>{h.sport === "cricket" ? "Scorecard" : "Box score"} ›</Link>
+      {/* the link opens the scorecard; tapping anywhere else closes the detail again */}
+      <Link className="ev2-game-link" href={`/tournaments/${tournamentId}/live/${h.contestId}`} onClick={(e) => e.stopPropagation()}>{h.sport === "cricket" ? "Scorecard" : "Box score"} ›</Link>
     </div>
   );
 }
@@ -716,20 +801,24 @@ function SportBoard({ basketball, leaders, cricket, matches, teams, highlights, 
 }) {
   const num = (v: unknown) => (typeof v === "number" ? v : 0);
   const name = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "TBD";
-  type Lead = { label: string; who: string; team: string; value: string };
-  const leads: Lead[] = [];
-  if (basketball) {
-    for (const [avg, label] of [["ppg", "Points"], ["rpg", "Rebounds"], ["apg", "Assists"]] as const) {
-      const top = [...(leaders?.rows ?? [])].sort((a, b) => num(b.values[avg]) - num(a.values[avg]))[0];
-      if (top && num(top.values[avg]) > 0) leads.push({ label, who: top.name, team: top.teamName, value: `${num(top.values[avg]).toFixed(1)} per game` });
-    }
-  }
-  const performers = !basketball && cricket ? ([
-    ["runs", "Top run scorers"], ["wickets", "Top wicket takers"], ["sr", "Best strike rate"], ["econ", "Best economy"], ["sixes", "Most sixes"],
-  ] as const).map(([k, title]) => ({ k, title, top: rankPlayers(cricket.players, k).slice(0, 3) })).filter((x) => x.top.length) : [];
+  // the categories each sport leads with, the first ones as the headline row
+  const performers: TPGroup[] = basketball
+    ? BB_STATS.map((st, i) => ({
+        k: st.total, title: st.label, unit: `${BB_SHORT[st.total]} / game`, major: i < 3,
+        rows: [...(leaders?.rows ?? [])].filter((r) => num(r.values[st.avg]) > 0)
+          .sort((a, b) => num(b.values[st.avg]) - num(a.values[st.avg])).slice(0, 3)
+          .map((r) => ({ id: r.subjectKey, name: r.name, team: r.teamName, shown: num(r.values[st.avg]).toFixed(1),
+            sub: `${num(r.values[st.total])} ${BB_SHORT[st.total].toLowerCase()} · ${r.contests} game${r.contests === 1 ? "" : "s"}` })),
+      })).filter((g) => g.rows.length)
+    : cricket ? ([
+        ["runs", "Top run scorers"], ["wickets", "Top wicket takers"], ["sr", "Best strike rate"], ["econ", "Best economy"], ["sixes", "Most sixes"],
+      ] as const).map(([k, title], i) => ({
+        k, title, unit: TP_UNIT[k], major: i < 2,
+        rows: rankPlayers(cricket.players, k).slice(0, 3).map(({ p, shown, sub }) => ({ id: p.id, name: p.name, team: p.team, shown, sub })),
+      })).filter((g) => g.rows.length) : [];
   const latest = matches.filter((m) => m.status === "completed" && m.team_a_id && m.team_b_id)
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at)).slice(0, 3);
-  if (!leads.length && !performers.length && !latest.length) return null;
+  if (!performers.length && !latest.length) return null;
   return (
     <>
       {performers.length ? (
@@ -738,35 +827,7 @@ function SportBoard({ basketball, leaders, cricket, matches, teams, highlights, 
             <div className="ev2-card-t">Top performers</div>
             <button className="ev2-game-link" onClick={onAll}>All ›</button>
           </div>
-          <div className="ev2-performers">
-            {performers.map((g) => (
-              <div key={g.k} className="ev2-perf">
-                <div className="ev2-perf-t">{g.title}</div>
-                <ol>
-                  {g.top.map(({ p, shown }) => (
-                    <li key={p.id}><span className="who">{p.name}<small>{p.team}</small></span><b>{shown}</b></li>
-                  ))}
-                </ol>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {leads.length ? (
-        <div className="ev2-card">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <div className="ev2-card-t">Leaders</div>
-            <button className="ev2-game-link" onClick={onAll}>All ›</button>
-          </div>
-          <div className="ev2-leads">
-            {leads.map((l) => (
-              <div key={l.label} className="ev2-lead">
-                <span className="l">{l.label}</span>
-                <span className="who">{l.who}</span>
-                <span className="v">{l.value}{l.team ? ` · ${l.team}` : ""}</span>
-              </div>
-            ))}
-          </div>
+          <TopPerformers groups={performers} sport={basketball ? "basketball" : "cricket"} />
         </div>
       ) : null}
       {latest.length ? (
@@ -821,7 +882,8 @@ function BasketballLeadersTab({ leaders }: { leaders: TournamentLeaders | null }
           {sorted.map((r, i) => (
             <div key={r.subjectKey} className={`ev2-srow${i < 2 ? " top3" : ""}`}>
               <span className="ev2-srow-rank">{i + 1}</span>
-              <TeamCrest name={r.name} />
+              {/* a player, not a team: an athlete in their team's colours */}
+              <span className="ev2-crest ck"><PlayerAvatar sport="basketball" team={r.teamName} size={40} /></span>
               <div className="ev2-prow-id">
                 <span className="ev2-srow-name">{r.name}</span>
                 <span className="ev2-prow-team">{r.teamName} · {r.contests} game{r.contests === 1 ? "" : "s"} · {num(r.values[stat.avg]).toFixed(1)} per game</span>
@@ -1033,6 +1095,7 @@ function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, crick
   tournamentId: string; cricket: boolean; canScore: boolean;
 }) {
   const [allResults, setAllResults] = useState(false);
+  const look = useContext(SportLook);
   const name = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "TBD";
   const at = (m: TournamentMatch) => m.starts_at ?? m.updated_at;
   const games = matches.filter((m) => m.team_a_id && m.team_b_id);
@@ -1050,14 +1113,20 @@ function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, crick
     return (
       <div className={`ev2-mc-row ${kind}`}>
         <div className="ev2-mc-meta">
-          {kind === "live" ? <span className="ev2-mc-live">● Live{mi?.period ? ` · ${mi.period}` : ""}</span> : <span>{matchWhen(m)}</span>}
+          {look ? (
+            <span className="ev2-mc-status">
+              {look === "cricket" ? <CricketStatus kind={kind === "live" ? "live" : kind === "next" ? "upcoming" : "completed"} /> : <BasketballStatus kind={kind === "live" ? "live" : kind === "next" ? "upcoming" : "completed"} />}
+              {kind === "live" && mi?.period ? mi.period : null}
+            </span>
+          ) : kind === "live" ? <span className="ev2-mc-live">● Live{mi?.period ? ` · ${mi.period}` : ""}</span> : <span>{matchWhen(m)}</span>}
           {m.round_label ? <span>{m.round_label}</span> : null}
         </div>
+        {look && kind !== "live" ? <div className="ev2-mc-when">{matchWhen(m)}</div> : null}
         {(["a", "b"] as const).map((side) => {
           const team = side === "a" ? m.team_a_id : m.team_b_id;
           return (
             <div key={side} className={`ev2-mc-side${kind === "done" && m.winner_team_id === team ? " won" : ""}`}>
-              <span>{name(team)}</span>
+              <span className="ev2-mc-team"><TeamCrest name={name(team)} logoUrl={teams.find((t) => t.id === team)?.logo_url} size="sm" />{name(team)}</span>
               {kind !== "next" ? <b>{score(m, side)}</b> : null}
             </div>
           );
@@ -1078,10 +1147,10 @@ function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, crick
       <div className="ev2-card">
         <div className="ev2-mc-head">
           <div className="ev2-card-t">Live now</div>
-          {canScore ? <Link className="ev2-mc-score" href={`/tournaments/${tournamentId}/score`}>Live scoring</Link> : null}
+          {canScore ? <Link className="ev2-mc-score" href={`/tournaments/${tournamentId}/score`}><ClipboardIcon size={16} color="#fff" accent="#fff" /> Live scoring</Link> : null}
         </div>
         {live.length ? <div className="ev2-mc-grid">{live.map((m) => <Row key={m.id} m={m} kind="live" />)}</div>
-          : <div className="ev2-mc-none">No game in progress right now.{next[0] ? ` Next: ${name(next[0].team_a_id)} v ${name(next[0].team_b_id)}, ${matchWhen(next[0])}.` : ""}</div>}
+          : <div className="ev2-mc-none">{look === "cricket" ? <StumpsIcon size={22} /> : look === "basketball" ? <HoopIcon size={22} /> : null}<span>No game in progress right now.{next[0] ? ` Next: ${name(next[0].team_a_id)} v ${name(next[0].team_b_id)}, ${matchWhen(next[0])}.` : ""}</span></div>}
       </div>
       {next.length ? (
         <div className="ev2-card">

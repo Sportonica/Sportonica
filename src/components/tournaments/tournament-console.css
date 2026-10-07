@@ -205,3 +205,80 @@
   .tc-table.stk td:first-child::before { display: none; }
   .tc-table.stk td:empty { display: none; }
 }
+
+/* ── Fixtures: score boxes with − / + ───────────────────────────── */
+.tc-step { display: flex; flex-direction: column; gap: 2px; }
+.tc-step-label { font-size: 10.5px; }
+.tc-step-row { display: inline-flex; align-items: center; gap: 4px; }
+.tc-step-btn { width: 28px; height: 30px; border-radius: 8px; border: 1px solid rgba(20,23,30,0.15); background: transparent; color: inherit; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer; line-height: 1; touch-action: manipulation; }
+.tc-step-btn:disabled { opacity: .35; cursor: default; }
+.tc-step input { text-align: center; }
+.tc-fx-add-toggle { display: none; }
+
+/* ── Fixtures on a phone: each match is a card, controls full width,
+      every tap target at least 44px, the score the biggest thing ── */
+@media (max-width: 640px) {
+  .tc-fx, .tc-fx tbody { display: block; width: 100%; }
+  .tc-table.tc-fx { min-width: 0; }
+  .tc-fx thead { display: none; }
+  .tc-fx-row {
+    display: grid; grid-template-columns: 26px minmax(0, 1fr) auto;
+    grid-template-areas: "sel match score" "sel when when" "act act act";
+    gap: 4px 10px; align-items: start;
+    padding: 14px; margin: 0 0 12px; border: 1px solid rgba(20,23,30,0.1); border-radius: 14px; background: #fff;
+  }
+  .tc-fx-row > td { display: block; padding: 0 !important; border: 0 !important; min-width: 0; }
+  .tc-fx-sel { grid-area: sel; padding-top: 3px !important; }
+  .tc-fx-match { grid-area: match; font-size: 15.5px; }
+  .tc-fx-when { grid-area: when; }
+  .tc-fx-score { grid-area: score; font-size: 22px; font-weight: 900; text-align: right; white-space: nowrap; }
+  .tc-fx-act { grid-area: act; margin-top: 10px; padding-top: 12px !important; border-top: 1px solid rgba(20,23,30,0.08) !important; }
+  .tc-fx-act > * + * { margin-top: 10px; }
+
+  /* big, thumb-sized controls */
+  .tc-fx-act .tc-btn { min-height: 44px; padding: 10px 14px !important; font-size: 14px !important; border-radius: 12px; }
+  .tc-fx-act .tc-btn.primary { flex: 1 1 auto; }
+  .tc-fx-act select, .tc-fx-act input:not([type="checkbox"]) { min-height: 44px; font-size: 16px !important; border-radius: 10px !important; }
+  .tc-fx-act select { width: 100% !important; }
+  .tc-fx-act .tc-dim { font-size: 12.5px !important; }
+
+  /* goals: one row per team, name left and − 3 + right, then a full-width save */
+  .tc-fx-act div:has(> .tc-step) { flex-direction: column; align-items: stretch !important; gap: 8px !important; }
+  .tc-fx-act .tc-step { flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; }
+  .tc-fx-act div:has(> .tc-step) > span.tc-dim:not(.tc-step-label) { display: none; }
+  .tc-fx-act div:has(> .tc-step) > .tc-btn { align-self: stretch !important; width: 100%; }
+  .tc-step-btn { width: 46px; height: 46px; font-size: 22px; border-radius: 12px; }
+  .tc-step input { width: 56px !important; height: 46px; font-size: 22px !important; font-weight: 800; }
+  .tc-step-label { font-size: 12.5px !important; font-weight: 700; opacity: .8; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* cricket: one block per side, runs / wickets / overs filling the width */
+  .tc-ck-entry { width: 100%; }
+  .tc-ck-sides { flex-direction: column; align-items: stretch !important; gap: 12px !important; }
+  .tc-ck-sides > div { width: 100%; }
+  .tc-ck-sides input { flex: 1 1 0; width: auto !important; min-width: 0; text-align: center; font-size: 18px !important; font-weight: 700; }
+  .tc-ck-entry label { flex: 1 1 140px; }
+  .tc-ck-entry label select, .tc-ck-entry label input { width: 100% !important; }
+
+  /* the add-match form waits behind a button */
+  .tc-fx-add-toggle { display: block; width: 100%; min-height: 46px; margin-bottom: 12px; font-size: 15px; }
+  .tc-fx-addwrap:not(.open) { display: none; }
+}
+
+/* ── Player sheets (box score, player stats): a spreadsheet row on a
+      laptop; on a phone each player is a block of labelled boxes ── */
+.tc-cell { display: contents; }
+.tc-cell-l { display: none; }
+@media (max-width: 640px) {
+  .tc-modal { max-height: 92dvh; padding: 16px; }
+  .tc-sheet-head { display: none !important; }
+  .tc-sheet-row { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; min-width: 0 !important; gap: 10px 8px !important; padding: 14px 0 !important; border-bottom: 1px solid rgba(20,23,30,0.08); align-items: end !important; }
+  .tc-cell-name { grid-column: 1 / -1; font-size: 15.5px !important; font-weight: 800; }
+  .tc-cell { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .tc-cell-l { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tc-cell input[type="number"] { width: 100% !important; height: 46px; font-size: 18px !important; font-weight: 700; text-align: center; border-radius: 10px !important; }
+  .tc-cell input[type="checkbox"], .tc-cell input[type="radio"] { width: 28px !important; height: 28px !important; margin: 9px 0; }
+  .tc-cell-pts { grid-column: 1 / -1; text-align: left; font-size: 14px; }
+  .tc-cell-pts:not(:empty)::before { content: "Points "; font-weight: 600; opacity: .6; }
+  .tc-modal input:not([type="checkbox"]):not([type="radio"]) { min-height: 44px; font-size: 16px !important; }
+  .tc-modal .tc-btn { min-height: 46px; font-size: 15px !important; }
+}

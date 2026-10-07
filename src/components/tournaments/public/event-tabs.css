@@ -543,3 +543,123 @@
 .ev2-mc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .ev2-mc-score { font-size: 13px; font-weight: 800; color: #fff; background: #006241; border-radius: 10px; padding: 7px 12px; text-decoration: none; }
 .ev2-mc-more { margin-top: 12px; background: none; border: 1px solid rgba(20,23,30,0.12); border-radius: 10px; padding: 9px 14px; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; color: inherit; }
+
+/* cricket: crests in place of letters, and the status badge on Match centre cards */
+.ev2-crest.ck { background: none; border: 0; box-shadow: none; padding: 0; overflow: visible; }
+.ev2-crest.ck svg { width: 100%; height: 100%; }
+.ev2-mc-team { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.ev2-mc-status { display: inline-flex; align-items: center; gap: 6px; opacity: 1; color: inherit; }
+.ev2-mc-row .ev2-mc-meta:has(.ev2-mc-status) { opacity: 1; }
+.ev2-mc-when { font-size: 11.5px; font-weight: 600; opacity: .6; margin-top: -2px; }
+.ev2-mc-meta { align-items: center; }
+.ev2-srow-badge:has(.bb-art-crest), .ev2-srow-badge:has(.ck-art-crest) { background: none; border: 0; padding: 0; overflow: visible; }
+.ev2-srow-badge svg { width: 100%; height: 100%; }
+.ev2-mc-none { display: flex; align-items: center; gap: 10px; }
+.ev2-mc-none svg { flex: none; }
+.ev2-mc-score { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Top performers (cricket overview): runs and wickets as the headline pair,
+   strike rate, economy and sixes as a row of three; each category's leader
+   featured with their avatar, team crest and the figure with its unit. */
+.ev2-tp { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.ev2-tp-cat { display: grid; gap: 10px; align-content: start; padding: 14px; border-radius: 14px; border: 1px solid rgba(20,23,30,0.08); background: #FBF9F5; min-width: 0; }
+.ev2-tp-cat.major { border-top: 3px solid #CA023A; }
+.ev2-tp.bb .ev2-tp-cat.major { border-top-color: #E65C00; }
+.ev2-tp.bb .ev2-tp-val b, .ev2-tp.bb .ev2-tp-t { color: #1A1A1A; }
+.ev2-tp-t { font-size: 10.5px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: #102A1E; opacity: .7; }
+.ev2-tp-lead { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.ev2-tp-lead .si-avatar { border-radius: 50%; }
+.ev2-tp-who { display: grid; gap: 3px; min-width: 0; }
+.ev2-tp-who b { font-size: 15.5px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.ev2-tp-who span { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; opacity: .7; min-width: 0; }
+.ev2-tp-val { display: grid; justify-items: end; line-height: 1; }
+.ev2-tp-val b { font-size: 30px; font-weight: 900; letter-spacing: -.02em; color: #102A1E; font-variant-numeric: tabular-nums; }
+.ev2-tp-val small { margin-top: 4px; font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; opacity: .55; }
+.ev2-tp-cat.minor .ev2-tp-val b { font-size: 22px; }
+.ev2-tp-cat.minor .ev2-tp-who b { font-size: 14px; }
+.ev2-tp-sub { font-size: 12.5px; font-weight: 600; opacity: .65; padding-left: 64px; margin-top: -4px; }
+.ev2-tp-rest { list-style: none; margin: 0; padding: 0; border-top: 1px solid rgba(20,23,30,0.08); }
+.ev2-tp-rest li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 8px 0 0; font-variant-numeric: tabular-nums; }
+.ev2-tp-rest .r { font-size: 12px; font-weight: 800; opacity: .45; }
+.ev2-tp-rest .n { display: flex; gap: 8px; align-items: baseline; min-width: 0; font-size: 13.5px; font-weight: 700; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ev2-tp-rest .n small { font-size: 11.5px; font-weight: 500; opacity: .6; }
+.ev2-tp-rest b { font-size: 14.5px; font-weight: 800; }
+@media (max-width: 760px) {
+  .ev2-tp { grid-template-columns: minmax(0, 1fr); }
+  .ev2-tp-cat.major, .ev2-tp-cat.minor { grid-column: auto !important; }
+}
+/* a small category: avatar and figure on top, the name and team under them, the rest by name only */
+.ev2-tp-cat.minor .ev2-tp-lead { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av val" "who who"; row-gap: 10px; }
+.ev2-tp-cat.minor .ev2-tp-lead .si-avatar { grid-area: av; }
+.ev2-tp-cat.minor .ev2-tp-val { grid-area: val; }
+.ev2-tp-cat.minor .ev2-tp-who { grid-area: who; }
+.ev2-tp-cat.minor .ev2-tp-rest .n small { display: none; }
+@media (max-width: 760px) {
+  /* on a phone there is room again: every category reads in one line */
+  .ev2-tp-cat.minor .ev2-tp-lead { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av who val"; }
+  .ev2-tp-cat.minor .ev2-tp-rest .n small { display: inline; }
+}
+.ev2-tp-cat.minor .ev2-tp-rest .n { white-space: normal; overflow: visible; font-size: 13px; line-height: 1.25; }
+.ev2-tp-cat.minor .ev2-tp-rest b { font-size: 13.5px; }
+
+/* a played game opens to its detail on tap */
+.ev2-fixture.expandable { cursor: pointer; }
+.ev2-fixture.expandable:focus-visible { outline: 2px solid #006241; outline-offset: 2px; }
+.ev2-fixture-more { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; max-width: 100%; }
+.ev2-fixture-more .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev2-fixture-more i { font-style: normal; font-size: 12px; opacity: .8; transition: transform .15s ease; }
+.ev2-fixture.open .ev2-fixture-more i { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .ev2-fixture-more i { transition: none; } }
+/* the score takes the width it needs (cricket's "180/4 – 156/2" is far wider than "3 – 1"); the team names give way */
+@media (max-width: 620px) { .ev2-fixture { grid-template-columns: 36px minmax(0, 1fr) minmax(56px, auto) minmax(0, 1fr) 58px; } }
+@media (max-width: 480px) {
+  .ev2-fixture { grid-template-columns: 30px minmax(0, 1fr) minmax(48px, auto) minmax(0, 1fr) 46px; }
+  .ev2-fixture-mid .score { white-space: nowrap; }
+  .ev2-fixture-more .lbl { display: none; }
+}
+
+/* cricket on a phone: each team on its own line with its full name, the score under them */
+@media (max-width: 480px) {
+  .ev2-fixture.stack {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-areas: "time a more" "time b more" "time s more" "x x x";
+    row-gap: 6px; align-items: center;
+  }
+  .ev2-fixture.stack .ev2-fixture-time { grid-area: time; align-self: start; padding-top: 4px; }
+  .ev2-fixture.stack .ev2-fixture-team-left { grid-area: a; }
+  .ev2-fixture.stack .ev2-fixture-team-right { grid-area: b; flex-direction: row-reverse; justify-content: flex-end; }
+  .ev2-fixture.stack .ev2-fixture-team { font-size: 14px; justify-content: flex-start; }
+  .ev2-fixture.stack .ev2-fixture-name { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; }
+  .ev2-fixture.stack .ev2-fixture-mid { grid-area: s; justify-self: start; }
+  .ev2-fixture.stack .ev2-fixture-mid .score { font-size: 13.5px; padding: 3px 8px; }
+  .ev2-fixture.stack .ev2-fixture-round { grid-area: more; align-self: start; padding-top: 4px; }
+  .ev2-fixture.stack .ev2-fixture-extra { grid-area: x; }
+}
+.ev2-fixture-more i { font-size: 15px; opacity: 1; color: #006241; font-weight: 900; }
+/* three headline categories share the narrow column: stack them like the small ones */
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-lead { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "av val" "who who"; row-gap: 10px; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-lead .si-avatar { grid-area: av; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-val { grid-area: val; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-who { grid-area: who; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-sub { padding-left: 0; margin-top: -2px; }
+.ev2-tp.bb .ev2-tp-cat.major .ev2-tp-val b { font-size: 26px; }
+.ev2-tp.bb .ev2-tp-rest .n small { display: none; }
+@media (max-width: 760px) {
+  .ev2-tp.bb .ev2-tp-cat.major .ev2-tp-lead, .ev2-tp.bb .ev2-tp-cat.minor .ev2-tp-lead { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "av who val"; }
+  .ev2-tp.bb .ev2-tp-cat.major .ev2-tp-sub { padding-left: 64px; }
+  .ev2-tp.bb .ev2-tp-rest .n small { display: inline; }
+}
+.ev2-tp.bb .ev2-tp-rest .n { white-space: normal; overflow: visible; font-size: 13px; line-height: 1.25; }
+
+/* standings on a phone: the team's full name on its own line, the figures in a full-width row under it */
+@media (max-width: 560px) {
+  .ev2-standings .ev2-srow:has(.ev2-srow-stats) {
+    display: grid; grid-template-columns: 18px auto minmax(0, 1fr); grid-template-areas: "rank badge name" "stats stats stats";
+    row-gap: 10px; column-gap: 10px;
+  }
+  .ev2-srow:has(.ev2-srow-stats) .ev2-srow-rank { grid-area: rank; }
+  .ev2-srow:has(.ev2-srow-stats) .ev2-srow-badge { grid-area: badge; }
+  .ev2-srow:has(.ev2-srow-stats) .ev2-srow-name { grid-area: name; max-width: none; white-space: normal; overflow: visible; font-size: 15px; line-height: 1.25; }
+  .ev2-srow-stats { grid-area: stats; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; overflow: visible; }
+  .ev2-srow-stats .ev2-schip { min-width: 0; }
+}
