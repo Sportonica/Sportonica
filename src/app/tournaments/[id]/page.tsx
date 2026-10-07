@@ -17,6 +17,7 @@ import { cricketPlayers, cricketTeams } from "@/lib/tournaments/cricketRecords";
 import type { CricketTournamentData } from "@/components/tournaments/public/CricketStats";
 import EventTabs from "@/components/tournaments/public/EventTabs";
 import { CricketBall, CricketHeroArt, ballFor } from "@/components/tournaments/public/CricketArt";
+import { BasketballBall, BasketballHeroArt } from "@/components/tournaments/public/BasketballArt";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
 import { canScoreTournament, getCricketMatchFacts, getCricketRecords, getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
@@ -170,7 +171,8 @@ export default async function TournamentDetailPage({
   ].filter(Boolean) as [string, string][];
   prizes.sort((a, b) => prizeAmount(b[1]) - prizeAmount(a[1]));
 
-  const accent = sportColor(tournament.sport);
+  // basketball tournaments wear court orange (BasketballArt); the rest their sport's colour
+  const accent = isBasketball(tournament.sport) ? "#E65C00" : sportColor(tournament.sport);
 
   return (
     <div className="play">
@@ -189,13 +191,18 @@ export default async function TournamentDetailPage({
               getSportKind(tournament.sport) === "cricket"
                 // cricket's own poster: a ball crossing the field, on cream
                 ? <div className="bk-hero-empty ck-hero-empty"><CricketHeroArt /></div>
-                : <div className="bk-hero-empty"><Trophy size={40} /></div>
+                : isBasketball(tournament.sport)
+                  // basketball's: court lines on maple, the ball crossing a charcoal block
+                  ? <div className="bk-hero-empty bb-hero-empty"><BasketballHeroArt /></div>
+                  : <div className="bk-hero-empty"><Trophy size={40} /></div>
             )}
             <div className="bk-hero-grad" />
           </div>
           <div className="bk-hero-info">
             {getSportKind(tournament.sport) === "cricket" ? (
               <span className="bk-sport-pill ck-pill"><CricketBall kind={ballFor(tournament.scoring_rules)} size={14} />{tournament.sport}</span>
+            ) : isBasketball(tournament.sport) ? (
+              <span className="bk-sport-pill bb-pill"><BasketballBall size={14} />{tournament.sport}</span>
             ) : <span className="bk-sport-pill">{tournament.sport}</span>}
             <h1>{tournament.name}</h1>
             <div className="sub t-sub">

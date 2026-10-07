@@ -1,0 +1,22 @@
+/* Basketball artwork: court orange, black seams, maple. Flat, no gradients or shadows. */
+
+.bb-art-ball { display: inline-block; vertical-align: -3px; flex: none; }
+.bb-art-crest { display: block; flex: none; border-radius: 50%; }
+.bb-art-hero { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.bb-art-status { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 8px; border-radius: 6px; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; line-height: 1.4; white-space: nowrap; }
+.bb-art-status.live { background: #E65C00; color: #fff; }
+.bb-art-status.upcoming { background: rgba(26,26,26,0.07); color: #1A1A1A; }
+.bb-art-status.completed { background: #1A1A1A; color: #F9F6F0; }
+.bb-art-pulse { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: bb-art-pulse 1.4s ease-in-out infinite; }
+@keyframes bb-art-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+@media (prefers-reduced-motion: reduce) { .bb-art-pulse { animation: none; } }
+
+.bk-sport-pill.bb-pill { display: inline-flex; align-items: center; gap: 6px; }
+.bk-hero-empty.bb-hero-empty { position: absolute; inset: 0; padding: 0; background: #F9F6F0; }
+
+/* a basketball tournament's tabs: the active tab in court orange */
+.ev2-bb .ev2-tab.on { background: #E65C00 !important; color: #fff; box-shadow: none; }
+.ev2-bb .ev2-tab-indicator { background: #E65C00 !important; box-shadow: none; }
+.ev2-bb .ev2-subtab.on::after { background: #E65C00; }
+.ev2-bb .ev2-srow.top3 { border-left-color: #E65C00; }

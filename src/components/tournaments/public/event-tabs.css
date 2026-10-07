@@ -552,3 +552,5 @@
 .ev2-mc-row .ev2-mc-meta:has(.ev2-mc-status) { opacity: 1; }
 .ev2-mc-when { font-size: 11.5px; font-weight: 600; opacity: .6; margin-top: -2px; }
 .ev2-mc-meta { align-items: center; }
+.ev2-srow-badge:has(.bb-art-crest), .ev2-srow-badge:has(.ck-art-crest) { background: none; border: 0; padding: 0; overflow: visible; }
+.ev2-srow-badge svg { width: 100%; height: 100%; }

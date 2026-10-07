@@ -15,6 +15,7 @@ import type { TournamentLeaders } from "@/lib/intelligence/types";
 import { cricketRulesOf, type CricketStanding } from "@/lib/tournaments/standings";
 import { CricketLeaders, CricketTablePublic, rankPlayers, type CricketTournamentData } from "./CricketStats";
 import { CricketCrest, CricketStatus } from "./CricketArt";
+import { BasketballCrest, BasketballStatus } from "./BasketballArt";
 import type { MatchHighlight } from "@/lib/intelligence/actions";
 import { diffText, standingsScheme } from "@/lib/tournaments/standings";
 import {
@@ -195,8 +196,8 @@ export default function EventTabs({
   }, [activeTab]);
 
   return (
-    <CricketLook.Provider value={isCricketSport}>
-    <div>
+    <SportLook.Provider value={isCricketSport ? "cricket" : isBasketballSport ? "basketball" : null}>
+    <div className={isBasketballSport ? "ev2-bb" : undefined}>
       <div className="ev2-tabbar-wrap">
         <div className="ev2-tabbar" ref={barRef}>
           {indicator && <div className="ev2-tab-indicator" style={{ transform: `translateX(${indicator.left}px)`, width: indicator.width }} />}
@@ -261,7 +262,7 @@ export default function EventTabs({
           your bracket match, they're just noise below the fold. */}
       {(activeTab === "Overview" || activeTab === "Register") && <RulesPanel tournament={tournament} />}
     </div>
-    </CricketLook.Provider>
+    </SportLook.Provider>
   );
 }
 
@@ -381,6 +382,7 @@ function TableTab({
   standingsByGroup: Record<string, TournamentStanding[]>;
   teams: TournamentTeam[];
 }) {
+  const look = useContext(SportLook);
   const groups = Object.keys(standingsByGroup).sort();
   if (groups.length === 0 || groups.every((g) => standingsByGroup[g].length === 0)) {
     return <div className="ev2-empty">No results yet.</div>;
@@ -404,7 +406,7 @@ function TableTab({
                     {logo
                       // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={logo} alt="" />
-                      : r.team_name.charAt(0).toUpperCase()}
+                      : look ? <SportCrest name={r.team_name} px={34} /> : r.team_name.charAt(0).toUpperCase()}
                   </span>
                   <span className="ev2-srow-name">{r.team_name}</span>
                   <div className="ev2-srow-stats">
@@ -528,13 +530,21 @@ function MatchDetailModal({ match: m, team, onClose, intel: si, tournamentId }: 
 }
 
 // ── Fixtures (public, read-only, by date) ──────────────────────────
-// a cricket tournament draws its teams as crests (CricketArt) instead of letters
-const CricketLook = createContext(false);
+// cricket and basketball tournaments draw their teams as crests (CricketArt,
+// BasketballArt) instead of letters; other sports keep the letter circle
+const SportLook = createContext<"cricket" | "basketball" | null>(null);
+
+/** A team's crest in its sport's artwork, or null where the sport has none (or the slot is empty). */
+function SportCrest({ name, px }: { name: string; px: number }) {
+  const look = useContext(SportLook);
+  if (!look || ["?", "TBD", "Bye"].includes(name)) return null;
+  return look === "cricket" ? <CricketCrest name={name} size={px} /> : <BasketballCrest name={name} size={px} />;
+}
 
 function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: string | null; size?: "sm" | "md" }) {
-  const cricket = useContext(CricketLook);
-  if (cricket && !logoUrl && !["?", "TBD", "Bye"].includes(name)) {
-    return <span className={`ev2-crest ck${size === "sm" ? " sm" : ""}`}><CricketCrest name={name} size={size === "sm" ? 26 : 40} /></span>;
+  const look = useContext(SportLook);
+  if (look && !logoUrl && !["?", "TBD", "Bye"].includes(name)) {
+    return <span className={`ev2-crest ck${size === "sm" ? " sm" : ""}`}><SportCrest name={name} px={size === "sm" ? 26 : 40} /></span>;
   }
   return (
     <span className={`ev2-crest${size === "sm" ? " sm" : ""}`}>
@@ -1043,6 +1053,7 @@ function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, crick
   tournamentId: string; cricket: boolean; canScore: boolean;
 }) {
   const [allResults, setAllResults] = useState(false);
+  const look = useContext(SportLook);
   const name = (id: string | null) => teams.find((t) => t.id === id)?.name ?? "TBD";
   const at = (m: TournamentMatch) => m.starts_at ?? m.updated_at;
   const games = matches.filter((m) => m.team_a_id && m.team_b_id);
@@ -1060,12 +1071,15 @@ function MatchCentreTab({ matches, teams, intel, highlights, tournamentId, crick
     return (
       <div className={`ev2-mc-row ${kind}`}>
         <div className="ev2-mc-meta">
-          {cricket ? (
-            <span className="ev2-mc-status"><CricketStatus kind={kind === "live" ? "live" : kind === "next" ? "upcoming" : "completed"} />{kind === "live" && mi?.period ? mi.period : null}</span>
+          {look ? (
+            <span className="ev2-mc-status">
+              {look === "cricket" ? <CricketStatus kind={kind === "live" ? "live" : kind === "next" ? "upcoming" : "completed"} /> : <BasketballStatus kind={kind === "live" ? "live" : kind === "next" ? "upcoming" : "completed"} />}
+              {kind === "live" && mi?.period ? mi.period : null}
+            </span>
           ) : kind === "live" ? <span className="ev2-mc-live">● Live{mi?.period ? ` · ${mi.period}` : ""}</span> : <span>{matchWhen(m)}</span>}
           {m.round_label ? <span>{m.round_label}</span> : null}
         </div>
-        {cricket && kind !== "live" ? <div className="ev2-mc-when">{matchWhen(m)}</div> : null}
+        {look && kind !== "live" ? <div className="ev2-mc-when">{matchWhen(m)}</div> : null}
         {(["a", "b"] as const).map((side) => {
           const team = side === "a" ? m.team_a_id : m.team_b_id;
           return (
