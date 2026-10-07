@@ -320,14 +320,16 @@ export default function FixturesTab({
   // Only one of those can hold its result, so the row offers what fits (see MatchRow).
   const basketball = sportKeyFor(tournament.sport) === "basketball";
   const [bbModes, setBbModes] = useState<Record<string, { contestId: string; mode: "box" | "live" }>>({});
+  // cricket too: a match in the live scorer keeps its result there
+  const tracksScorer = basketball || sportKind === "cricket";
   const [boxScoring, setBoxScoring] = useState<{ match: TournamentMatch; prefill: { a: number | null; b: number | null } } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
-    if (!basketball) return;
+    if (!tracksScorer) return;
     let stale = false;
     basketballScoringModes(tournament.id).then((res) => { if (!stale && !isActionError(res)) setBbModes(res); }).catch(() => { /* scoring tables unavailable: quick entry only */ });
     return () => { stale = true; };
-  }, [basketball, tournament.id, matches]);
+  }, [tracksScorer, tournament.id, matches]);
   const bbFor = (m: TournamentMatch) => {
     if (!basketball) return null;
     const c = bbModes[m.id];
@@ -674,6 +676,7 @@ export default function FixturesTab({
                     sportKind={sportKind}
                     liveScoringHref={liveScoringHref}
                     basketball={bbFor(m)}
+                    scoredLive={sportKind === "cricket" && bbModes[m.id] ? { scorerHref: `/tournaments/${tournament.id}/score/${bbModes[m.id].contestId}`, centreHref: `/tournaments/${tournament.id}/live/${bbModes[m.id].contestId}` } : null}
                     onOpenScorer={() => run(async () => {
                       const c = await openMatchContest(m.id);
                       if (!isActionError(c)) router.push(`/tournaments/${tournament.id}/score/${c.id}`);
@@ -966,7 +969,7 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -975,6 +978,8 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   liveScoringHref: string | null;
   // basketball: how this match is being scored (null for other sports)
   basketball: { mode: "none" | "box" | "live"; scorerHref: string | null; centreHref: string | null } | null;
+  // cricket: this match is in the live scorer, which holds its result
+  scoredLive: { scorerHref: string; centreHref: string } | null;
   // basketball: open this match in the live scorer
   onOpenScorer: () => void;
   // open the box score, with the score typed so far for the team lines
@@ -1275,8 +1280,20 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
               </div>
             )}
           </div>
+        ) : sportKind === "cricket" && scoredLive ? (
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <Link className="tc-btn primary" href={scoredLive.scorerHref} style={{ padding: "6px 10px", fontSize: 11.5, textDecoration: "none" }}>{done ? "Open in scorer" : "Score live"}</Link>
+            <Link className="tc-btn" href={scoredLive.centreHref} style={{ padding: "6px 10px", fontSize: 11.5, textDecoration: "none" }}>Scorecard</Link>
+            <span className="tc-dim" style={{ fontSize: 11 }}>Scored ball by ball: fix it in the scorer.</span>
+          </div>
         ) : sportKind === "cricket" ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+            {!done && liveScoringHref ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button className="tc-btn primary" disabled={pending} style={{ padding: "8px 14px", fontSize: 12.5 }} onClick={onOpenScorer}>Score match</button>
+                <span className="tc-dim" style={{ fontSize: 11 }}>ball by ball, live. Or enter the final score below.</span>
+              </div>
+            ) : null}
             <CricketScoreEntry match={match} teamName={teamName} pending={pending} onSave={onCricketResult} confirmCascadeIfNeeded={confirmCascadeIfNeeded} />
             {match.team_a_id && match.team_b_id && (
               <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>

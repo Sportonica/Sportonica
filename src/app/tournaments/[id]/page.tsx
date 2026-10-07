@@ -5,7 +5,7 @@ import { ChevronLeft, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   getTournament, getDisplayVenueName, getMyTeamForTournament, getTournamentMatches, listTournamentTeams,
-  getTournamentStandings, getTournamentPlayerStats, getTournamentAwards,
+  getTournamentStandings, getTournamentPlayerStats, getTournamentAwards, getTournamentCricketStats,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS, tournamentPath } from "@/lib/tournaments/types";
@@ -15,10 +15,10 @@ import { sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
 import EventTabs from "@/components/tournaments/public/EventTabs";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
-import { getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
+import { getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
-import { computeBasketballStandings, isBasketball } from "@/lib/tournaments/standings";
+import { computeBasketballStandings, computeCricketStandings, isBasketball, isCricket } from "@/lib/tournaments/standings";
 import "@/app/(play)/play.css";
 import "@/app/platform/events/events.css";
 import "./tournament-hero.css";
@@ -86,8 +86,14 @@ export default async function TournamentDetailPage({
   const teams = isActionError(teamsRes) ? [] : teamsRes;
   const playerStats = isActionError(playerStatsRes) ? [] : playerStatsRes;
   // basketball's player stats come from its scored games (points, rebounds…), not the goals table
-  const leadersRes = isLiveOrDone && isBasketball(tournament.sport) ? await getTournamentLeaders(id) : null;
+  const leadersRes = isLiveOrDone && (isBasketball(tournament.sport) || isCricket(tournament.sport)) ? await getTournamentLeaders(id) : null;
   const leaders = leadersRes && !isActionError(leadersRes) ? leadersRes : null;
+  // cricket: batting and bowling figures entered from the fixtures
+  const cricketRes = isLiveOrDone && isCricket(tournament.sport) ? await getTournamentCricketStats(id) : null;
+  const cricketStats = cricketRes && !isActionError(cricketRes) ? cricketRes : [];
+  // what each scored game recorded: period scores, result, top performers
+  const highlightsRes = isLiveOrDone && sportKeyFor(tournament.sport) ? await getMatchHighlights(id) : null;
+  const highlights = highlightsRes && !isActionError(highlightsRes) ? highlightsRes : {};
   const awards = isActionError(awardsRes) ? { winner: null, runnerUp: null, semifinalists: [] } : awardsRes;
 
   const hasStandings = tournament.format === "league" || tournament.format === "group_knockout";
@@ -98,6 +104,9 @@ export default async function TournamentDetailPage({
   if (hasStandings && matches.length > 0 && isBasketball(tournament.sport)) {
     // basketball tables follow the competition's own rules, from the fixtures
     for (const g of groups) standingsByGroup[g] = computeBasketballStandings(matches, teams, tournament.scoring_rules, g || null);
+  } else if (hasStandings && matches.length > 0 && isCricket(tournament.sport)) {
+    // cricket tables: points then net run rate, from the fixtures' runs and overs
+    for (const g of groups) standingsByGroup[g] = computeCricketStandings(matches, teams, tournament.scoring_rules, g || null);
   } else if (hasStandings && matches.length > 0) {
     const entries = await Promise.all(groups.map(async (g) => {
       const res = await getTournamentStandings(id, g || undefined);
@@ -194,6 +203,8 @@ export default async function TournamentDetailPage({
               standingsByGroup={standingsByGroup}
               playerStats={playerStats}
               leaders={leaders}
+              cricketStats={cricketStats}
+              highlights={highlights}
               awards={awards}
               myTeam={isActionError(myTeam) ? null : myTeam}
               loggedIn={!!user}

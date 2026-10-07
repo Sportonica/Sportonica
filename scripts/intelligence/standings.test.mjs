@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { computeBasketballStandings, standingsScheme } from "../../src/lib/tournaments/standings.ts";
+import { computeBasketballStandings, computeCricketStandings, diffText, standingsScheme } from "../../src/lib/tournaments/standings.ts";
 import { section } from "./harness.mjs";
 
 const team = (id, group = null, status = "confirmed") => ({ id, name: id, status, group_name: group });
@@ -73,3 +73,31 @@ section("standings: streaks, groups, and the sport's table vocabulary", () => {
   assert.equal(standingsScheme("Basketball", { allowTie: true }).draws, true);
   assert.equal(standingsScheme("Futsal").forLabel, "GF");
 });
+
+section("standings: cricket points and net run rate, a side bowled out counting its full overs", () => {
+  const cteams = [team("Lions"), team("Tigers"), team("Bears")];
+  const cgame = (a, b, ra, wa, oa, rb, wb, ob, extra = {}) => game(a, b, ra, rb, { wickets_a: wa, overs_a: oa, wickets_b: wb, overs_b: ob, ...extra });
+  const ms = [
+    cgame("Lions", "Tigers", 160, 4, 20, 120, 10, 15.3), // Tigers all out in 15.3: counted as 20 overs
+    cgame("Tigers", "Bears", 140, 6, 20, 141, 3, 18.2),  // Bears chase in 18.2 overs
+    cgame("Bears", "Lions", 150, 5, 20, 150, 8, 20, { winner_team_id: null }), // tie
+  ];
+  const t = computeCricketStandings(ms, cteams, { preset: "t20" });
+  assert.deepEqual(t.map((r) => [r.team_name, r.points, r.won, r.lost, r.drawn]), [
+    ["Lions", 3, 1, 0, 1], ["Bears", 3, 1, 0, 1], ["Tigers", 0, 0, 2, 0],
+  ]);
+  // Lions: 310 off 40 overs, 270 against in 40 (Tigers' 15.3 counted as 20): 7.75 - 6.75
+  assert.equal(t[0].goal_diff, 1);
+  // Bears: 291 off 38.2 overs, 290 against in 40
+  assert.equal(t[1].goal_diff, Math.round(((291 / 230) * 6 - (290 / 240) * 6) * 1000) / 1000);
+  assert.ok(t[0].goal_diff > t[1].goal_diff, "level on points: net run rate decides");
+  const sc = standingsScheme("Cricket");
+  assert.equal(sc.diffLabel, "NRR");
+  assert.equal(diffText(sc, 1), "+1.000");
+  assert.equal(diffText(sc, -0.4567), "-0.457");
+  // a walkover counts for points but not for the run rate
+  const wo = computeCricketStandings([...ms, game("Tigers", "Bears", null, null, { status: "walkover", winner_team_id: "Tigers" })], cteams, {});
+  assert.equal(wo.find((r) => r.team_name === "Tigers").points, 2);
+  assert.equal(wo.find((r) => r.team_name === "Bears").goal_diff, t[1].goal_diff);
+});
+

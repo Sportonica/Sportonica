@@ -260,3 +260,8 @@ details.si-more[open] > summary::after { content: " -"; }
 .si-jerseys.asking .si-jersey { animation: si-pulse 1.2s ease-in-out infinite; }
 @keyframes si-pulse { 50% { background: var(--si-surface-2); } }
 @media (prefers-reduced-motion: reduce) { .si-jerseys.asking .si-jersey { animation: none; background: var(--si-surface-2); } }
+
+/* cricket scorer */
+.si-cricket-crease { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
+.si-cricket-crease > div { display: grid; gap: 1px; font-size: 13.5px; }
+.si-cricket-crease .si-muted { font-size: 11.5px; }

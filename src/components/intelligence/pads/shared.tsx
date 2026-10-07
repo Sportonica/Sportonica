@@ -76,3 +76,23 @@ export function LineupPicker({ players, size, min = size, label, onSave, action 
     </div>
   );
 }
+
+/** Side A's colour and side B's, the same as in the charts. */
+export const teamColor = (side: Side): string => (side === "a" ? "var(--si-series-1)" : "var(--si-series-2)");
+
+/** A player as a team vest in the team's colour: the number big, the name and position under it. */
+export function Jersey({ p, color, on, fouls = 0, out = false, note, onClick }: { p: Participant; color: string; on: boolean; fouls?: number; out?: boolean; note?: string | null; onClick: () => void }) {
+  const first = p.name.split(" ")[0];
+  return (
+    <button type="button" className={`si-jersey${on ? " on" : ""}${out ? " out" : ""}`} style={{ ["--team" as string]: color }} onClick={onClick}
+      aria-pressed={on} aria-label={`${p.number != null ? `#${p.number} ` : ""}${p.name}${p.position ? `, ${p.position}` : ""}${fouls ? `, ${fouls} fouls` : ""}`}>
+      <span className="si-vest">
+        <svg viewBox="0 0 60 66" aria-hidden="true"><path d="M17 3 Q30 15 43 3 L52 6 Q49 19 57 26 L57 63 L3 63 L3 26 Q11 19 8 6 Z" /></svg>
+        <b>{p.number ?? "–"}</b>
+      </span>
+      <span className="si-jersey-name">{first}</span>
+      {p.position || fouls || note ? <span className="si-jersey-meta">{[note, p.position, fouls ? `${fouls}f` : null].filter(Boolean).join(" · ")}</span> : null}
+    </button>
+  );
+}
+
