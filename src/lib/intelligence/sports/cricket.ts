@@ -226,7 +226,7 @@ function battingTable(inn: CricketInnings, ctx: MatchContext): StatTable {
   return { key: `bat-${inn.n}`, title: `${sideName(ctx, inn.batting)} batting (${ordinal(inn.n)} innings)`, columns, rows };
 }
 
-function dismissalText(b: Bat, ctx: MatchContext): string {
+export function dismissalText(b: Pick<Bat, "how" | "by" | "fielder">, ctx: MatchContext): string {
   const bowler = b.by ? playerName(ctx, b.by) : "";
   const fielder = b.fielder ? playerName(ctx, b.fielder) : "";
   switch (b.how) {

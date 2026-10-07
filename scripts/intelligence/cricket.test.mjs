@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { cricketEngine as E, oversText, parseOvers, runRate } from "../../src/lib/intelligence/sports/cricket.ts";
 import { aggregate } from "../../src/lib/intelligence/aggregate.ts";
+import * as V from "../../src/lib/intelligence/sports/cricketView.ts";
 import { makeContext, openMatch, section, cell, card } from "./harness.mjs";
 
 const ctx = makeContext("cricket", 6);
@@ -350,4 +351,53 @@ section("cricket: the formats the tournament form saves are valid rules", () => 
     assert.equal(rules.oversPerInnings, r.oversPerInnings, `${r.preset} overs`);
     assert.equal(rules.maxOversPerBowler, r.maxOversPerBowler, `${r.preset} overs per bowler`);
   }
+});
+
+section("cricket screens: figures read from the state", () => {
+  const m = firstInnings();
+  const s = m.env.sport, rules = m.rules, inn = s.innings[0];
+  const n = V.liveNumbers(inn, rules);
+  assert.deepEqual([n.runs, n.wickets, n.overs, n.crr, n.target], [21, 3, "1.3", 14, null], "21/3 off 1.3 overs is 14 an over");
+  const [b1, b2] = V.bowlingCard(inn, ctx, rules);
+  assert.equal(b1.figures, "1.0-0-17-1", "a wide and a no-ball count against the bowler, a leg bye does not");
+  assert.equal(b1.dots, 2, "the dot ball and the wicket ball are dots");
+  assert.equal(b2.figures, "0.3-0-2-1", "a run out is not the bowler's wicket");
+  assert.deepEqual(V.fallOfWickets(inn, ctx, rules).map((f) => f.score), ["11-1", "21-2", "21-3"]);
+  assert.deepEqual(V.sideScores(s, ctx, rules).map((x) => x.score), ["21/3", null]);
+  const card = V.battingCard(inn, ctx);
+  assert.deepEqual(card.lines.map((b) => b.how), ["run out (Bravo 4)", "b Bravo 1", "not out", "c Bravo 3 b Bravo 2"]);
+  assert.equal(card.yetToBat.length, 2);
+  const top = V.topPerformers(s, ctx, rules);
+  assert.equal(top.bat.line, "8 (3)");
+  assert.equal(top.bowl.line, "1/2", "most wickets, then fewest runs");
+});
+
+section("cricket screens: ball badges and commentary", () => {
+  assert.deepEqual(V.ballBadge("1wd"), { text: "WD", tone: "extra" }, "a plain wide shows no runs");
+  assert.deepEqual(V.ballBadge("3wd"), { text: "2WD", tone: "extra" }, "runs beyond the wide's penalty");
+  assert.deepEqual(V.ballBadge("2lb"), { text: "2LB", tone: "extra" });
+  assert.deepEqual(V.ballBadge("1+W"), { text: "W", tone: "wicket" });
+  assert.equal(V.ballBadge("6").tone, "six");
+  assert.equal(V.ballBadge("0").tone, "dot");
+  assert.deepEqual(V.parseBallLabel("1st innings 6.2"), { innings: 1, ball: "6.2" });
+  assert.equal(V.parseBallLabel(null), null);
+  const four = V.describeDelivery({ striker: "a1", nonStriker: "a2", bowler: "b1", runsBat: 4 }, ctx);
+  assert.deepEqual([four.badge, four.headline], ["4", "FOUR"]);
+  const out = V.describeDelivery({ striker: "a1", nonStriker: "a2", bowler: "b1", wicket: { type: "bowled" } }, ctx);
+  assert.equal(out.text, "Bravo 1 to Alpha 1, Alpha 1 is bowled by Bravo 1.");
+  const caught = V.describeDelivery({ striker: "a1", nonStriker: "a2", bowler: "b1", wicket: { type: "caught", fielder: "b3" }, commentary: "Top edge." }, ctx);
+  assert.equal(caught.text, "Bravo 1 to Alpha 1, Alpha 1 c Bravo 3 b Bravo 1. Top edge.");
+  const wide = V.describeDelivery({ striker: "a1", nonStriker: "a2", bowler: "b1", extra: "wide", extraRuns: 1 }, ctx);
+  assert.deepEqual([wide.badge, wide.headline], ["1WD", "WIDE + 1"]);
+});
+
+section("cricket screens: the chase", () => {
+  const m = firstInnings();
+  m.push("INNINGS_START", { batting: "b", striker: "b1", nonStriker: "b2" });
+  ball(m, "b1", "b2", "a1", { runsBat: 4 });
+  const n = V.liveNumbers(m.env.sport.innings[1], m.rules);
+  assert.deepEqual([n.target, n.need, n.ballsLeft], [22, 18, 11]);
+  assert.equal(n.rrr, 9.82, "18 from 11 balls");
+  const st = V.partnerships(m.env.sport.innings[1], ctx);
+  assert.deepEqual([st.length, st[0].current, st[0].runs, st[0].batters[0].runs], [1, true, 4, 4]);
 });

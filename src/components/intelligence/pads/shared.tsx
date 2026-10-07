@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import type { Participant, Side } from "@/lib/intelligence/core/types";
-import type { ContestView } from "@/lib/intelligence/types";
+import type { ContestView, TimelineEntry } from "@/lib/intelligence/types";
 
 export interface PadProps {
   contest: ContestView;
   // queue an event; the console sends it and shows any refusal
   send: (type: string, payload?: Record<string, unknown>) => void;
+  // undo from the pad itself: look up the last event (fresh from the server), then undo it
+  undo?: { last: () => Promise<TimelineEntry | null>; run: (e: TimelineEntry) => void; disabled: boolean };
 }
 
 export const SIDE_KEYS: Side[] = ["a", "b"];
