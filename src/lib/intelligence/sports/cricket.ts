@@ -13,6 +13,7 @@ import {
   type Analytics, type EngineEvent, type Issue, type MatchContext, type MatchResult, type ScoreView,
   type Side, type SportIntelligenceEngine, type StatColumn, type StatLine, type StatTable, type StatValue,
 } from "../core/types";
+import { DEFAULT_CRICKET_TABLE, cricketTableOf, cricketTableProblem, type CricketTable } from "./cricketTable";
 import { add, isNonNegInt, isPosInt, mergeRules, playerName, playersOf, ratio, round, sideName, sideOfPlayer, str } from "../core/util";
 
 export interface CricketPhase { name: string; from: number; to: number }
@@ -33,9 +34,11 @@ export interface CricketRules {
   allowDraw: boolean;
   followOnLead: number | null;
   phases: CricketPhase[];
+  /** the league table (points, tiebreakers, who goes through); not used to score a match */
+  table: CricketTable;
 }
 
-const BASE = { ballsPerOver: 6, wicketsPerInnings: 10, wideRuns: 1, noBallRuns: 1, wideRebowled: true, noBallRebowled: true };
+const BASE = { ballsPerOver: 6, wicketsPerInnings: 10, wideRuns: 1, noBallRuns: 1, wideRebowled: true, noBallRebowled: true, table: DEFAULT_CRICKET_TABLE };
 
 export const CRICKET_PRESETS: Record<CricketRules["preset"], CricketRules> = {
   t20: { ...BASE, preset: "t20", oversPerInnings: 20, inningsPerSide: 1, maxOversPerBowler: 4, freeHit: true, allowDeclaration: false, allowDraw: false, followOnLead: null,
@@ -93,6 +96,8 @@ export interface CricketState {
   carry: Record<Side, number>;
   result: MatchResult | null;
   log: { seq: number; text: string }[];
+  /** overs per innings set for this match (OVERS_CHANGE), in place of the competition's; absent when unchanged */
+  oversLimit?: number;
 }
 
 // ── overs arithmetic ────────────────────────────────────────────────
@@ -296,7 +301,7 @@ const CAREER_DERIVED: StatColumn[] = [
 export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> = {
   sport: "cricket",
   label: "Cricket",
-  eventTypes: ["TOSS", "INNINGS_START", "DELIVERY", "NEW_BATTER", "RETIRE", "PENALTY_RUNS", "DECLARE", "INNINGS_END", "TARGET_REVISED"],
+  eventTypes: ["TOSS", "INNINGS_START", "DELIVERY", "NEW_BATTER", "RETIRE", "PENALTY_RUNS", "DECLARE", "INNINGS_END", "TARGET_REVISED", "OVERS_CHANGE"],
 
   answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, CRICKET_KNOWLEDGE); },
   rulesGuide: (rules) => CRICKET_KNOWLEDGE.guide(rules),
@@ -305,6 +310,11 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
     const preset = (input && typeof input === "object" ? (input as { preset?: unknown }).preset : undefined) ?? "t20";
     if (typeof preset !== "string" || !(preset in CRICKET_PRESETS)) throw new RulesError("preset must be t20, odi, test or custom");
     const r = mergeRules(CRICKET_PRESETS[preset as CricketRules["preset"]], input);
+    const tableInput = input && typeof input === "object" ? (input as { table?: unknown }).table : undefined;
+    const tableWhy = cricketTableProblem(tableInput);
+    if (tableWhy) throw new RulesError(tableWhy);
+    // a partial table keeps the defaults for what it leaves out
+    r.table = cricketTableOf({ ...DEFAULT_CRICKET_TABLE, ...(tableInput && typeof tableInput === "object" ? tableInput : {}) });
     if (r.oversPerInnings !== null && !isPosInt(r.oversPerInnings)) throw new RulesError("oversPerInnings must be empty or a positive whole number");
     if (r.inningsPerSide !== 1 && r.inningsPerSide !== 2) throw new RulesError("inningsPerSide must be 1 or 2");
     if (!isPosInt(r.ballsPerOver) || r.ballsPerOver > 9) throw new RulesError("ballsPerOver must be between 1 and 9");
@@ -419,6 +429,17 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
       case "INNINGS_END":
         return inn ? null : "There is no innings in progress";
 
+      case "OVERS_CHANGE": {
+        // Before the first ball, or during the first innings. In the chase, fewer overs
+        // also mean a new target, which is what Revise target is for.
+        if (rules.oversPerInnings === null) return "This format has no overs limit";
+        if (!isPosInt(p.overs) || p.overs > 200) return "Overs must be a whole number between 1 and 200";
+        if (inn && inn.target !== null) return "In the chase, change the overs with Revise target, which sets the new target too";
+        if (!inn && s.innings.length) return "The overs can only be changed before the match or during the first innings";
+        if (inn && p.overs * rules.ballsPerOver < inn.balls) return `${oversText(inn.balls, rules.ballsPerOver)} overs have already been bowled`;
+        return null;
+      }
+
       case "TARGET_REVISED":
         if (!inn || inn.target === null) return "A target can only be revised during the chase";
         if (!isPosInt(p.target)) return "The revised target must be a positive whole number";
@@ -446,7 +467,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
           striker, nonStriker, bowler: null, lastOverBowler: null, overs: [], fow: [], partnerships: [],
           stand: { wicket: 1, runs: 0, balls: 0, batters: [striker, nonStriker] },
           closed: null, target: chaseTarget(s, rules, batting),
-          maxBalls: rules.oversPerInnings === null ? null : rules.oversPerInnings * rules.ballsPerOver,
+          maxBalls: rules.oversPerInnings === null ? null : (s.oversLimit ?? rules.oversPerInnings) * rules.ballsPerOver,
           freeHit: false, followOn: p.followOn === true,
         };
         s.carry[batting] = 0;
@@ -500,6 +521,16 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
         inn.striker = null; inn.nonStriker = null;
         s.log.push({ seq: ev.seq, text: `${ordinal(inn.n)} innings ${ev.type === "DECLARE" ? "declared" : "ended"}: ${sideName(ctx, inn.batting)} ${inn.runs}/${inn.wickets}` });
         evaluate(s, ctx, rules, ev.seq);
+        return s;
+      }
+
+      case "OVERS_CHANGE": {
+        const overs = p.overs as number;
+        s.oversLimit = overs;
+        const inn = open(s);
+        if (inn) inn.maxBalls = overs * rules.ballsPerOver;
+        s.log.push({ seq: ev.seq, text: `Overs changed to ${overs} an innings` });
+        checkClose(s, ctx, rules, ev.seq);
         return s;
       }
 
@@ -822,6 +853,7 @@ export const cricketEngine: SportIntelligenceEngine<CricketRules, CricketState> 
       case "DECLARE": return "Innings declared";
       case "INNINGS_END": return "Innings ended";
       case "TARGET_REVISED": return `Target revised to ${String(p.target)}`;
+      case "OVERS_CHANGE": return `Overs changed to ${String(p.overs)} an innings${typeof p.reason === "string" && p.reason ? `. ${p.reason}` : ""}`;
       default: {
         const extra = str(p.extra);
         const runs = (typeof p.runsBat === "number" ? p.runsBat : 0) + (typeof p.extraRuns === "number" ? p.extraRuns : 0);

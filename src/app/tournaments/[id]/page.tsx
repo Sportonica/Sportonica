@@ -13,9 +13,11 @@ import type { TournamentStanding } from "@/lib/tournaments/types";
 import { telHref } from "@/lib/playTogether/types";
 import { sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
+import { cricketPlayers, cricketTeams } from "@/lib/tournaments/cricketRecords";
+import type { CricketTournamentData } from "@/components/tournaments/public/CricketStats";
 import EventTabs from "@/components/tournaments/public/EventTabs";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
-import { getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
+import { getCricketMatchFacts, getCricketRecords, getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
 import { computeBasketballStandings, computeCricketStandings, isBasketball, isCricket } from "@/lib/tournaments/standings";
@@ -100,13 +102,24 @@ export default async function TournamentDetailPage({
   const groups = tournament.format === "group_knockout"
     ? [...new Set(teams.map((t) => t.group_name).filter((g): g is string => !!g))].sort()
     : [""];
+  // cricket: what the scored matches add to the fixtures (each match's overs, abandoned matches,
+  // who batted first) and the per-match player lines behind the leaderboards and records
+  const cricketSport = isCricket(tournament.sport) && isLiveOrDone;
+  const [factsRes, recordsRes] = cricketSport ? await Promise.all([getCricketMatchFacts(id), getCricketRecords(id)]) : [null, null];
+  const facts = factsRes && !isActionError(factsRes) ? factsRes : {};
+  const cricketData: CricketTournamentData | null = cricketSport ? (() => {
+    const rec = recordsRes && !isActionError(recordsRes) ? recordsRes : { lines: [], names: {}, partnerships: [] };
+    const teamName = (teamId: string | null) => teams.find((t) => t.id === teamId)?.name ?? "";
+    const players = cricketPlayers(rec.lines, (pid, tid) => ({ name: rec.names[pid]?.name ?? "Player", team: rec.names[pid]?.team ?? teamName(tid) }), cricketStats);
+    return { players, partnerships: rec.partnerships, ...cricketTeams(matches, teams, tournament.scoring_rules, facts) };
+  })() : null;
   const standingsByGroup: Record<string, TournamentStanding[]> = {};
   if (hasStandings && matches.length > 0 && isBasketball(tournament.sport)) {
     // basketball tables follow the competition's own rules, from the fixtures
     for (const g of groups) standingsByGroup[g] = computeBasketballStandings(matches, teams, tournament.scoring_rules, g || null);
   } else if (hasStandings && matches.length > 0 && isCricket(tournament.sport)) {
-    // cricket tables: points then net run rate, from the fixtures' runs and overs
-    for (const g of groups) standingsByGroup[g] = computeCricketStandings(matches, teams, tournament.scoring_rules, g || null);
+    // cricket tables: points then net run rate, from the fixtures' runs and overs (and each scored match's own overs)
+    for (const g of groups) standingsByGroup[g] = computeCricketStandings(matches, teams, tournament.scoring_rules, g || null, facts);
   } else if (hasStandings && matches.length > 0) {
     const entries = await Promise.all(groups.map(async (g) => {
       const res = await getTournamentStandings(id, g || undefined);
@@ -204,6 +217,7 @@ export default async function TournamentDetailPage({
               playerStats={playerStats}
               leaders={leaders}
               cricketStats={cricketStats}
+              cricket={cricketData}
               highlights={highlights}
               awards={awards}
               myTeam={isActionError(myTeam) ? null : myTeam}

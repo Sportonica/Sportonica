@@ -18,6 +18,7 @@
 
 import type { TournamentMatch, TournamentStanding, TournamentTeam } from "./types";
 import { resolveBasketballRules, type BasketballRules } from "../intelligence/sports/basketball/rules";
+import { cricketTableOf, type CricketTable, type CricketTiebreaker } from "../intelligence/sports/cricketTable";
 
 export interface StandingsScheme {
   draws: boolean;
@@ -198,59 +199,158 @@ export function computeBasketballStandings(
 
 // What the table needs from the competition's cricket rules (the engine's
 // presets, sports/cricket.ts, without loading the engine into the page).
-interface CricketTableRules { oversPerInnings: number | null; ballsPerOver: number; wicketsPerInnings: number }
+interface CricketTableRules { oversPerInnings: number | null; ballsPerOver: number; wicketsPerInnings: number; table: CricketTable }
 const CRICKET_OVERS: Record<string, number | null> = { t20: 20, odi: 50, test: null, custom: 20 };
 
 export function cricketRulesOf(scoringRules: unknown): CricketTableRules {
-  const r = (scoringRules ?? {}) as Partial<CricketTableRules> & { preset?: string };
+  const r = (scoringRules ?? {}) as Partial<CricketTableRules> & { preset?: string; table?: unknown };
   const preset = r.preset && r.preset in CRICKET_OVERS ? r.preset : "t20";
   return {
     oversPerInnings: r.oversPerInnings !== undefined ? r.oversPerInnings : CRICKET_OVERS[preset],
     ballsPerOver: r.ballsPerOver ?? 6,
     wicketsPerInnings: r.wicketsPerInnings ?? 10,
+    table: cricketTableOf(r.table),
   };
 }
 
-// "4.5" overs is 4 overs and 5 balls
-const ballsOf = (overs: number | null, ballsPerOver: number): number => {
+// "4.5" overs is 4 overs and 5 balls (29 balls), never the decimal 4.5
+export const ballsOf = (overs: number | null, ballsPerOver: number): number => {
   if (overs === null) return 0;
   const whole = Math.floor(overs);
   return whole * ballsPerOver + Math.round((overs - whole) * 10);
 };
 
+/** 105 balls -> "17.3" */
+export const oversOf = (balls: number, ballsPerOver = 6): string => `${Math.floor(balls / ballsPerOver)}.${balls % ballsPerOver}`;
+
+/**
+ * Per scored fixture (getCricketMatchFacts): the balls each side was
+ * allowed, and whether the match was abandoned. A fixture without a
+ * scored match uses the competition's overs and its own status.
+ */
+export type CricketMatchFacts = Record<string, { a: number | null; b: number | null; abandoned?: boolean; first?: "a" | "b" | null }>;
+
+export type CricketResult = "W" | "L" | "T" | "N";
+export type QualificationStatus = "qualified" | "eliminated" | "contention";
+
+export interface CricketStanding extends TournamentStanding {
+  tied: number;
+  no_result: number;
+  /** legal balls, so overs are never decimals: 105 balls is 17.3 overs */
+  balls_faced: number;
+  balls_bowled: number;
+  /** results with a net run rate (an abandoned match or walkover has none) */
+  nrr_games: number;
+  /** most recent last */
+  form: CricketResult[];
+  remaining: number;
+  max_points: number;
+  /** null when the competition has not said how many go through */
+  status: QualificationStatus | null;
+}
+
+const DONE = new Set(["completed", "walkover"]);
+const OFF = new Set(["cancelled"]);
+
+/** How a finished league fixture counts: a result, a tie, or no result (abandoned, or completed with no scores). */
+function cricketOutcome(m: TournamentMatch, facts: CricketMatchFacts): "a" | "b" | "tie" | "nr" | null {
+  if (facts[m.id]?.abandoned && (m.status === "cancelled" || m.status === "completed")) return "nr";
+  if (!DONE.has(m.status)) return null;
+  if (m.winner_team_id === m.team_a_id) return "a";
+  if (m.winner_team_id === m.team_b_id) return "b";
+  return m.score_a === null || m.score_b === null ? "nr" : "tie";
+}
+
 export function computeCricketStandings(
-  matches: TournamentMatch[], teams: TeamRef[], scoringRules: unknown, group: string | null = null,
-): TournamentStanding[] {
+  matches: TournamentMatch[], teams: TeamRef[], scoringRules: unknown, group: string | null = null, facts: CricketMatchFacts = {},
+): CricketStanding[] {
   const rules = cricketRulesOf(scoringRules);
+  const pts = rules.table;
   const bpo = rules.ballsPerOver || 6;
   const quota = rules.oversPerInnings !== null ? rules.oversPerInnings * bpo : null;
   const pool = teams.filter((t) => t.status === "confirmed" && (group === null || t.group_name === group));
-  const t = new Map(pool.map((x) => [x.id, { name: x.name, played: 0, won: 0, tied: 0, lost: 0, points: 0, runsFor: 0, ballsFaced: 0, runsAgainst: 0, ballsBowled: 0 }]));
-  const games = matches.filter((m) => (m.stage === "league" || m.stage === "group") && (group === null || m.group_name === group)
-    && (m.status === "completed" || m.status === "walkover") && m.team_a_id && m.team_b_id);
-  for (const m of games) {
+  const t = new Map(pool.map((x) => [x.id, {
+    name: x.name, played: 0, won: 0, tied: 0, noResult: 0, lost: 0, points: 0,
+    runsFor: 0, ballsFaced: 0, runsAgainst: 0, ballsBowled: 0, nrrGames: 0, remaining: 0,
+    results: [] as { at: string; r: CricketResult; opp: string }[],
+  }]));
+  // the table is the league stage only: a knockout match never counts towards it
+  const league = matches.filter((m) => (m.stage === "league" || m.stage === "group") && (group === null || m.group_name === group) && m.team_a_id && m.team_b_id);
+  const when = (m: TournamentMatch) => m.starts_at ?? m.updated_at;
+
+  for (const m of league) {
     const a = t.get(m.team_a_id!), b = t.get(m.team_b_id!);
     if (!a || !b) continue;
+    const out = cricketOutcome(m, facts);
+    if (out === null) {
+      if (!OFF.has(m.status)) { a.remaining += 1; b.remaining += 1; }
+      continue;
+    }
     a.played += 1; b.played += 1;
-    if (m.winner_team_id === m.team_a_id) { a.won += 1; a.points += 2; b.lost += 1; }
-    else if (m.winner_team_id === m.team_b_id) { b.won += 1; b.points += 2; a.lost += 1; }
-    else { a.tied += 1; b.tied += 1; a.points += 1; b.points += 1; }
-    // net run rate only counts games with both innings recorded; a walkover has none
-    if (m.status === "walkover" || m.score_a === null || m.score_b === null) continue;
-    const faced = (overs: number | null, wickets: number | null) =>
-      wickets !== null && wickets >= rules.wicketsPerInnings && quota !== null ? quota : ballsOf(overs, bpo);
-    const fa = faced(m.overs_a, m.wickets_a), fb = faced(m.overs_b, m.wickets_b);
+    const res = (x: typeof a, r: CricketResult, opp: string) => {
+      x.results.push({ at: when(m), r, opp });
+      if (r === "W") { x.won += 1; x.points += pts.win; }
+      else if (r === "L") { x.lost += 1; x.points += pts.loss; }
+      else if (r === "T") { x.tied += 1; x.points += pts.tie; }
+      else { x.noResult += 1; x.points += pts.noResult; }
+    };
+    res(a, out === "a" ? "W" : out === "b" ? "L" : out === "tie" ? "T" : "N", m.team_b_id!);
+    res(b, out === "b" ? "W" : out === "a" ? "L" : out === "tie" ? "T" : "N", m.team_a_id!);
+
+    // net run rate only counts games with both innings recorded; a walkover or no result has none
+    if (out === "nr" || m.status === "walkover" || m.score_a === null || m.score_b === null) continue;
+    // a side bowled out is charged its full allowance: this match's, when its overs were changed
+    const faced = (overs: number | null, wickets: number | null, allowed: number | null | undefined) => {
+      const full = allowed ?? quota;
+      return wickets !== null && wickets >= rules.wicketsPerInnings && full !== null ? full : ballsOf(overs, bpo);
+    };
+    const fa = faced(m.overs_a, m.wickets_a, facts[m.id]?.a), fb = faced(m.overs_b, m.wickets_b, facts[m.id]?.b);
     if (!fa || !fb) continue;
-    a.runsFor += m.score_a; a.ballsFaced += fa; a.runsAgainst += m.score_b; a.ballsBowled += fb;
-    b.runsFor += m.score_b; b.ballsFaced += fb; b.runsAgainst += m.score_a; b.ballsBowled += fa;
+    a.runsFor += m.score_a; a.ballsFaced += fa; a.runsAgainst += m.score_b; a.ballsBowled += fb; a.nrrGames += 1;
+    b.runsFor += m.score_b; b.ballsFaced += fb; b.runsAgainst += m.score_a; b.ballsBowled += fa; b.nrrGames += 1;
   }
+
   const nrr = (x: { runsFor: number; ballsFaced: number; runsAgainst: number; ballsBowled: number }) =>
     x.ballsFaced && x.ballsBowled ? Math.round(((x.runsFor / x.ballsFaced) * bpo - (x.runsAgainst / x.ballsBowled) * bpo) * 1000) / 1000 : 0;
-  return [...t.entries()]
-    .map(([id, x]) => ({
-      team_id: id, team_name: x.name, played: x.played, won: x.won, drawn: x.tied, lost: x.lost,
-      goals_for: x.runsFor, goals_against: x.runsAgainst, goal_diff: nrr(x), points: x.points,
-    }))
-    .sort((x, y) => y.points - x.points || y.goal_diff - x.goal_diff || y.won - x.won || x.team_name.localeCompare(y.team_name));
+
+  // head to head: table points won in the games between teams level on points
+  const h2h = (id: string, level: Set<string>) => {
+    const x = t.get(id)!;
+    return x.results.filter((g) => level.has(g.opp)).reduce((sum, g) => sum + (g.r === "W" ? pts.win : g.r === "L" ? pts.loss : g.r === "T" ? pts.tie : pts.noResult), 0);
+  };
+  const rows: CricketStanding[] = [...t.entries()].map(([id, x]) => ({
+    team_id: id, team_name: x.name, played: x.played, won: x.won, drawn: x.tied + x.noResult, lost: x.lost,
+    tied: x.tied, no_result: x.noResult,
+    goals_for: x.runsFor, goals_against: x.runsAgainst, goal_diff: nrr(x), points: x.points,
+    balls_faced: x.ballsFaced, balls_bowled: x.ballsBowled, nrr_games: x.nrrGames,
+    form: x.results.sort((p, q) => p.at.localeCompare(q.at)).slice(-5).map((g) => g.r),
+    remaining: x.remaining, max_points: x.points + x.remaining * pts.win, status: null,
+  }));
+  const byPoints = new Map<number, Set<string>>();
+  for (const r of rows) byPoints.set(r.points, (byPoints.get(r.points) ?? new Set()).add(r.team_id));
+  const key = (r: CricketStanding, tb: CricketTiebreaker): number =>
+    tb === "nrr" ? r.goal_diff : tb === "wins" ? r.won : tb === "runs_for" ? r.goals_for : h2h(r.team_id, byPoints.get(r.points)!);
+  rows.sort((x, y) => {
+    if (y.points !== x.points) return y.points - x.points;
+    for (const tb of pts.tiebreakers) { const d = key(y, tb) - key(x, tb); if (d) return d; }
+    return x.team_name.localeCompare(y.team_name);
+  });
+
+  // Qualification, only once it is mathematically certain. A team is through
+  // when fewer than `qualifiers` others can still reach its points (a tie on
+  // points counts as a threat: the tiebreak is not known yet); out when at
+  // least `qualifiers` others already have more than it can reach.
+  const q = pts.qualifiers;
+  if (q !== null && rows.length > q && rows.some((r) => r.played > 0)) {
+    const finished = rows.every((r) => r.remaining === 0);
+    rows.forEach((r, i) => {
+      if (finished) { r.status = i < q ? "qualified" : "eliminated"; return; }
+      const others = rows.filter((o) => o !== r);
+      if (others.filter((o) => o.max_points >= r.points).length < q) r.status = "qualified";
+      else if (others.filter((o) => o.points > r.max_points).length >= q) r.status = "eliminated";
+      else r.status = "contention";
+    });
+  }
+  return rows;
 }
 

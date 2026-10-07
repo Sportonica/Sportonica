@@ -1,0 +1,103 @@
+/* Cricket tournament tables and records. Flat rows and thin rules on
+   the paper background, numbers in tabular figures, brand green only
+   for what matters (points, the leader, qualification). */
+
+.cs { --cs-ink: #14171e; --cs-2: #3f4a46; --cs-3: #6b7a75; --cs-line: rgba(20,23,30,0.1); --cs-green: #006241; --cs-red: #c2353b; --cs-amber: #a86a12;
+  display: grid; gap: 14px; color: var(--cs-ink); font-variant-numeric: tabular-nums; }
+.cs-muted { color: var(--cs-3); }
+.cs-h { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--cs-2); margin: 0 0 8px; }
+.cs-note { font-size: 12.5px; color: var(--cs-3); margin: 0; line-height: 1.5; }
+.cs-block { display: grid; gap: 6px; }
+
+/* points table: a grid of rows, each opening to the full line */
+.cs-table { background: #fff; border: 1px solid var(--cs-line); border-radius: 12px; overflow: hidden; }
+.cs-tr { display: grid; grid-template-columns: 24px minmax(0, 1fr) 30px 30px 30px 30px 34px 40px 62px 112px; gap: 4px; align-items: center; padding: 10px 12px; font-size: 14px; }
+.cs-tr > span:nth-child(n+3) { text-align: right; }
+.cs-tr.head { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--cs-3); padding-top: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--cs-line); }
+.cs-row { border-top: 1px solid var(--cs-line); }
+.cs-row:first-of-type { border-top: 0; }
+.cs-row > summary { list-style: none; cursor: pointer; }
+.cs-row > summary::-webkit-details-marker { display: none; }
+.cs-row[open] > summary { background: rgba(0, 98, 65, 0.04); }
+.cs-row.in .cs-rank { color: var(--cs-green); }
+.cs-rank { font-weight: 800; color: var(--cs-3); }
+.cs-team { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.cs-badge { width: 26px; height: 26px; border-radius: 7px; background: rgba(0, 98, 65, 0.1); color: var(--cs-green); display: grid; place-items: center; font-size: 12px; font-weight: 800; overflow: hidden; flex: none; }
+.cs-badge img { width: 100%; height: 100%; object-fit: cover; }
+.cs-team-name { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
+.cs-pts { font-weight: 900; font-size: 15px; }
+.cs-nrr { font-weight: 700; }
+.cs-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; padding: 4px 14px 14px 46px; font-size: 13px; }
+.cs-more > div { display: grid; gap: 1px; }
+.cs-more span { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--cs-3); }
+.cs-more b { font-weight: 800; }
+.cs-more small { font-weight: 500; color: var(--cs-3); }
+.cs-more > div:nth-child(-n+2) { display: none; } /* tied / form: already in the row on wide screens */
+
+.cs-form { display: inline-flex; gap: 3px; justify-content: flex-end; }
+.cs-form i { font-style: normal; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 4px; display: inline-grid; place-items: center; font-size: 10px; font-weight: 900; color: #fff; box-sizing: border-box; }
+.cs-form .r-W { background: var(--cs-green); }
+.cs-form .r-L { background: var(--cs-red); }
+.cs-form .r-T { background: var(--cs-amber); }
+.cs-form .r-N { background: #8a958f; }
+
+.cs-status { font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+.cs-status.qualified { background: var(--cs-green); color: #fff; }
+.cs-status.eliminated { background: rgba(20,23,30,0.08); color: var(--cs-3); }
+.cs-status.contention { background: rgba(168,106,18,0.12); color: var(--cs-amber); }
+
+@media (max-width: 560px) {
+  .cs-tr { grid-template-columns: 20px minmax(0, 1fr) 24px 24px 24px 34px 54px; padding: 10px; font-size: 13.5px; }
+  .cs-tr .wide { display: none; }
+  .cs-more { padding-left: 14px; }
+  .cs-more > div:nth-child(-n+2) { display: grid; }
+}
+
+/* leaderboards */
+.cs-seg { display: flex; gap: 4px; padding: 3px; border: 1px solid var(--cs-line); border-radius: 10px; background: #fff; overflow-x: auto; scrollbar-width: none; }
+.cs-seg button { flex: 1 0 auto; border: 0; background: none; border-radius: 8px; padding: 8px 12px; font: inherit; font-size: 13px; font-weight: 700; color: var(--cs-2); cursor: pointer; }
+.cs-seg button.on { background: var(--cs-green); color: #fff; }
+.cs-board { list-style: none; margin: 0; padding: 0; background: #fff; border: 1px solid var(--cs-line); border-radius: 12px; }
+.cs-board li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--cs-line); }
+.cs-board li:first-child { border-top: 0; }
+.cs-who { display: grid; min-width: 0; }
+.cs-who b { font-size: 14.5px; overflow-wrap: anywhere; }
+.cs-who small { font-size: 12px; color: var(--cs-3); }
+.cs-val { font-size: 18px; font-weight: 900; }
+.cs-board li.first .cs-val, .cs-board li.first .cs-rank { color: var(--cs-green); }
+
+/* team statistics */
+.cs-teams { display: grid; gap: 8px; }
+.cs-teamcard { background: #fff; border: 1px solid var(--cs-line); border-radius: 12px; }
+.cs-teamcard > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: baseline; padding: 12px 14px; }
+.cs-teamcard > summary::-webkit-details-marker { display: none; }
+.cs-teamcard .cs-more { padding-left: 14px; }
+.cs-teamcard .cs-more > div:nth-child(-n+2) { display: grid; }
+.cs-wl { font-weight: 800; font-size: 13px; }
+
+/* records */
+.cs-records { display: grid; gap: 16px; }
+.cs-recs { margin: 0; background: #fff; border: 1px solid var(--cs-line); border-radius: 12px; }
+.cs-recs > div { display: grid; grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr); gap: 12px; padding: 10px 14px; border-top: 1px solid var(--cs-line); align-items: baseline; }
+.cs-recs > div:first-child { border-top: 0; }
+.cs-recs dt { font-size: 12.5px; font-weight: 700; color: var(--cs-2); }
+.cs-recs dd { margin: 0; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.cs-recs dd b { font-size: 17px; font-weight: 900; }
+.cs-recs dd span { font-size: 13.5px; font-weight: 600; }
+.cs-recs dd small { color: var(--cs-3); font-weight: 500; }
+
+/* organiser overview */
+.cs-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); border: 1px solid var(--cs-line); border-radius: 12px; overflow: hidden; background: #fff; }
+.cs-tiles > div { display: grid; gap: 2px; padding: 12px 14px; border-right: 1px solid var(--cs-line); border-bottom: 1px solid var(--cs-line); min-width: 0; }
+.cs-tiles span { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--cs-3); }
+.cs-tiles b { font-size: 16px; font-weight: 900; overflow-wrap: anywhere; }
+.cs-tiles small { font-size: 12px; color: var(--cs-3); }
+.cs-recent { display: grid; gap: 4px; font-size: 13.5px; }
+.cs-recent > div { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 0; border-top: 1px solid var(--cs-line); }
+.cs-recent small { color: var(--cs-green); font-weight: 700; }
+
+.cs-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.cs-chips::-webkit-scrollbar { display: none; }
+.cs-chip { flex: none; border: 1px solid var(--cs-line); background: #fff; color: var(--cs-2); border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.cs-chip.on { background: var(--cs-ink); border-color: var(--cs-ink); color: #fff; }
+.cs-empty { padding: 28px 16px; text-align: center; color: var(--cs-3); font-size: 13.5px; border: 1px dashed var(--cs-line); border-radius: 12px; }
