@@ -123,6 +123,16 @@ function MatchHeader({ contest }: { contest: ContestView }) {
       {n && n.need !== null ? (
         <div className="ck-need">Need {n.need} run{n.need === 1 ? "" : "s"}{n.ballsLeft !== null ? ` from ${n.ballsLeft} ball${n.ballsLeft === 1 ? "" : "s"}` : ""}</div>
       ) : null}
+      {s.superOvers?.length ? (
+        <div className="ck-super">
+          {Array.from({ length: Math.ceil(s.superOvers.length / 2) }, (_, k) => s.superOvers!.slice(k * 2, k * 2 + 2)).map((pair, k, all) => (
+            <div key={k}>
+              <span className="ck-label">{all.length > 1 ? `Super over ${k + 1}` : "Super over"}</span>
+              {pair.map((i) => <span key={i.n}>{ctx.sides?.[i.batting].name} <b>{i.runs}/{i.wickets}</b>{i.closed ? "" : ` (${i.balls} ball${i.balls === 1 ? "" : "s"})`}</span>)}
+            </div>
+          ))}
+        </div>
+      ) : null}
       {decided ? <div className="ck-result">{decided}</div> : null}
       {contest.summary.statusReason ? <div className="si-reason">{contest.summary.statusReason}</div> : null}
     </section>

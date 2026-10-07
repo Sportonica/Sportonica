@@ -7,8 +7,8 @@
 import { useState } from "react";
 import type { MatchContext, Participant, Side } from "@/lib/intelligence/core/types";
 import type { TimelineEntry } from "@/lib/intelligence/types";
-import type { CricketRules, CricketState } from "@/lib/intelligence/sports/cricket";
-import { bowlerLine, describeDelivery, overComplete, parseBallLabel, thisOver, type DeliveryPayload } from "@/lib/intelligence/sports/cricketView";
+import { superOverBatting, type CricketRules, type CricketState } from "@/lib/intelligence/sports/cricket";
+import { bowlerLine, describeDelivery, openInnings, overComplete, parseBallLabel, thisOver, type DeliveryPayload } from "@/lib/intelligence/sports/cricketView";
 import { Balls, BattersPanel, BowlerPanel } from "../cricket/parts";
 import { EXTRA_LABEL, WicketSheet, deliveryPayload, type Extra, type WicketInput } from "../cricket/sheets";
 import { Jersey, SIDE_KEYS, teamColor, type PadProps } from "./shared";
@@ -94,12 +94,32 @@ function OversEditor({ current, bowledBalls, ballsPerOver, onSave }: {
   );
 }
 
+/** The two batters for a super over; the batting side is the rules' (superOverBatting). */
+function SuperOverStart({ side, sides, second, onStart }: {
+  side: Side; sides: NonNullable<PadProps["contest"]["context"]["sides"]>; second: boolean; onStart: (striker: string, nonStriker: string) => void;
+}) {
+  const [picked, setPicked] = useState<string[]>([]);
+  const toggle = (id: string) => setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : cur.length < 2 ? [...cur, id] : cur));
+  return (
+    <div className="si-ask">
+      <div className="si-pad-name">{second ? "Super over, second half" : "Super over"}: {sides[side].name} bat. Tap their two batters, striker first</div>
+      <Pick players={sides[side].players} side={side} picked={picked} onPick={toggle}
+        note={(id) => (picked[0] === id ? "on strike" : picked[1] === id ? "non-striker" : null)} />
+      <div className="ck-muted" style={{ fontSize: 12.5 }}>One over each, two wickets end it. It decides the winner but adds nothing to the match totals or anyone&apos;s figures.</div>
+      <button type="button" className="si-btn primary si-big-btn" disabled={picked.length !== 2} onClick={() => { onStart(picked[0], picked[1]); setPicked([]); }}>
+        Start super over
+      </button>
+    </div>
+  );
+}
+
 export default function CricketPad({ contest, send, undo }: PadProps) {
   const s = contest.state as CricketState;
   const rules = contest.rules as unknown as CricketRules;
   const ctx = contest.context;
   const sides = ctx.sides!;
-  const inn = s.innings.length && !s.innings[s.innings.length - 1].closed ? s.innings[s.innings.length - 1] : null;
+  const inn = openInnings(s);
+  const [superOver, setSuperOver] = useState(false);
 
   const [batting, setBatting] = useState<Side | null>(null);
   const [openers, setOpeners] = useState<string[]>([]);
@@ -114,7 +134,29 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
   const changeOvers = (overs: number, reason: string) => send("OVERS_CHANGE", { overs, ...(reason ? { reason } : {}) });
   const undoRow = undo ? <div className="ck-pad-foot"><UndoButton undo={undo} ctx={ctx} /></div> : null;
 
+  const soBat = superOverBatting(s);
+  const startSuperOver = (striker: string, nonStriker: string) => { send("SUPER_OVER_START", { batting: soBat, striker, nonStriker }); setSuperOver(false); setBowler(""); };
+
+  // level scores in a limited-overs match: settle it with a super over, or accept the tie
+  if (s.result?.outcome === "tie" && rules.oversPerInnings !== null && soBat) {
+    return (
+      <div className="si-pad">
+        <div className="ck-tied">
+          <b>{s.superOvers?.length ? "The super over is tied too." : "Scores level: the match is tied."}</b>
+          <span className="ck-muted" style={{ fontSize: 13 }}>Play {s.superOvers?.length ? "another" : "a"} super over to find a winner, or tap Complete match to leave it as a tie.</span>
+          {!superOver ? <button type="button" className="si-btn primary" style={{ justifySelf: "start" }} onClick={() => setSuperOver(true)}>Play a super over</button> : null}
+        </div>
+        {superOver ? <SuperOverStart side={soBat} sides={sides} second={false} onStart={startSuperOver} /> : null}
+        {undoRow}
+      </div>
+    );
+  }
   if (s.result) return <><div className="si-info">The match is decided. Tap Complete match, or edit a ball in the commentary if the result is wrong.</div>{undoRow}</>;
+
+  // between the two halves of a super over
+  if (!inn && s.superOvers?.length && soBat) {
+    return <div className="si-pad"><SuperOverStart side={soBat} sides={sides} second onStart={startSuperOver} />{undoRow}</div>;
+  }
 
   // ── between innings: who bats, and the two openers ──
   if (!inn) {
@@ -197,7 +239,7 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
   };
   // a new batter is asked for only when this ball cannot end the innings
   const canBringIn = (w: WicketInput) => {
-    if (inn.wickets + 1 >= rules.wicketsPerInnings) return false;
+    if (inn.wickets + 1 >= (inn.maxWickets ?? rules.wicketsPerInnings)) return false;
     const legal = !((extra === "wide" && rules.wideRebowled) || (extra === "no_ball" && rules.noBallRebowled));
     if (legal && inn.maxBalls !== null && inn.balls + 1 >= inn.maxBalls) return false;
     const penalty = extra === "wide" ? rules.wideRuns : extra === "no_ball" ? rules.noBallRuns : 0;
@@ -271,9 +313,9 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
       {undoRow}
 
       <details className="si-more">
-        <summary>{inn.target === null && matchOvers !== null ? "Change overs, commentary, retirements, penalties" : "Commentary note, retirements, penalties and innings"}</summary>
+        <summary>{inn.target === null && matchOvers !== null && !inn.superOver ? "Change overs, commentary, retirements, penalties" : "Commentary note, retirements, penalties and innings"}</summary>
         <div className="si-grid" style={{ gap: 10 }}>
-          {inn.target === null && matchOvers !== null ? (
+          {inn.target === null && matchOvers !== null && !inn.superOver ? (
             <OversEditor current={inn.maxBalls === null ? matchOvers : inn.maxBalls / rules.ballsPerOver} bowledBalls={inn.balls} ballsPerOver={rules.ballsPerOver} onSave={changeOvers} />
           ) : null}
           <label className="si-label">Commentary for the next ball

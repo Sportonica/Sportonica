@@ -10,7 +10,7 @@ import { playerName } from "@/lib/intelligence/core/util";
 import type { TimelineEntry } from "@/lib/intelligence/types";
 import type { CricketInnings, CricketRules, CricketState } from "@/lib/intelligence/sports/cricket";
 import {
-  ballBadge, battingCard, bowlerLine, bowlingCard, crease, describeDelivery, extrasOf, fallOfWickets, fmt, liveNumbers,
+  allInnings, ballBadge, battingCard, inningsName, bowlerLine, bowlingCard, crease, describeDelivery, extrasOf, fallOfWickets, fmt, liveNumbers,
   ordinal, overComplete, overSummaries, parseBallLabel, partnerships, thisOver, type DeliveryPayload,
 } from "@/lib/intelligence/sports/cricketView";
 import "./cricket.css";
@@ -31,7 +31,7 @@ export function LiveScore({ inn, ctx, rules, compact = false }: { inn: CricketIn
   return (
     <div className={`ck-live${compact ? " compact" : ""}`}>
       <div className="ck-live-main">
-        <div className="ck-live-team">{ctx.sides?.[inn.batting].name}<span>{ordinal(inn.n)} innings</span></div>
+        <div className="ck-live-team">{ctx.sides?.[inn.batting].name}<span>{inningsName(inn)}</span></div>
         <div className="ck-live-score">{n.runs}<span>/{n.wickets}</span></div>
         <div className="ck-live-overs">{n.overs}{n.maxOvers !== null ? <span> / {n.maxOvers}</span> : null} ov</div>
       </div>
@@ -213,16 +213,17 @@ function InningsCard({ inn, ctx, rules }: { inn: CricketInnings; ctx: MatchConte
 
 export function Scorecard({ state, ctx, rules }: { state: CricketState; ctx: MatchContext; rules: CricketRules }) {
   const [pick, setPick] = useState<number | null>(null);
-  if (!state.innings.length) return <div className="ck-empty">The scorecard starts with the first ball.</div>;
-  const idx = pick ?? state.innings.length - 1;
-  const inn = state.innings[idx];
+  const list = allInnings(state);
+  if (!list.length) return <div className="ck-empty">The scorecard starts with the first ball.</div>;
+  const idx = pick ?? list.length - 1;
+  const inn = list[idx];
   return (
     <div className="ck-grid">
-      {state.innings.length > 1 ? (
+      {list.length > 1 ? (
         <div className="ck-seg" role="tablist">
-          {state.innings.map((i, k) => (
+          {list.map((i, k) => (
             <button key={i.n} type="button" role="tab" aria-selected={k === idx} className={k === idx ? "on" : ""} onClick={() => setPick(k)}>
-              {ctx.sides?.[i.batting].name}{rules.inningsPerSide > 1 ? ` · ${ordinal(Math.ceil(i.n / 2))}` : ""}
+              {i.superOver ? <small>{inningsName(i, state)}</small> : null}{ctx.sides?.[i.batting].name}{!i.superOver && rules.inningsPerSide > 1 ? ` · ${ordinal(Math.ceil(i.n / 2))}` : ""}
               <b>{i.runs}/{i.wickets}</b>
             </button>
           ))}
@@ -247,10 +248,11 @@ export interface CommentaryItem {
   after: string[];
   /** not a ball: overs changed, target revised, innings declared or ended */
   note?: boolean;
+  superOver?: boolean;
 }
 
 // what else the scorer records that viewers should see in the commentary
-const NOTE_EVENTS = new Set(["OVERS_CHANGE", "TARGET_REVISED", "DECLARE", "INNINGS_END", "PENALTY_RUNS", "RETIRE"]);
+const NOTE_EVENTS = new Set(["SUPER_OVER_START", "OVERS_CHANGE", "TARGET_REVISED", "DECLARE", "INNINGS_END", "PENALTY_RUNS", "RETIRE"]);
 
 /** Deliveries newest first, in match order: a corrected ball sits where the ball it replaced was. */
 export function commentaryFrom(entries: TimelineEntry[], ctx: MatchContext): CommentaryItem[] {
@@ -266,13 +268,16 @@ export function commentaryFrom(entries: TimelineEntry[], ctx: MatchContext): Com
     const at = parseBallLabel(e.label);
     if (!at) continue;
     const d = describeDelivery(e.payload as DeliveryPayload, ctx);
-    items.push({ entry: e, innings: at.innings, ball: at.ball, ...d, after: e.derived, at: e.correction?.kind === "replace" && e.correction.targetSeq ? e.correction.targetSeq : e.seq });
+    items.push({ entry: e, innings: at.innings, superOver: at.superOver, ball: at.ball, ...d, after: e.derived, at: e.correction?.kind === "replace" && e.correction.targetSeq ? e.correction.targetSeq : e.seq });
   }
   items.sort((x, y) => y.at - x.at);
   for (let i = 0; i < items.length; i++) {
     if (!items[i].note) continue;
-    const near = items.slice(i + 1).find((x) => !x.note) ?? items.slice(0, i).reverse().find((x) => !x.note);
+    const older = items.slice(i + 1).find((x) => !x.note), newer = items.slice(0, i).reverse().find((x) => !x.note);
+    // a super over's start belongs with the balls after it; anything else with the innings it happened in
+    const near = items[i].entry.type === "SUPER_OVER_START" ? newer ?? older : older ?? newer;
     items[i].innings = near?.innings ?? 1;
+    items[i].superOver = near?.superOver;
   }
   return items;
 }
@@ -287,7 +292,7 @@ export function Commentary({ items, onEdit, onRemove, compact = false }: {
         const prev = items[i - 1];
         return (
           <Fragment key={c.entry.id}>
-            {prev && prev.innings !== c.innings ? <li className="ck-comm-break">{ordinal(c.innings)} innings</li> : null}
+            {prev && prev.innings !== c.innings ? <li className="ck-comm-break">{c.superOver ? "Super over" : `${ordinal(c.innings)} innings`}</li> : null}
             {c.note ? <li className="ck-comm-note">{c.text}</li> : null}
             {c.after.filter((t) => !t.startsWith("End of over")).map((t, k) => <li key={`a${k}`} className="ck-comm-event">{t}</li>)}
             {c.after.some((t) => t.startsWith("End of over")) ? (

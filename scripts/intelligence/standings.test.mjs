@@ -177,7 +177,7 @@ section("cricket table: qualification only when it is certain", () => {
 });
 
 section("cricket rules: the points table is validated when saved", () => {
-  assert.deepEqual(E.resolveRules({ preset: "t20" }).table, { win: 2, tie: 1, noResult: 1, loss: 0, tiebreakers: ["nrr", "wins"], qualifiers: null });
+  assert.deepEqual(E.resolveRules({ preset: "t20" }).table, { win: 2, tie: 1, noResult: 1, loss: 0, tiebreakers: ["nrr", "wins"], qualifiers: null, bonusRatio: null });
   assert.equal(E.resolveRules({ preset: "t20", table: { win: 3, qualifiers: 4 } }).table.win, 3, "a partial table keeps the other defaults");
   assert.throws(() => E.resolveRules({ preset: "t20", table: { win: 0, loss: 1 } }), /more points than a loss/);
   assert.throws(() => E.resolveRules({ preset: "t20", table: { tiebreakers: ["coin_toss"] } }), /Unknown tiebreaker/);
@@ -220,4 +220,40 @@ section("cricket records: team totals, chases and margins from the fixtures", ()
   assert.equal(chasingSide(m2, 10), "b", "a 60-run win: a chase never ends more than 6 ahead, so the winner batted first");
   const close = g("Lions", "Bears", 150, 6, 20, 147, 7, 20);
   assert.equal(chasingSide(close, 10), null, "3 runs apart, same overs, no toss: not guessed");
+});
+
+section("cricket table: bonus points for a convincing win, never for a super over win", () => {
+  const T = [team("Lions"), team("Tigers"), team("Bears")];
+  const g = (a, b, ra, rb, extra = {}) => game(a, b, ra, rb, { wickets_a: 5, overs_a: 20, wickets_b: 5, overs_b: 20, ...extra });
+  const big = g("Lions", "Tigers", 200, 150);   // 10.0 v 7.5 an over: 1.33 times
+  const close = g("Tigers", "Bears", 160, 150); // 1.07 times: no bonus
+  const so = g("Bears", "Lions", 140, 140, { winner_team_id: "Bears" }); // level, Bears won the super over
+  const rules = { preset: "t20", table: { bonusRatio: 1.25 } };
+  const t = computeCricketStandings([big, close, so], T, rules);
+  const by = Object.fromEntries(t.map((r) => [r.team_name, [r.won, r.bonus, r.points]]));
+  assert.deepEqual(by, { Lions: [1, 1, 3], Tigers: [1, 0, 2], Bears: [1, 0, 2] });
+  assert.equal(computeCricketStandings([big], T, { preset: "t20" }).find((r) => r.team_name === "Lions").points, 2, "off by default");
+  assert.throws(() => E.resolveRules({ preset: "t20", table: { bonusRatio: 5 } }), /between 1 and 3/);
+});
+
+section("cricket results: tie, no result and super over read the same everywhere", () => {
+  const T = [team("Lions"), team("Tigers")];
+  const g = (ra, rb, extra = {}) => game("Lions", "Tigers", ra, rb, { wickets_a: 5, overs_a: 20, wickets_b: 5, overs_b: 20, winner_team_id: null, ...extra });
+  const cases = [
+    [g(150, 150), "T", "level scores, no winner: a tie"],
+    [g(150, 90), "N", "unequal scores, no winner: no result (rained off mid-chase)"],
+    [g(0, 0, { overs_a: 0, overs_b: 0 }), "N", "no ball bowled: no result"],
+    [g(150, 150, { winner_team_id: "Tigers" }), "L", "level scores with a winner: a super over"],
+  ];
+  for (const [m, want, why] of cases) {
+    const lions = computeCricketStandings([m], T, { preset: "t20" }).find((r) => r.team_name === "Lions");
+    assert.deepEqual(lions.form, [want], why);
+    const teams = cricketTeams([m], T, { preset: "t20" }).teams.find((x) => x.teamId === "Lions");
+    assert.equal(teams.tied + teams.noResult + teams.won + teams.lost, 1, `${why}: records agree`);
+    assert.equal(want === "T" ? teams.tied : want === "N" ? teams.noResult : teams.lost, 1, `${why}: records agree`);
+  }
+  // a super over win is no successful chase and has no margin
+  const so = cricketTeams([g(150, 150, { winner_team_id: "Tigers", toss_winner_team_id: "Tigers", toss_decision: "bowl" })], T, { preset: "t20" });
+  const tig = so.teams.find((x) => x.teamId === "Tigers");
+  assert.deepEqual([tig.won, tig.bestChase, tig.biggestWinWickets, tig.biggestWinRuns], [1, null, null, null]);
 });

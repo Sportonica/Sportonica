@@ -236,6 +236,8 @@ export type QualificationStatus = "qualified" | "eliminated" | "contention";
 export interface CricketStanding extends TournamentStanding {
   tied: number;
   no_result: number;
+  /** bonus points included in points (CricketTable.bonusRatio) */
+  bonus: number;
   /** legal balls, so overs are never decimals: 105 balls is 17.3 overs */
   balls_faced: number;
   balls_bowled: number;
@@ -252,13 +254,20 @@ export interface CricketStanding extends TournamentStanding {
 const DONE = new Set(["completed", "walkover"]);
 const OFF = new Set(["cancelled"]);
 
-/** How a finished league fixture counts: a result, a tie, or no result (abandoned, or completed with no scores). */
-function cricketOutcome(m: TournamentMatch, facts: CricketMatchFacts): "a" | "b" | "tie" | "nr" | null {
+/**
+ * How a finished league fixture counts. A winner (a super over win too:
+ * level runs and a winner). No winner: a tie needs level scores from a
+ * match that was played; anything else is no result (abandoned, no scores,
+ * unequal scores, or none of the overs bowled).
+ */
+export function cricketOutcome(m: TournamentMatch, facts: CricketMatchFacts = {}): "a" | "b" | "tie" | "nr" | null {
   if (facts[m.id]?.abandoned && (m.status === "cancelled" || m.status === "completed")) return "nr";
   if (!DONE.has(m.status)) return null;
   if (m.winner_team_id === m.team_a_id) return "a";
   if (m.winner_team_id === m.team_b_id) return "b";
-  return m.score_a === null || m.score_b === null ? "nr" : "tie";
+  if (m.score_a === null || m.score_b === null || m.score_a !== m.score_b) return "nr";
+  const noBall = !(m.overs_a ?? 0) && !(m.overs_b ?? 0) && m.score_a === 0;
+  return noBall ? "nr" : "tie";
 }
 
 export function computeCricketStandings(
@@ -271,7 +280,7 @@ export function computeCricketStandings(
   const pool = teams.filter((t) => t.status === "confirmed" && (group === null || t.group_name === group));
   const t = new Map(pool.map((x) => [x.id, {
     name: x.name, played: 0, won: 0, tied: 0, noResult: 0, lost: 0, points: 0,
-    runsFor: 0, ballsFaced: 0, runsAgainst: 0, ballsBowled: 0, nrrGames: 0, remaining: 0,
+    runsFor: 0, ballsFaced: 0, runsAgainst: 0, ballsBowled: 0, nrrGames: 0, remaining: 0, bonus: 0,
     results: [] as { at: string; r: CricketResult; opp: string }[],
   }]));
   // the table is the league stage only: a knockout match never counts towards it
@@ -308,6 +317,11 @@ export function computeCricketStandings(
     if (!fa || !fb) continue;
     a.runsFor += m.score_a; a.ballsFaced += fa; a.runsAgainst += m.score_b; a.ballsBowled += fb; a.nrrGames += 1;
     b.runsFor += m.score_b; b.ballsFaced += fb; b.runsAgainst += m.score_a; b.ballsBowled += fa; b.nrrGames += 1;
+    // a bonus point for a convincing win, on the same run rates as NRR (not for a super over win: the match was level)
+    if (pts.bonusRatio !== null && (out === "a" || out === "b") && m.score_a !== m.score_b) {
+      const [w, rw, bw, rl, bl] = out === "a" ? [a, m.score_a, fa, m.score_b, fb] : [b, m.score_b, fb, m.score_a, fa];
+      if ((rw / bw) >= pts.bonusRatio * (rl / bl)) { w.bonus += 1; w.points += 1; }
+    }
   }
 
   const nrr = (x: { runsFor: number; ballsFaced: number; runsAgainst: number; ballsBowled: number }) =>
@@ -320,11 +334,11 @@ export function computeCricketStandings(
   };
   const rows: CricketStanding[] = [...t.entries()].map(([id, x]) => ({
     team_id: id, team_name: x.name, played: x.played, won: x.won, drawn: x.tied + x.noResult, lost: x.lost,
-    tied: x.tied, no_result: x.noResult,
+    tied: x.tied, no_result: x.noResult, bonus: x.bonus,
     goals_for: x.runsFor, goals_against: x.runsAgainst, goal_diff: nrr(x), points: x.points,
     balls_faced: x.ballsFaced, balls_bowled: x.ballsBowled, nrr_games: x.nrrGames,
     form: x.results.sort((p, q) => p.at.localeCompare(q.at)).slice(-5).map((g) => g.r),
-    remaining: x.remaining, max_points: x.points + x.remaining * pts.win, status: null,
+    remaining: x.remaining, max_points: x.points + x.remaining * (pts.win + (pts.bonusRatio !== null ? 1 : 0)), status: null,
   }));
   const byPoints = new Map<number, Set<string>>();
   for (const r of rows) byPoints.set(r.points, (byPoints.get(r.points) ?? new Set()).add(r.team_id));
