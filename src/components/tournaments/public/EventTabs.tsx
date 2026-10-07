@@ -246,7 +246,7 @@ export default function EventTabs({
         : <TableTab tournament={tournament} standingsByGroup={standingsByGroup} teams={teams} />)}
       {activeTab === "Knockout" && <KnockoutTab matches={matches} teams={teams} intel={intel} tournamentId={tournament.id} />}
       {activeTab === "Fixtures" && (
-        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} />
+        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} stacked={isCricketSport} />
       )}
       {activeTab === "Player Stats" && (
         authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
@@ -561,10 +561,15 @@ function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: str
   );
 }
 
-function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {} }: {
+function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {}, stacked = false }: {
   tournamentId: string; matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>;
   highlights?: Record<string, MatchHighlight>;
+  // cricket's scores ("180/4 – 156/2") are too wide to share a phone's line with two names: there the teams stack
+  stacked?: boolean;
 }) {
+  // a played game's detail (innings, result, top performers) opens on tap, one game at a time or several
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (id: string) => setOpen((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   if (matches.length === 0) return <div className="ev2-empty">Fixtures haven&apos;t been generated yet.</div>;
   const team = (id: string | null) => (id ? teams.find((t) => t.id === id) : undefined);
   const teamName = (id: string | null) => team(id)?.name ?? "Unknown";
@@ -606,8 +611,15 @@ function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {
             const teamBName = m.team_b_id ? teamName(m.team_b_id) : m.status === "completed" ? "Bye" : "TBD";
             const live = m.status === "live";
             const si = intel[m.id];
+            const h = highlights[m.id];
+            const canOpen = !!h && (!!h.periods || !!h.stars.length || !!h.result);
+            const isOpen = canOpen && open.has(m.id);
             return (
-              <div key={m.id} className="ev2-fixture">
+              <div key={m.id} className={`ev2-fixture${stacked ? " stack" : ""}${canOpen ? " expandable" : ""}${isOpen ? " open" : ""}`}
+                {...(canOpen ? {
+                  role: "button", tabIndex: 0, "aria-expanded": isOpen, onClick: () => toggle(m.id),
+                  onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(m.id); } },
+                } : {})}>
                 <div className="ev2-fixture-time">
                   {m.starts_at ? new Date(m.starts_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: KTM }) : "TBD"}
                 </div>
@@ -638,13 +650,17 @@ function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {
                   <TeamCrest name={teamBName} logoUrl={team(m.team_b_id)?.logo_url} size="sm" />
                 </span>
                 <div className="ev2-fixture-round">
-                  {si ? (
-                    <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "inherit", fontWeight: 700 }}>
-                      {live ? si.period : si.brief || "Match centre"} ›
+                  {si && live ? (
+                    <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "inherit", fontWeight: 700 }} onClick={(e) => e.stopPropagation()}>
+                      {si.period} ›
                     </Link>
+                  ) : canOpen ? (
+                    <span className="ev2-fixture-more">{m.round_label ? <span className="lbl">{m.round_label}</span> : null}<i aria-hidden="true">▾</i></span>
+                  ) : si ? (
+                    <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "inherit", fontWeight: 700 }} onClick={(e) => e.stopPropagation()}>Match centre ›</Link>
                   ) : m.round_label}
                 </div>
-                {highlights[m.id] ? <GameDetail h={highlights[m.id]} tournamentId={tournamentId} /> : null}
+                {isOpen ? <GameDetail h={h!} tournamentId={tournamentId} names={[teamAName, teamBName]} /> : null}
               </div>
             );
           })}
@@ -714,13 +730,16 @@ function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; team
 }
 
 /** Under a game card: the period scores, the result and the top performers, then the full box score. */
-function GameDetail({ h, tournamentId }: { h: MatchHighlight; tournamentId: string }) {
+function GameDetail({ h, tournamentId, names }: { h: MatchHighlight; tournamentId: string; names?: [string, string] }) {
   if (!h.periods && !h.stars.length && !h.result) return null;
   return (
     <div className="ev2-fixture-extra">
       {h.periods ? (
         <div className="ev2-periods">
-          {h.periods.map((p) => <span key={p.label}><b>{p.label}</b> {p.a}–{p.b}</span>)}
+          {/* a quarter has both sides' points; an innings only the batting side's runs, so it names the side */}
+          {h.periods.map((p) => (
+            <span key={p.label}><b>{p.label}</b> {p.a && p.b ? `${p.a}–${p.b}` : `${names ? `${names[p.a ? 0 : 1]} ` : ""}${p.a || p.b}`}</span>
+          ))}
         </div>
       ) : null}
       {h.result ? <div className="ev2-game-result">{h.result}</div> : null}
@@ -729,7 +748,8 @@ function GameDetail({ h, tournamentId }: { h: MatchHighlight; tournamentId: stri
           {h.stars.map((st, i) => <span key={i} className={`side-${st.side}`}>{st.text}</span>)}
         </div>
       ) : null}
-      <Link className="ev2-game-link" href={`/tournaments/${tournamentId}/live/${h.contestId}`}>{h.sport === "cricket" ? "Scorecard" : "Box score"} ›</Link>
+      {/* the link opens the scorecard; tapping anywhere else closes the detail again */}
+      <Link className="ev2-game-link" href={`/tournaments/${tournamentId}/live/${h.contestId}`} onClick={(e) => e.stopPropagation()}>{h.sport === "cricket" ? "Scorecard" : "Box score"} ›</Link>
     </div>
   );
 }

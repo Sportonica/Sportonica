@@ -600,3 +600,38 @@
 }
 .ev2-tp-cat.minor .ev2-tp-rest .n { white-space: normal; overflow: visible; font-size: 13px; line-height: 1.25; }
 .ev2-tp-cat.minor .ev2-tp-rest b { font-size: 13.5px; }
+
+/* a played game opens to its detail on tap */
+.ev2-fixture.expandable { cursor: pointer; }
+.ev2-fixture.expandable:focus-visible { outline: 2px solid #006241; outline-offset: 2px; }
+.ev2-fixture-more { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; max-width: 100%; }
+.ev2-fixture-more .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ev2-fixture-more i { font-style: normal; font-size: 12px; opacity: .8; transition: transform .15s ease; }
+.ev2-fixture.open .ev2-fixture-more i { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .ev2-fixture-more i { transition: none; } }
+/* the score takes the width it needs (cricket's "180/4 – 156/2" is far wider than "3 – 1"); the team names give way */
+@media (max-width: 620px) { .ev2-fixture { grid-template-columns: 36px minmax(0, 1fr) minmax(56px, auto) minmax(0, 1fr) 58px; } }
+@media (max-width: 480px) {
+  .ev2-fixture { grid-template-columns: 30px minmax(0, 1fr) minmax(48px, auto) minmax(0, 1fr) 46px; }
+  .ev2-fixture-mid .score { white-space: nowrap; }
+  .ev2-fixture-more .lbl { display: none; }
+}
+
+/* cricket on a phone: each team on its own line with its full name, the score under them */
+@media (max-width: 480px) {
+  .ev2-fixture.stack {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    grid-template-areas: "time a more" "time b more" "time s more" "x x x";
+    row-gap: 6px; align-items: center;
+  }
+  .ev2-fixture.stack .ev2-fixture-time { grid-area: time; align-self: start; padding-top: 4px; }
+  .ev2-fixture.stack .ev2-fixture-team-left { grid-area: a; }
+  .ev2-fixture.stack .ev2-fixture-team-right { grid-area: b; flex-direction: row-reverse; justify-content: flex-end; }
+  .ev2-fixture.stack .ev2-fixture-team { font-size: 14px; justify-content: flex-start; }
+  .ev2-fixture.stack .ev2-fixture-name { white-space: normal; overflow: visible; text-overflow: clip; text-align: left; }
+  .ev2-fixture.stack .ev2-fixture-mid { grid-area: s; justify-self: start; }
+  .ev2-fixture.stack .ev2-fixture-mid .score { font-size: 13.5px; padding: 3px 8px; }
+  .ev2-fixture.stack .ev2-fixture-round { grid-area: more; align-self: start; padding-top: 4px; }
+  .ev2-fixture.stack .ev2-fixture-extra { grid-area: x; }
+}
+.ev2-fixture-more i { font-size: 15px; opacity: 1; color: #006241; font-weight: 900; }
