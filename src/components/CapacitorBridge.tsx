@@ -2,22 +2,25 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, SystemBars, SystemBarsStyle } from "@capacitor/core";
 import { App, type URLOpenListenerEvent } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
-import { StatusBar, Style } from "@capacitor/status-bar";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { consumeHardwareBack } from "@/lib/capacitor/hardwareBack";
+import { recordAppOpen } from "@/lib/capacitor/appOpenActions";
+import { createClient } from "@/lib/supabase/client";
 
-// The app is cream/"paper" only (see src/lib/hooks/useTheme.ts) — status bar
-// always matches the paper background, same value as layout.tsx's
-// viewport.themeColor.
+// The app is cream/"paper" only (see src/lib/hooks/useTheme.ts), so the
+// system bars always want dark icons. Uses Capacitor's built-in
+// SystemBars rather than @capacitor/status-bar: the app is edge-to-edge
+// (Android 15+ forces it), so there's no bar color to set — the paper
+// window background (android styles.xml) shows through behind the bars —
+// and the old plugin's setStatusBarColor calls are deprecated on
+// Android 15, which Play Console flags.
 function syncStatusBar() {
-  StatusBar.setBackgroundColor({ color: "#F2EDE6" }).catch(() => {});
-  // Style.Dark = dark icons, for the light "paper" background — named
-  // for the status bar CONTENT color, not the background, which trips
-  // people up.
-  StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+  // SystemBarsStyle.Light = dark icons for a light background — named
+  // for the BACKGROUND, the opposite of @capacitor/status-bar's Style.
+  SystemBars.setStyle({ style: SystemBarsStyle.Light }).catch(() => {});
 }
 
 // Native-only wiring, mounted once in the root layout. No-ops entirely
@@ -55,6 +58,20 @@ export default function CapacitorBridge() {
 
     syncStatusBar();
 
+    // Tag the signed-in account as a native-app user (appOpenActions.ts)
+    // on launch, on every return to the foreground, and right after a
+    // sign-in — testers usually sign in on their very first launch.
+    const platform = Capacitor.getPlatform();
+    const tagAppOpen = () => { recordAppOpen(platform).catch(() => {}); };
+    tagAppOpen();
+    const resumeSub = App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) tagAppOpen();
+    });
+    const { data: authSub } = createClient().auth.onAuthStateChange((event) => {
+      // Deferred like PushBridge's: let the session cookie land first.
+      if (event === "SIGNED_IN") setTimeout(tagAppOpen, 0);
+    });
+
     // Universal Link (iOS) / App Link (Android) reopening the app —
     // this is how a Google or Apple sign-in started via Browser.open()
     // (see GoogleButton.tsx / AppleButton.tsx) hands control back once
@@ -86,6 +103,8 @@ export default function CapacitorBridge() {
     return () => {
       urlSub.then((s) => s.remove());
       backSub.then((s) => s.remove());
+      resumeSub.then((s) => s.remove());
+      authSub.subscription.unsubscribe();
     };
   }, [router]);
 
