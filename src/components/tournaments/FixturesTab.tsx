@@ -7,7 +7,7 @@ import { Plus, Trash2, X, History, Pencil, Search, ChevronDown, Check } from "lu
 import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
   getTeamRoster, getMatchPlayerStats, recordMatchPlayerStats,
-  generateKnockoutBracket, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
+  generateKnockoutBracket, generateKnockoutFromGroups, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
   recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound, updateLiveScore,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
@@ -69,6 +69,41 @@ function winnerOptions(matches: TournamentMatch[], teamName: (id: string | null)
     byId.set(m.winner_team_id, entry);
   }
   return [...byId.values()];
+}
+
+// A match's place in the bracket tree, read off the next_match links:
+// the Final is 0, its slot-a feeder 0 and slot-b feeder 1, and so on
+// down (position = parent * 2 + slot). Sorting a round by it puts the
+// two matches that meet next side by side, so "QF1 and QF2 feed SF1"
+// is visible on the page. Unlinked (hand-built) matches get no entry.
+function bracketPositions(matches: TournamentMatch[]): Map<string, number> {
+  const byId = new Map(matches.map((m) => [m.id, m]));
+  const pos = new Map<string, number>();
+  // A root only counts if something feeds it (a Final, not a loose match).
+  const roots = matches.filter((x) => !x.next_match_id && matches.some((f) => f.next_match_id === x.id));
+  const visit = (m: TournamentMatch, seen: Set<string>): number | null => {
+    if (pos.has(m.id)) return pos.get(m.id)!;
+    if (seen.has(m.id)) return null;
+    seen.add(m.id);
+    const next = m.next_match_id ? byId.get(m.next_match_id) : undefined;
+    let p: number | null;
+    if (next) {
+      const parent = visit(next, seen);
+      p = parent === null ? null : parent * 2 + (m.next_match_slot === "b" ? 1 : 0);
+    } else {
+      const i = roots.findIndex((x) => x.id === m.id);
+      p = i < 0 ? null : i;
+    }
+    if (p !== null) pos.set(m.id, p);
+    return p;
+  };
+  for (const m of matches) visit(m, new Set());
+  return pos;
+}
+
+// The match whose winner fills `slot` of `match`, if the bracket links one.
+function feederOf(matches: TournamentMatch[], match: TournamentMatch, slot: "a" | "b") {
+  return matches.find((f) => f.next_match_id === match.id && f.next_match_slot === slot) ?? null;
 }
 
 // For a knockout round after the first, who can play in it: the
@@ -422,6 +457,14 @@ export default function FixturesTab({
   const canAddMatches = registrationClosed && teams.length >= 1;
   const canGenerateBracket =
     tournament.format === "knockout" && tournament.status === "registration_closed" && matches.length === 0 && teams.length >= 2;
+  // Groups done (or under way): offer to build the linked knockout
+  // bracket from the standings, once, before any knockout match exists.
+  const groupMatches = matches.filter((m) => m.stage === "group");
+  const groupsLeft = groupMatches.filter((m) => !DONE.has(m.status)).length;
+  const canGenerateKnockout =
+    tournament.format === "group_knockout" && tournament.status === "live"
+    && groupMatches.length > 0 && !matches.some((m) => m.stage === "knockout");
+  const [advancePerGroup, setAdvancePerGroup] = useState("2");
 
   if (!canAddMatches && matches.length === 0) {
     return (
@@ -437,6 +480,12 @@ export default function FixturesTab({
   for (const m of filteredMatches) {
     if (!rounds.has(m.round_label)) rounds.set(m.round_label, []);
     rounds.get(m.round_label)!.push(m);
+  }
+  // Linked knockout rounds in bracket order; everything else as loaded.
+  const positions = bracketPositions(matches);
+  for (const ms of rounds.values()) {
+    if (!ms.some((m) => positions.has(m.id))) continue;
+    ms.sort((x, y) => (positions.get(x.id) ?? Number.MAX_SAFE_INTEGER) - (positions.get(y.id) ?? Number.MAX_SAFE_INTEGER));
   }
 
   const REGEN_MESSAGES: Record<string, string> = {
@@ -572,6 +621,39 @@ export default function FixturesTab({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {canGenerateKnockout && (
+        <div className="tc-card" style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Generate the knockout stage</div>
+          <div className="tc-card-sub" style={{ marginBottom: 10 }}>
+            Builds the bracket from the group standings, all the way to the Final, and moves each winner on automatically.
+            Group winners play a runner-up from another group, and two teams from the same group can only meet again in the Final.
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+              Teams through from each group
+              <input
+                type="number" min={1} value={advancePerGroup} onChange={(e) => setAdvancePerGroup(e.target.value)}
+                style={{ ...inputStyle, width: 60 }} aria-label="Teams through from each group"
+              />
+            </label>
+            <button
+              className="tc-btn primary" disabled={pending || groupsLeft > 0 || !(Number(advancePerGroup) >= 1)}
+              onClick={() => {
+                if (!window.confirm(`Generate the knockout stage with the top ${advancePerGroup} of each group?`)) return;
+                run(() => generateKnockoutFromGroups(tournament.id, Number(advancePerGroup)));
+              }}
+            >
+              Generate knockout stage
+            </button>
+            {groupsLeft > 0 && (
+              <span className="tc-dim" style={{ fontSize: 12 }}>
+                {groupsLeft} group {groupsLeft === 1 ? "match needs" : "matches need"} a result first.
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -1028,6 +1110,21 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   onDelete: () => void;
   pending: boolean;
 }) {
+  // An empty slot fed by an earlier bracket match names that match
+  // ("Winner of Afghanistan v Nepal") instead of a bare TBD.
+  const positions = useMemo(() => bracketPositions(matches), [matches]);
+  const feederB = feederOf(matches, match, "b");
+  const feederBPending = !!feederB && !DONE.has(feederB.status);
+  const sideName = (slot: "a" | "b") => {
+    const id = slot === "a" ? match.team_a_id : match.team_b_id;
+    const f = id ? null : feederOf(matches, match, slot);
+    if (!f || f.status === "cancelled") return teamName(id);
+    if (f.team_a_id && f.team_b_id) return `Winner of ${teamName(f.team_a_id)} v ${teamName(f.team_b_id)}`;
+    const sameRound = matches
+      .filter((x) => x.round_label === f.round_label && positions.has(x.id))
+      .sort((x, y) => positions.get(x.id)! - positions.get(y.id)!);
+    return `Winner of ${f.round_label} ${sameRound.findIndex((x) => x.id === f.id) + 1}`;
+  };
   const [editingTime, setEditingTime] = useState(false);
   const [editingTeams, setEditingTeams] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -1141,7 +1238,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ fontWeight: 600 }}>{teamName(match.team_a_id)} <span className="tc-dim">vs</span> {teamName(match.team_b_id)}</div>
+            <div style={{ fontWeight: 600 }}>{sideName("a")} <span className="tc-dim">vs</span> {sideName("b")}</div>
             <button
               aria-label="Edit teams" disabled={pending}
               onClick={() => { setTeamAId(match.team_a_id ?? ""); setTeamBId(match.team_b_id ?? ""); setEditingTeams(true); }}
@@ -1245,7 +1342,10 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           // above already uses — this just makes it a one-click action
           // instead of something you'd only find by opening that editor
           // and noticing Team B's "TBD / bye" placeholder.
-          match.team_a_id && !done ? (
+          // A bracket match still to be played fills the slot, so no bye.
+          feederBPending ? (
+            <span className="tc-dim" style={{ fontSize: 12 }}>Waiting for {sideName("b").replace(/^Winner/, "the winner")}.</span>
+          ) : match.team_a_id && !done ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span className="tc-dim" style={{ fontSize: 12 }}>No opponent assigned.</span>
               <button
