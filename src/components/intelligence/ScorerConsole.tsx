@@ -8,12 +8,13 @@
 // dropped connection (or sent twice) is stored once. If the connection
 // is lost the queue waits and resumes on its own.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { correctContestEvent, getContestEvents, getRuleDefaults, recalculateContest, recordContestEvent, setContestRules } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
 import type { Issue } from "@/lib/intelligence/core/types";
+import { withQueued, type QueuedEvent as Queued } from "@/lib/intelligence/optimistic";
 import type { ContestView, TimelineEntry } from "@/lib/intelligence/types";
 import { useLiveContest } from "./useLiveContest";
 import { ScoreCard, Timeline } from "./views";
@@ -23,15 +24,15 @@ import { SIDE_KEYS } from "./pads/shared";
 import RuleFields from "./RuleFields";
 import "./intelligence.css";
 
-interface Queued { type: string; payload: Record<string, unknown>; clientId: string; occurredAt: string }
-
 const newId = (): string => crypto.randomUUID();
 const LIFECYCLE = new Set(["MATCH_START", "MATCH_PAUSE", "MATCH_RESUME", "MATCH_POSTPONE", "MATCH_CANCEL", "MATCH_ABANDON", "MATCH_FORFEIT", "MATCH_RESTART", "MATCH_COMPLETE", "MATCH_REOPEN"]);
 
 export default function ScorerConsole({ initial, tournamentName }: { initial: ContestView; tournamentName: string }) {
-  const [contest, setContest] = useLiveContest(initial);
-  const storageKey = `si-queue-${initial.id}`;
   const [queue, setQueue] = useState<Queued[]>([]);
+  // pushes wait while our own taps are on their way: they are already on screen
+  const [contest, setContest] = useLiveContest(initial, queue.length > 0);
+  const shown = useMemo(() => withQueued(contest, queue), [contest, queue]);
+  const storageKey = `si-queue-${initial.id}`;
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
@@ -180,7 +181,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
   };
 
   const Pad = PADS[contest.sport];
-  const st = contest.status;
+  const st = shown.status;
   const sides = contest.context.sides;
   const inPlay = st === "live" || st === "paused";
   const cricket = contest.sport === "cricket";
@@ -194,7 +195,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
           <h1 className="si-h1">{contest.label ?? "Scorer"}</h1>
         </div>
 
-        <div className="si-sticky">{cricket ? <CricketScorerHeader contest={contest} /> : <ScoreCard summary={contest.summary} context={contest.context} />}</div>
+        <div className="si-sticky">{cricket ? <CricketScorerHeader contest={shown} /> : <ScoreCard summary={shown.summary} context={shown.context} />}</div>
 
         {offline ? <div className="si-error">No connection. {queue.length} event{queue.length === 1 ? "" : "s"} waiting. They will be sent in order when the connection returns.</div>
           : queue.length > 1 ? <div className="si-info">Sending {queue.length} events…</div> : null}
@@ -225,7 +226,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
               {cricket && st === "live" ? null : <button type="button" className="si-btn" disabled={busy || queue.length > 0 || contest.lastSeq === 0} onClick={() => void undo()}>Undo last</button>}
             </div>
 
-            {st === "live" || (replacing && inPlay) ? <Pad contest={contest} send={send} undo={padUndo} />
+            {st === "live" || (replacing && inPlay) ? <Pad contest={shown} send={send} undo={padUndo} />
               : st === "paused" ? <div className="si-info">The match is paused. Resume it to keep scoring.</div>
               : st === "scheduled" ? <div className="si-info">Start the match to begin scoring.</div>
               : st === "postponed" ? <div className="si-info">This match is postponed. Start it when it is played.</div>
@@ -262,7 +263,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
           </div>
 
           {cricket ? (
-            <CricketScorerSide contest={contest} entries={entries} busy={busy}
+            <CricketScorerSide contest={shown} entries={entries} busy={busy}
               onEdit={(e, payload, reason) => void correct(e, reason, { type: "DELIVERY", payload })}
               onRemove={(e) => { if (window.confirm(`Remove "${e.text}" from the match? It stays in the record as removed.`)) void correct(e, "Removed by the scorer"); }}>
               <details className="si-more">
