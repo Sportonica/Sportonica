@@ -65,11 +65,21 @@ export default async function TournamentDetailPage({
   // reaching this point with a non-published status means the viewer is
   // the owner previewing it before publish.
 
+  // who is looking, for "your team" and the Live scoring button only:
+  // checked locally from the session token (no auth server round trip);
+  // every action re-checks the user itself
   const sb = await createClient();
-  const { data: { user } } = await sb.auth.getUser();
+  const { data: claims } = await sb.auth.getClaims();
+  const user = claims?.claims?.sub ? { id: claims.claims.sub } : null;
 
   const isLiveOrDone = tournament.status === "live" || tournament.status === "completed";
-  const [venueName, myTeam, matchesRes, teamsRes, playerStatsRes, awardsRes, canScore] = await Promise.all([
+  const scored = !!sportKeyFor(tournament.sport);
+  const cricketSport = isCricket(tournament.sport) && isLiveOrDone;
+  // Every query the page needs, in one round: each one is a trip to the
+  // database, and run one after another they added up to most of the
+  // page's load time.
+  const [venueName, myTeam, matchesRes, teamsRes, playerStatsRes, awardsRes, canScore,
+    contestsRes, leadersRes, cricketRes, highlightsRes, factsRes, recordsRes] = await Promise.all([
     getDisplayVenueName(tournament),
     user ? getMyTeamForTournament(id) : Promise.resolve(null),
     isLiveOrDone ? getTournamentMatches(id) : Promise.resolve([]),
@@ -78,27 +88,29 @@ export default async function TournamentDetailPage({
     isLiveOrDone ? getTournamentAwards(id) : Promise.resolve({ winner: null, runnerUp: null, semifinalists: [] }),
     // organisers and scorers get a Live scoring button in the Match centre tab
     user ? canScoreTournament(id) : Promise.resolve(false),
+    // sport-aware scores for fixtures that are scored event by event
+    scored ? listTournamentContests(id) : Promise.resolve([]),
+    // basketball's player stats come from its scored games (points, rebounds…), not the goals table
+    isLiveOrDone && (isBasketball(tournament.sport) || isCricket(tournament.sport)) ? getTournamentLeaders(id) : Promise.resolve(null),
+    // cricket: batting and bowling figures entered from the fixtures
+    isLiveOrDone && isCricket(tournament.sport) ? getTournamentCricketStats(id) : Promise.resolve(null),
+    // what each scored game recorded: period scores, result, top performers
+    isLiveOrDone && scored ? getMatchHighlights(id) : Promise.resolve(null),
+    // cricket: what the scored matches add to the fixtures (each match's overs, abandoned matches,
+    // who batted first) and the per-match player lines behind the leaderboards and records
+    cricketSport ? getCricketMatchFacts(id) : Promise.resolve(null),
+    cricketSport ? getCricketRecords(id) : Promise.resolve(null),
   ]);
   const matches = isActionError(matchesRes) ? [] : matchesRes;
-  // sport-aware scores for fixtures that are scored event by event
   const intel: Record<string, MatchIntel> = {};
-  if (sportKeyFor(tournament.sport)) {
-    const contests = await listTournamentContests(id);
-    for (const c of isActionError(contests) ? [] : contests) {
-      const mi = c.matchId ? toMatchIntel({ id: c.id, status: c.status, summary: c.summary }) : null;
-      if (mi && c.matchId) intel[c.matchId] = mi;
-    }
+  for (const c of isActionError(contestsRes) ? [] : contestsRes) {
+    const mi = c.matchId ? toMatchIntel({ id: c.id, status: c.status, summary: c.summary }) : null;
+    if (mi && c.matchId) intel[c.matchId] = mi;
   }
   const teams = isActionError(teamsRes) ? [] : teamsRes;
   const playerStats = isActionError(playerStatsRes) ? [] : playerStatsRes;
-  // basketball's player stats come from its scored games (points, rebounds…), not the goals table
-  const leadersRes = isLiveOrDone && (isBasketball(tournament.sport) || isCricket(tournament.sport)) ? await getTournamentLeaders(id) : null;
   const leaders = leadersRes && !isActionError(leadersRes) ? leadersRes : null;
-  // cricket: batting and bowling figures entered from the fixtures
-  const cricketRes = isLiveOrDone && isCricket(tournament.sport) ? await getTournamentCricketStats(id) : null;
   const cricketStats = cricketRes && !isActionError(cricketRes) ? cricketRes : [];
-  // what each scored game recorded: period scores, result, top performers
-  const highlightsRes = isLiveOrDone && sportKeyFor(tournament.sport) ? await getMatchHighlights(id) : null;
   const highlights = highlightsRes && !isActionError(highlightsRes) ? highlightsRes : {};
   const awards = isActionError(awardsRes) ? { winner: null, runnerUp: null, semifinalists: [] } : awardsRes;
 
@@ -106,10 +118,6 @@ export default async function TournamentDetailPage({
   const groups = tournament.format === "group_knockout"
     ? [...new Set(teams.map((t) => t.group_name).filter((g): g is string => !!g))].sort()
     : [""];
-  // cricket: what the scored matches add to the fixtures (each match's overs, abandoned matches,
-  // who batted first) and the per-match player lines behind the leaderboards and records
-  const cricketSport = isCricket(tournament.sport) && isLiveOrDone;
-  const [factsRes, recordsRes] = cricketSport ? await Promise.all([getCricketMatchFacts(id), getCricketRecords(id)]) : [null, null];
   const facts = factsRes && !isActionError(factsRes) ? factsRes : {};
   const cricketData: CricketTournamentData | null = cricketSport ? (() => {
     const rec = recordsRes && !isActionError(recordsRes) ? recordsRes : { lines: [], names: {}, partnerships: [] };

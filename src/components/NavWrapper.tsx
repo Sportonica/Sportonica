@@ -1,10 +1,14 @@
 "use client";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import MagnetDock from "./layout/MagnetDock";
 import AppHeader from "./AppHeader";
-import NearbyPopup from "./NearbyPopup";
-import AnimatedBackground from "./AnimatedBackground";
-import EnsureE2EKey from "./EnsureE2EKey";
+
+// Drawn or shown only after the page is up (a canvas, a popup, a key
+// check): loaded once it is interactive, not with every page's first load.
+const NearbyPopup = dynamic(() => import("./NearbyPopup"), { ssr: false });
+const AnimatedBackground = dynamic(() => import("./AnimatedBackground"), { ssr: false });
+const EnsureE2EKey = dynamic(() => import("./EnsureE2EKey"), { ssr: false });
 import { isBareChromeRoute } from "@/lib/nav/authRoutes";
 
 // Global chrome: the animated backdrop, the magnet dock, the top-right
