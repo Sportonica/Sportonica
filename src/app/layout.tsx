@@ -1,10 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import NavWrapper from '@/components/NavWrapper'
-import PWARegister from '@/components/PWARegister'
-import CapacitorBridge from '@/components/CapacitorBridge'
-import PushBridge from '@/components/PushBridge'
-import Onboarding from '@/components/onboarding/Onboarding'
+import DeferredChrome from '@/components/DeferredChrome'
+import NavProgress from '@/components/NavProgress'
 
 // Every page is rendered per request, never prerendered: the
 // Content-Security-Policy only lets inline scripts run if they carry that
@@ -57,22 +55,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" data-theme="paper" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
+        {/* Inter is self-hosted (globals.css): fetch it alongside the CSS, not after it */}
+        <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
       {/* Extensions inject attributes into body before React hydrates. */}
       <body suppressHydrationWarning>
         <a href="#main-content" className="skip-link">Skip to content</a>
+        <NavProgress />
         <NavWrapper />
         <main id="main-content" tabIndex={-1}>{children}</main>
-        <PWARegister />
-        <CapacitorBridge />
-        <PushBridge />
-        <Onboarding />
+        <DeferredChrome />
       </body>
     </html>
   )
