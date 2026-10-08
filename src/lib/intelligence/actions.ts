@@ -557,6 +557,53 @@ export async function correctContestEvent(
   return { contest: toView(res.contest), duplicate: res.duplicate, warning };
 }
 
+// ── one match's rules ───────────────────────────────────────────
+
+/**
+ * Change the rules of a match that is already set up for scoring. Every
+ * event is replayed under the new rules, and the change is refused if
+ * any of them would no longer be possible (fewer overs than were already
+ * bowled, a quarter that no longer exists). A finished match's result is
+ * re-sent to the fixture, as after a correction.
+ */
+export async function setContestRules(contestId: string, input: Record<string, unknown>): Promise<RecordEventResult | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const row = await loadContest(sb, contestId);
+  if (isActionError(row)) return row;
+  if (row.sport === "swimming") return actionError("A race's rules are set when it is created.");
+  const loaded = await loadEvents(sb, contestId);
+  if (isActionError(loaded)) return loaded;
+  const engine = getEngine(row.sport as SportKey);
+
+  let rules: unknown, oldRules: unknown;
+  try { rules = engine.resolveRules(input); } catch (e) { return actionError(e instanceof RulesError ? e.message : "Those rules are not valid."); }
+  try { oldRules = engine.resolveRules(row.rules); } catch { oldRules = null; }
+  const events = loaded.map(toStored);
+  const errorsOf = (r: unknown) => reconstruct(engine, row.context, r, events).issues.filter((i) => i.severity === "error");
+  // problems the log already had are not this change's fault
+  const before = new Set(oldRules === null ? [] : errorsOf(oldRules).map((i) => i.message));
+  const rebuilt = reconstruct(engine, row.context, rules, events);
+  const introduced = rebuilt.issues.find((i) => i.severity === "error" && !before.has(i.message));
+  if (introduced) return actionError(`These rules don't fit what has already been recorded: ${introduced.message}`);
+
+  const env = rebuilt.envelope as MatchEnvelope;
+  const snap = snapshot(engine, env, row.context, rules);
+  const { data, error } = await sb.rpc("si_set_contest_rules", {
+    p_contest_id: contestId, p_expected_seq: row.last_seq, p_rules: rules,
+    p_status: env.status, p_state: env, p_summary: snap.summary, p_lines: snap.lines, p_mirror: snap.mirror,
+  });
+  // checked before fail(): it hides raw database text, including "function does not exist"
+  if (error) {
+    const known = friendlyIntelligenceError(error.message);
+    return actionError(known !== error.message ? known : friendlyTournamentError(error.message));
+  }
+  // a finished match may now have a different result
+  const warning = env.status === "completed" || env.status !== row.status ? await syncFixture(sb, row, env, snap.mirror) : null;
+  reval(row.tournament_id, contestId);
+  return { contest: toView(data as ContestRow), duplicate: false, warning };
+}
+
 // ── recalculateScore(matchId) ───────────────────────────────────
 
 /**

@@ -13,11 +13,10 @@ import { ROUNDS, STROKES, type SwimEntry } from "@/lib/intelligence/sports/swimm
 import type { ContestView } from "@/lib/intelligence/types";
 import type { TournamentMatch } from "@/lib/tournaments/types";
 import { RulesGuide, StatusPill } from "./views";
+import RuleFields from "./RuleFields";
 import "./intelligence.css";
 
 export interface HubTeam { id: string; name: string; players: { id: string; name: string; userId: string | null }[] }
-
-const label = (key: string): string => key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase());
 
 export default function ScorerHub({ tournamentId, tournamentName, sportName, sport, matches, teams, contests, rules, ruleChoices, guide }: {
   tournamentId: string; tournamentName: string; sportName: string; sport: SportKey | null;
@@ -96,44 +95,32 @@ export default function ScorerHub({ tournamentId, tournamentName, sportName, spo
   );
 }
 
-// Every rule of the sport, as the engine reports it: numbers, switches
-// and choices. Nothing here knows which sport it is editing.
+// Every rule of the sport, as the engine reports it, in labelled groups
+// where the sport has them (RuleFields).
 function RulesForm({ tournamentId, sport, initial, sportChoices, onError }: {
   tournamentId: string; sport: SportKey; initial: Record<string, unknown>; sportChoices?: Record<string, readonly string[]>; onError: (m: string | null) => void;
 }) {
   const [rules, setRules] = useState(initial);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
-  const set = (k: string, v: unknown) => { setSaved(false); setRules({ ...rules, [k]: v }); };
   const choices: Record<string, readonly string[]> = {
     preset: ["t20", "odi", "test", "custom"], format: ["singles", "doubles"], scoring: ["side_out", "rally"], nextGameServe: ["alternate", "winner", "loser"],
     ...sportChoices,
   };
-  const editable = Object.entries(rules).filter(([, v]) => v === null || ["number", "boolean", "string"].includes(typeof v));
+  // a preset is a whole set of defaults, not one field
+  const pickPreset = (preset: string) => start(async () => {
+    const d = await getRuleDefaults(sport, preset);
+    // the league table is not part of a preset
+    if (isActionError(d)) onError(d.message); else { setSaved(false); setRules("table" in rules ? { ...d, table: rules.table } : d); }
+  });
 
   return (
     <details className="si-card si-more">
       <summary>Scoring rules for this tournament</summary>
       <div className="si-grid" style={{ gap: 12 }}>
-        <div className="si-muted" style={{ fontSize: 12.5 }}>These apply to matches set up for scoring from now on. A match already being scored keeps the rules it started with. Leave a limit empty for &quot;no limit&quot;.</div>
-        <div className="si-form">
-          {editable.map(([k, v]) => (
-            <label key={k} className="si-label">{label(k)}
-              {choices[k] ? (
-                <select className="si-input" value={String(v)} onChange={(e) => {
-                  const value = e.target.value;
-                  if (k !== "preset") { set(k, value); return; }
-                  // a preset is a whole set of defaults, not one field
-                  start(async () => { const d = await getRuleDefaults(sport, value); if (isActionError(d)) onError(d.message); else { setSaved(false); setRules(d); } });
-                }}>{choices[k].map((c) => <option key={c} value={c}>{c.replace(/_/g, " ")}</option>)}</select>
-              ) : typeof v === "boolean" ? (
-                <select className="si-input" value={v ? "yes" : "no"} onChange={(e) => set(k, e.target.value === "yes")}><option value="yes">Yes</option><option value="no">No</option></select>
-              ) : (
-                <input className="si-input" inputMode="numeric" value={v === null ? "" : String(v)} onChange={(e) => set(k, e.target.value.trim() === "" ? null : Number(e.target.value))} />
-              )}
-            </label>
-          ))}
-        </div>
+        <div className="si-muted" style={{ fontSize: 12.5 }}>These apply to matches set up for scoring from now on. A match already being scored keeps the rules it started with: change those from the match&apos;s own scorer. Leave a limit empty for &quot;no limit&quot;.</div>
+        <RuleFields sport={sport} look="scorer" rules={rules} choices={choices}
+          onChange={(r) => { setSaved(false); setRules(r); }} onPreset={pickPreset} />
         <div className="si-row">
           <button type="button" className="si-btn primary small" disabled={pending} onClick={() => start(async () => {
             const res = await saveScoringRules(tournamentId, rules);

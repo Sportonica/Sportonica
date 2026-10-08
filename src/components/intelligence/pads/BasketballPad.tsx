@@ -97,6 +97,19 @@ export default function BasketballPad({ contest, send }: PadProps) {
     send("MATCH_COMPLETE");
   };
 
+  // a game to a target (3x3: 21, or 2 points in overtime) is over the moment a team gets there
+  const overtime = s.period > rules.periods;
+  const target = (overtime ? rules.overtimeTargetPoints : rules.targetScore) ?? null;
+  const pointsNow = (side: Side) => (overtime ? s.byPeriod[side][s.period - 1] ?? 0 : s.score[side]);
+  const reached = s.periodOpen && target ? SIDE_KEYS.find((x) => pointsNow(x) >= target) ?? null : null;
+  const endAtTarget = () => {
+    if (!reached) return;
+    const why = overtime ? `${sides[reached].name} scored ${target} in overtime` : `${sides[reached].name} reached ${target}`;
+    fire("PERIOD_END"); clk.periodEnded();
+    send("GAME_END_EARLY", { reason: why });
+    send("MATCH_COMPLETE");
+  };
+
   // simple mode: record what was tapped, for the player picked (or nobody)
   const answer = (who: string | null, now: { side: Side; what: "1" | "2" | "3" | "foul" } | null = ask) => {
     if (!now) return;
@@ -146,6 +159,13 @@ export default function BasketballPad({ contest, send }: PadProps) {
           ) : null}
         </div>
       )}
+
+      {reached ? (
+        <div className="si-info si-row" role="status" style={{ justifyContent: "space-between" }}>
+          <span>{sides[reached].name} {overtime ? `scored ${target} in overtime` : `reached ${target}`}. The game is over.</span>
+          <button type="button" className="si-btn primary small" onClick={endAtTarget}>End the game</button>
+        </div>
+      ) : null}
 
       {SIDE_KEYS.some(needsRoster) ? (
         <div className="si-card si-grid" style={{ gap: 12 }}>
@@ -248,7 +268,7 @@ export default function BasketballPad({ contest, send }: PadProps) {
                   <div className="si-keys three">
                     {(["1", "2", "3"] as const).map((w) => (
                       <button type="button" key={w} className="si-key-btn score big" onClick={() => key(side, w)}>
-                        +{w === "1" ? rules.freeThrowValue : w === "2" ? rules.twoPointValue : rules.threePointValue}
+                        +{w === "1" ? `${rules.freeThrowValue} FT` : w === "2" ? rules.twoPointValue : rules.threePointValue}
                       </button>
                     ))}
                   </div>
