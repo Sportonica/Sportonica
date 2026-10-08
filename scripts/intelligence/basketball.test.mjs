@@ -191,7 +191,44 @@ section("basketball: presets and configurable formats (FIBA, NBA, NCAA, 3x3, cus
   assert.throws(() => E.resolveRules({ standingsWinPoints: 1, standingsLossPoints: 1 }), RulesError);
   assert.throws(() => E.resolveRules({ teamFoulWindow: "quarter" }), RulesError);
   assert.throws(() => E.resolveRules({ clutchMinutes: 11 }), RulesError);
-  assert.deepEqual(E.ruleChoices.preset, ["fiba", "nba", "ncaa", "custom"]);
+  assert.deepEqual(E.ruleChoices.preset, ["fiba", "nba", "ncaa", "3x3", "custom"]);
+});
+
+section("basketball: the 3x3 preset, first to 21 and first to 2 in overtime", () => {
+  const r = E.resolveRules({ preset: "3x3" });
+  assert.deepEqual([r.periods, r.periodMinutes, r.targetScore, r.overtimeTargetPoints, r.playersOnCourt, r.shotClockSeconds, r.twoPointValue, r.threePointValue, r.timeoutsPerGame],
+    [1, 10, 21, 2, 3, 12, 1, 2, 1]);
+  assert.equal(E.resolveRules({}).targetScore, null, "FIBA plays to the clock");
+  assert.throws(() => E.resolveRules({ targetScore: 0 }), RulesError);
+
+  // a team reaches 21: the scorer ends the period and the game there
+  const ctx3 = makeContext("basketball", 4);
+  const m = openMatch(E, ctx3, { preset: "3x3" });
+  m.push("MATCH_START"); m.push("PERIOD_START");
+  for (let i = 0; i < 10; i++) m.push(...made("a", "a1", 2));
+  m.push(...made("a", "a2", 1));
+  m.push(...made("b", "b1", 2));
+  assert.deepEqual(m.env.sport.score, { a: 21, b: 2 });
+  m.push("PERIOD_END");
+  m.push("GAME_END_EARLY", { reason: "reached 21" });
+  m.push("MATCH_COMPLETE");
+  assert.equal(m.env.result.winner, "a");
+  m.assertReconstructs("3x3 to 21");
+
+  // level at the end of the 10 minutes: overtime, first to score 2 in it
+  const ot = openMatch(E, ctx3, { preset: "3x3" });
+  ot.push("MATCH_START"); ot.push("PERIOD_START");
+  ot.push(...made("a", "a1", 2)); ot.push(...made("b", "b1", 2));
+  ot.push("PERIOD_END");
+  ot.refuses("MATCH_COMPLETE", {}, /level/, "a level 3x3 game");
+  ot.push("PERIOD_START");
+  ot.push(...made("b", "b1", 1)); ot.push(...made("b", "b2", 1));
+  assert.equal(ot.env.sport.byPeriod.b[1], 2, "overtime points are counted on their own");
+  ot.push("PERIOD_END");
+  ot.push("GAME_END_EARLY", { reason: "scored 2 in overtime" });
+  ot.push("MATCH_COMPLETE");
+  assert.equal(ot.env.result.winner, "b");
+  ot.assertReconstructs("3x3 overtime");
 });
 
 section("basketball: shot clock values come from the competition", () => {

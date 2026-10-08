@@ -7,6 +7,8 @@ import { SPORT_NAMES as SPORTS, normalizeSport, sportTeamSize } from "@/lib/spor
 import { saveScoringRules } from "@/lib/intelligence/actions";
 import { CRICKET_TIEBREAKERS, TIEBREAKER_LABEL, cricketTableOf, type CricketTiebreaker } from "@/lib/intelligence/sports/cricketTable";
 import { BASKETBALL_PRESETS, type BasketballPreset } from "@/lib/intelligence/sports/basketball/rules";
+import { CRICKET_PRESETS, type CricketRules } from "@/lib/intelligence/sports/cricketRules";
+import RuleFields from "@/components/intelligence/RuleFields";
 import { createTournament, updateTournamentDraft, publishTournament, uploadTournamentBanner, uploadTournamentQr } from "@/lib/tournaments/actions";
 import { parseMapsUrl } from "@/lib/admin/location";
 import { isActionError } from "@/lib/actionError";
@@ -25,13 +27,15 @@ const toLocalDate = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) 
 const toLocalTime = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kathmandu" }) : "");
 const combine = (date: string, time: string) => (date && time ? `${date}T${time}:00${KTM_OFFSET}` : "");
 
-// the engine's cricket presets (sports/cricket.ts), as the form offers them
+// the engine's cricket presets, with box-cricket overs for "custom"
 const CRICKET_FORMATS = {
-  t20: { label: "T20: 20 overs", overs: 20, perBowler: 4 },
-  odi: { label: "One-day: 50 overs", overs: 50, perBowler: 10 },
-  test: { label: "Two innings, no over limit", overs: null, perBowler: null },
-  custom: { label: "Custom overs (box cricket)", overs: 8, perBowler: 2 },
+  t20: { overs: 20, perBowler: 4 },
+  odi: { overs: 50, perBowler: 10 },
+  test: { overs: null, perBowler: null },
+  custom: { overs: 8, perBowler: 2 },
 } as const;
+const cricketPreset = (p: keyof typeof CRICKET_FORMATS): CricketRules =>
+  ({ ...CRICKET_PRESETS[p], oversPerInnings: CRICKET_FORMATS[p].overs, maxOversPerBowler: CRICKET_FORMATS[p].perBowler });
 
 export default function TournamentForm({
   venues, existing, mode = "venue", onSaved,
@@ -149,22 +153,25 @@ export default function TournamentForm({
     const base = BASKETBALL_PRESETS[(saved.preset as BasketballPreset) in BASKETBALL_PRESETS ? (saved.preset as BasketballPreset) : "fiba"];
     return { ...base, ...saved };
   });
-  const setPreset = (preset: BasketballPreset) => setBb({ ...BASKETBALL_PRESETS[preset] });
-  const bbRules = () => ({
-    preset: bb.preset, periods: bb.periods, periodMinutes: bb.periodMinutes, overtimeMinutes: bb.overtimeMinutes,
-    allowTie: bb.allowTie, shotClockSeconds: bb.shotClockSeconds, shotClockReset: bb.shotClockSeconds === null ? null : Math.min(bb.shotClockReset ?? 14, bb.shotClockSeconds),
-  });
+  const setPreset = (preset: string) => {
+    if (!(preset in BASKETBALL_PRESETS)) return;
+    const next = BASKETBALL_PRESETS[preset as BasketballPreset];
+    setBb({ ...next });
+    // a new tournament takes the format's team size too (3x3: 3 on court and 1 substitute)
+    if (!existing) { setMinPlayers(next.playersOnCourt); setMaxPlayers(next.playersOnCourt); setSubLimit(next.gameRosterSize - next.playersOnCourt); }
+  };
   // cricket: the format and overs (saved as the tournament's scoring rules)
   const isCricketSport = sport === "Cricket";
   const [ck, setCk] = useState(() => {
-    const saved = (existing?.scoring_rules ?? {}) as { preset?: string; oversPerInnings?: number | null; maxOversPerBowler?: number | null; table?: unknown };
+    const saved = (existing?.scoring_rules ?? {}) as Partial<CricketRules>;
     const preset = (saved.preset && saved.preset in CRICKET_FORMATS ? saved.preset : "t20") as keyof typeof CRICKET_FORMATS;
-    return { preset, oversPerInnings: saved.oversPerInnings ?? CRICKET_FORMATS[preset].overs, maxOversPerBowler: saved.maxOversPerBowler ?? CRICKET_FORMATS[preset].perBowler, table: cricketTableOf(saved.table) };
+    return { ...cricketPreset(preset), ...saved, table: cricketTableOf(saved.table) };
   });
   // scoring rules are saved next to the tournament, once it exists
   async function saveGameRules(id: string): Promise<string | null> {
     if (!isBasketballSport && !isCricketSport) return null;
-    const res = await saveScoringRules(id, isBasketballSport ? bbRules() : ck);
+    // every rule, not just the ones on show: the server fills any missing one from the preset
+    const res = await saveScoringRules(id, isBasketballSport ? bb : ck);
     return isActionError(res) ? `The tournament was saved, but the ${sport.toLowerCase()} settings were not: ${res.message}` : null;
   }
 
@@ -725,42 +732,10 @@ export default function TournamentForm({
       {isBasketballSport && (
         <>
           <SectionTitle>Basketball game</SectionTitle>
-          <div className="ev-row">
-            <div className="ev-field">
-              <label>Rules</label>
-              <select value={bb.preset} onChange={(e) => setPreset(e.target.value as BasketballPreset)}>
-                <option value="fiba">FIBA: 4 × 10 min</option>
-                <option value="nba">NBA: 4 × 12 min</option>
-                <option value="ncaa">College: 2 × 20 min</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-            <div className="ev-field">
-              <label>{bb.periods === 4 ? "Quarter" : "Period"} length (min)</label>
-              <input type="number" min={1} max={30} value={bb.periodMinutes}
-                onChange={(e) => setBb({ ...bb, preset: "custom", periodMinutes: Math.max(1, Number(e.target.value) || 1) })} />
-            </div>
-          </div>
-          <div className="ev-row">
-            <div className="ev-field">
-              <label>Overtime</label>
-              <select value={bb.allowTie ? "none" : String(bb.overtimeMinutes)}
-                onChange={(e) => setBb(e.target.value === "none" ? { ...bb, preset: "custom", allowTie: true } : { ...bb, preset: bb.preset, allowTie: false, overtimeMinutes: Number(e.target.value) })}>
-                {[...new Set([5, 3, bb.overtimeMinutes])].map((m) => <option key={m} value={m}>{m} minutes, until there&apos;s a winner</option>)}
-                <option value="none">No overtime: a game can end level</option>
-              </select>
-            </div>
-            <div className="ev-field">
-              <label>Shot clock</label>
-              <select value={bb.shotClockSeconds === null ? "off" : String(bb.shotClockSeconds)}
-                onChange={(e) => setBb({ ...bb, preset: "custom", shotClockSeconds: e.target.value === "off" ? null : Number(e.target.value) })}>
-                {[...new Set([24, 14, ...(bb.shotClockSeconds ? [bb.shotClockSeconds] : [])])].map((n) => <option key={n} value={n}>{n} seconds</option>)}
-                <option value="off">Off</option>
-              </select>
-            </div>
-          </div>
+          <RuleFields sport="basketball" look="console" rules={bb as unknown as Record<string, unknown>}
+            onChange={(r) => setBb(r as unknown as typeof bb)} onPreset={setPreset} />
           <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
-            Fouls, timeouts and the rest follow the rules chosen above. They can be fine-tuned in Live scoring before the first game.
+            Matches already being scored keep the rules they started with. Change one match&apos;s rules from its scorer.
           </p>
         </>
       )}
@@ -768,35 +743,11 @@ export default function TournamentForm({
       {isCricketSport && (
         <>
           <SectionTitle>Cricket game</SectionTitle>
-          <div className="ev-row">
-            <div className="ev-field">
-              <label>Format</label>
-              <select value={ck.preset} onChange={(e) => {
-                const p = e.target.value as keyof typeof CRICKET_FORMATS;
-                setCk({ ...ck, preset: p, oversPerInnings: CRICKET_FORMATS[p].overs, maxOversPerBowler: CRICKET_FORMATS[p].perBowler });
-              }}>
-                {Object.entries(CRICKET_FORMATS).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
-              </select>
-            </div>
-            {ck.preset !== "test" && (
-              <div className="ev-field">
-                <label>Overs per side</label>
-                <input type="number" min={1} max={50} value={ck.oversPerInnings ?? ""}
-                  onChange={(e) => setCk({ ...ck, preset: "custom", oversPerInnings: Math.max(1, Number(e.target.value) || 1) })} />
-              </div>
-            )}
-          </div>
-          {ck.preset !== "test" && (
-            <div className="ev-row">
-              <div className="ev-field">
-                <label>Max overs per bowler</label>
-                <input type="number" min={1} value={ck.maxOversPerBowler ?? ""} placeholder="No limit"
-                  onChange={(e) => setCk({ ...ck, preset: "custom", maxOversPerBowler: e.target.value.trim() === "" ? null : Math.max(1, Number(e.target.value) || 1) })} />
-              </div>
-            </div>
-          )}
+          <RuleFields sport="cricket" look="console" rules={ck as unknown as Record<string, unknown>}
+            onChange={(r) => setCk({ ...(r as unknown as CricketRules), table: ck.table })}
+            onPreset={(p) => { if (p in CRICKET_FORMATS) setCk({ ...cricketPreset(p as keyof typeof CRICKET_FORMATS), table: ck.table }); }} />
           <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
-            Wides, no-balls, free hits and the rest follow the format. They can be fine-tuned in Live scoring before the first match.
+            Matches already being scored keep the rules they started with. Change one match&apos;s rules from its scorer.
           </p>
           {format !== "knockout" && (
             <>

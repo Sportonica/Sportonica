@@ -134,10 +134,13 @@ export const SI_ERROR_MESSAGES: Record<string, string> = {
   SI_EVENTS_IMMUTABLE: "Recorded events can't be edited or deleted. Record a correction instead.",
   NOT_SET_UP: "Live scoring isn't set up on this database yet. Apply db/sports_intelligence.sql in Supabase.",
   SPORT_NOT_ENABLED: "This sport isn't enabled for live scoring on this database yet. Apply db/sports_intelligence_tennis.sql in Supabase.",
+  MATCH_RULES_NOT_SET_UP: "Changing a match's rules isn't set up on this database yet. Apply db/si_contest_rules.sql in Supabase.",
+  INVALID_RULES: "Those rules are not valid.",
 };
 
 export function friendlyIntelligenceError(message: string): string {
   // PostgREST / Postgres "relation or function does not exist"
+  if (/si_set_contest_rules/.test(message) && /(does not exist|Could not find|schema cache)/i.test(message)) return SI_ERROR_MESSAGES.MATCH_RULES_NOT_SET_UP;
   if (/si_(contests|events|stat_lines|append_event|open_contest|save_snapshot|set_scoring_rules|can_score)/.test(message) && /(does not exist|Could not find|schema cache)/i.test(message)) {
     return SI_ERROR_MESSAGES.NOT_SET_UP;
   }

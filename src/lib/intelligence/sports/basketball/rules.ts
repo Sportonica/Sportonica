@@ -13,7 +13,7 @@
 import { RulesError } from "../../core/types";
 import { isNonNegInt, isPosInt, mergeRules } from "../../core/util";
 
-export const BASKETBALL_PRESETS_LIST = ["fiba", "nba", "ncaa", "custom"] as const;
+export const BASKETBALL_PRESETS_LIST = ["fiba", "nba", "ncaa", "3x3", "custom"] as const;
 export type BasketballPreset = (typeof BASKETBALL_PRESETS_LIST)[number];
 
 export interface BasketballRules {
@@ -24,6 +24,10 @@ export interface BasketballRules {
   periodMinutes: number;
   overtimeMinutes: number;
   allowTie: boolean;
+  /** the game ends as soon as a team reaches this score in regulation (3x3: 21); null: played to the clock */
+  targetScore: number | null;
+  /** overtime ends as soon as a team scores this many points in it (3x3: 2); null: played to the clock */
+  overtimeTargetPoints: number | null;
   playersOnCourt: number;
   /** players a team may dress for one game: on court plus bench (FIBA 12 = 5 + 7 substitutes) */
   gameRosterSize: number;
@@ -101,7 +105,7 @@ export interface BasketballRules {
 
 const FIBA: BasketballRules = {
   preset: "fiba",
-  periods: 4, periodMinutes: 10, overtimeMinutes: 5, allowTie: false, playersOnCourt: 5, gameRosterSize: 12,
+  periods: 4, periodMinutes: 10, overtimeMinutes: 5, allowTie: false, targetScore: null, overtimeTargetPoints: null, playersOnCourt: 5, gameRosterSize: 12,
   shotClockSeconds: 24, alternatingPossession: true,
   quarterBreakMinutes: 2, halftimeMinutes: 15, substitutionsPerGame: null,
   twoPointValue: 2, threePointValue: 3, freeThrowValue: 1, trackShotAttempts: true,
@@ -139,6 +143,22 @@ export const BASKETBALL_PRESETS: Record<BasketballPreset, BasketballRules> = {
     timeoutsPerGame: 4, timeoutsFirstHalf: 0, timeoutsSecondHalf: 0, timeoutsPerOvertime: 1,
     standingsWinPoints: 1, standingsLossPoints: 0, standingsForfeitLossPoints: 0,
   },
+  // FIBA 3x3: one 10-minute period or first to 21, baskets worth 1 and 2,
+  // a 12-second shot clock, overtime won by the first team to score 2,
+  // no personal foul-outs (99 stands for none), the bonus from the 7th
+  // team foul and one timeout a team
+  "3x3": {
+    ...FIBA, preset: "3x3",
+    periods: 1, periodMinutes: 10, overtimeMinutes: 5, targetScore: 21, overtimeTargetPoints: 2,
+    playersOnCourt: 3, gameRosterSize: 4, shotClockSeconds: 12, shotClockReset: null, alternatingPossession: false,
+    quarterBreakMinutes: 1, halftimeMinutes: 0,
+    twoPointValue: 1, threePointValue: 2, freeThrowValue: 1,
+    foulLimit: 99, technicalsCountTowardFoulLimit: false, technicalEjectAt: null, unsportsmanlikeEjectAt: 2, combinedEjectAt: null,
+    teamFoulWindow: "period", bonusAfterFouls: 6, overtimeTeamFouls: "carry",
+    timeoutsPerGame: 1, timeoutsFirstHalf: 0, timeoutsSecondHalf: 0, timeoutsPerOvertime: 0,
+    clutchMinutes: 2, clutchMargin: 3,
+    standingsWinPoints: 1, standingsLossPoints: 0, standingsForfeitLossPoints: 0, standingsTiebreak: "head_to_head",
+  },
   custom: { ...FIBA, preset: "custom" },
 };
 
@@ -154,7 +174,7 @@ const nullableInt = (v: unknown): boolean => v === null || isPosInt(v);
 export function resolveBasketballRules(input: unknown): BasketballRules {
   const presetIn = input && typeof input === "object" ? (input as { preset?: unknown }).preset : undefined;
   const preset = presetIn ?? "fiba";
-  if (typeof preset !== "string" || !(preset in BASKETBALL_PRESETS)) throw new RulesError("preset must be fiba, nba, ncaa or custom");
+  if (typeof preset !== "string" || !(preset in BASKETBALL_PRESETS)) throw new RulesError("preset must be fiba, nba, ncaa, 3x3 or custom");
   const r = mergeRules(BASKETBALL_PRESETS[preset as BasketballPreset], input);
 
   for (const k of ["periods", "periodMinutes", "overtimeMinutes", "twoPointValue", "threePointValue", "freeThrowValue", "foulLimit", "playersOnCourt", "gameRosterSize", "clutchMinutes"] as const) {
@@ -163,7 +183,7 @@ export function resolveBasketballRules(input: unknown): BasketballRules {
   for (const k of ["quarterBreakMinutes", "halftimeMinutes", "bonusFreeThrows", "technicalFreeThrows", "unsportsmanlikeFreeThrows", "bonusAfterFouls", "timeoutsFirstHalf", "timeoutsSecondHalf", "timeoutsPerOvertime", "clutchMargin", "standingsWinPoints", "standingsLossPoints", "standingsForfeitLossPoints"] as const) {
     if (!isNonNegInt(r[k])) throw new RulesError(`${k} must be a whole number, 0 or more`);
   }
-  for (const k of ["shotClockSeconds", "shotClockReset", "technicalEjectAt", "unsportsmanlikeEjectAt", "combinedEjectAt", "doubleBonusAfterFouls", "bonusAfterFoulsOvertime"] as const) {
+  for (const k of ["shotClockSeconds", "shotClockReset", "technicalEjectAt", "unsportsmanlikeEjectAt", "combinedEjectAt", "doubleBonusAfterFouls", "bonusAfterFoulsOvertime", "targetScore", "overtimeTargetPoints"] as const) {
     if (!nullableInt(r[k])) throw new RulesError(`${k} must be a positive whole number, or empty for none`);
   }
   if (r.substitutionsPerGame !== null && !isNonNegInt(r.substitutionsPerGame)) throw new RulesError("substitutionsPerGame must be a whole number, or empty for unlimited");

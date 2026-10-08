@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { correctContestEvent, getContestEvents, recalculateContest, recordContestEvent } from "@/lib/intelligence/actions";
+import { correctContestEvent, getContestEvents, getRuleDefaults, recalculateContest, recordContestEvent, setContestRules } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
 import type { Issue } from "@/lib/intelligence/core/types";
 import type { ContestView, TimelineEntry } from "@/lib/intelligence/types";
@@ -20,6 +20,7 @@ import { ScoreCard, Timeline } from "./views";
 import { PADS } from "./pads";
 import { CricketScorerHeader, CricketScorerSide } from "./cricket/scorer";
 import { SIDE_KEYS } from "./pads/shared";
+import RuleFields from "./RuleFields";
 import "./intelligence.css";
 
 interface Queued { type: string; payload: Record<string, unknown>; clientId: string; occurredAt: string }
@@ -253,6 +254,11 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
                 )) : null}
               </div>
             </details>
+
+            {contest.sport !== "swimming" ? (
+              <MatchRules key={JSON.stringify(contest.rules)} contest={contest} busy={busy || queue.length > 0}
+                onSaved={(res) => { setContest(res.contest); setWarning(res.warning); setError(null); void refreshTimeline(); }} onError={setError} />
+            ) : null}
           </div>
 
           {cricket ? (
@@ -284,6 +290,45 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
         </div>
       </div>
     </div>
+  );
+}
+
+// This match's own rules: fixed when it was set up, changed here when they
+// were wrong. Every event is replayed under the new rules on save, and the
+// change is refused if anything already recorded no longer fits.
+function MatchRules({ contest, busy, onSaved, onError }: {
+  contest: ContestView; busy: boolean;
+  onSaved: (res: { contest: ContestView; warning: string | null }) => void; onError: (m: string) => void;
+}) {
+  const [rules, setRules] = useState<Record<string, unknown>>(contest.rules);
+  const [saving, setSaving] = useState(false);
+  const changed = JSON.stringify(rules) !== JSON.stringify(contest.rules);
+  const pickPreset = async (preset: string) => {
+    const d = await getRuleDefaults(contest.sport, preset);
+    if (isActionError(d)) onError(d.message);
+    else setRules("table" in rules ? { ...d, table: rules.table } : d);
+  };
+  const save = async () => {
+    if (!window.confirm("Change this match's rules? The whole match is rebuilt from its events under the new rules.")) return;
+    setSaving(true);
+    try {
+      const res = await setContestRules(contest.id, rules);
+      if (isActionError(res)) onError(res.message); else onSaved(res);
+    } catch { onError("No connection. The rules were not changed. Try again."); }
+    setSaving(false);
+  };
+  return (
+    <details className="si-more">
+      <summary>Rules for this match</summary>
+      <div className="si-grid" style={{ gap: 12 }}>
+        <div className="si-muted" style={{ fontSize: 12.5 }}>Fixed when this match was set up. Change them here if they were wrong; the tournament&apos;s rules for other matches stay as they are.</div>
+        <RuleFields sport={contest.sport} look="scorer" rules={rules} onChange={setRules} onPreset={(p) => void pickPreset(p)} />
+        <div className="si-row">
+          <button type="button" className="si-btn primary small" disabled={busy || saving || !changed} onClick={() => void save()}>Save match rules</button>
+          {changed ? <button type="button" className="si-btn small" disabled={saving} onClick={() => setRules(contest.rules)}>Discard changes</button> : null}
+        </div>
+      </div>
+    </details>
   );
 }
 
