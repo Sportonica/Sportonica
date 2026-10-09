@@ -76,7 +76,8 @@ export function EventsRail({ events }: { events: RailEvent[] }) {
             <div className="rc-when">{when(e.event_date)}</div>
             <div className="rc-foot">
               <span style={{ color: c }}>{e.slots_remaining} spots left</span>
-              <span>{Number(e.fee) === 0 ? "Free" : `Rs ${e.fee}`}</span>
+              {/* organised events and tournaments: no fee, nothing shown (not "Free") */}
+              {Number(e.fee) > 0 ? <span>Rs {e.fee}</span> : null}
             </div>
           </Link>
         );
