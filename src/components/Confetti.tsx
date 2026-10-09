@@ -64,5 +64,5 @@ export default function Confetti() {
     return () => { cancelAnimationFrame(frame); window.removeEventListener("resize", resize); };
   }, []);
 
-  return <canvas ref={ref} className="cp-confetti" aria-hidden="true" />;
+  return <canvas ref={ref} aria-hidden="true" style={{ position: "fixed", inset: 0, width: "100vw", height: "100vh", pointerEvents: "none", zIndex: 50 }} />;
 }

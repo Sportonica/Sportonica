@@ -1,0 +1,61 @@
+.qz {
+  min-height: 80vh; display: grid; place-items: center; padding: 32px 16px;
+  background: radial-gradient(ellipse at top, rgba(0, 98, 65, 0.35), transparent 60%), var(--bg);
+}
+.qz-card {
+  width: 100%; max-width: 480px; display: grid; gap: 14px; padding: 28px 20px; border-radius: 22px;
+  background: var(--inkSoft); border: 1px solid var(--border-line); color: var(--chalk);
+}
+.qz-kicker { font-size: 12.5px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-primary-light); margin: 0; }
+.qz-title { font-size: clamp(24px, 6.5vw, 32px); font-weight: 800; line-height: 1.15; margin: 0; }
+.qz-q { font-size: clamp(19px, 5vw, 23px); font-weight: 800; line-height: 1.3; margin: 0; }
+.qz-muted { font-size: 14px; color: var(--muted); margin: 0; }
+.qz-error { font-size: 14px; color: #ef4444; margin: 0; }
+.qz-field { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.qz-input {
+  font: inherit; font-size: 16px; color: var(--chalk); padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--border-line); background: var(--inkMid);
+}
+.qz-input:focus { outline: 2px solid var(--color-primary-light); outline-offset: 1px; }
+.qz-check { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.qz-check input { margin-top: 3px; width: 18px; height: 18px; flex: none; accent-color: var(--color-primary); }
+.qz-btn {
+  font: inherit; font-size: 16px; font-weight: 800; padding: 14px; border-radius: 14px; border: 0; cursor: pointer;
+  background: var(--color-primary); color: #fff;
+}
+.qz-btn:disabled { opacity: 0.6; }
+.qz-link { font: inherit; font-size: 14px; font-weight: 700; background: none; border: 0; color: var(--color-primary-light); cursor: pointer; justify-self: start; padding: 4px 0; }
+.qz-progress { display: grid; grid-auto-flow: column; gap: 6px; }
+.qz-progress span { height: 5px; border-radius: 3px; background: var(--inkMid); }
+.qz-progress span.on { background: var(--color-primary-light); }
+.qz-options { display: grid; gap: 10px; }
+.qz-option {
+  font: inherit; font-size: 16px; font-weight: 700; text-align: left; padding: 15px 16px; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--border-line); background: var(--inkMid); color: var(--chalk);
+}
+.qz-option.on { border-color: var(--color-primary-light); outline: 2px solid var(--color-primary-light); }
+.qz-option:disabled { opacity: 0.6; }
+.qz-score { display: flex; align-items: baseline; gap: 8px; }
+.qz-score b { font-size: 56px; font-weight: 800; line-height: 1; color: var(--color-primary-light); }
+.qz-score span { font-size: 16px; color: var(--muted); }
+.qz-win { display: grid; gap: 6px; justify-items: center; text-align: center; padding: 18px; border-radius: 16px; border: 2px dashed var(--color-primary-light); background: var(--inkMid); }
+.qz-win-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.qz-win-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(26px, 8vw, 34px); font-weight: 800; letter-spacing: 0.12em; }
+.qz-win-help { font-size: 13.5px; color: var(--muted); }
+.qz-rank-line { font-size: 15px; margin: 0; }
+.qz-rank-line b { color: var(--color-primary-light); }
+a.qz-btn { display: block; text-align: center; text-decoration: none; }
+.qz-lb { align-content: start; gap: 18px; }
+.qz-lb-head { display: grid; gap: 6px; text-align: center; max-width: 520px; }
+.qz-lb-grid { display: grid; gap: 16px; width: 100%; max-width: 980px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); }
+.qz-board { max-width: none; align-content: start; }
+.qz-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.qz-rows li { display: grid; grid-template-columns: 34px 1fr auto 74px; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--inkMid); font-size: 15px; }
+.qz-rows li.top { border: 1px solid var(--color-primary-light); }
+.qz-rank { font-weight: 800; text-align: center; }
+.qz-rows li.top1 .qz-rank { color: #f5b301; }
+.qz-name { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qz-pts { font-weight: 800; }
+.qz-pts small { font-weight: 600; color: var(--muted); }
+.qz-time { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.qz-lb-play { width: 100%; max-width: 320px; }

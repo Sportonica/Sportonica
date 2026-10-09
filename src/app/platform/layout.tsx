@@ -31,6 +31,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           <Link href="/platform/bookings">Bookings</Link>
           <Link href="/platform/users">Users</Link>
           <Link href="/platform/reports">Reports</Link>
+          <Link href="/platform/quiz">Quiz</Link>
           <Link href="/discover">↗ App</Link>
         </nav>
       </header>
