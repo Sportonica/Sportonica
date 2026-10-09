@@ -135,3 +135,9 @@ export function isCorrect(id: string, option: string): boolean {
   const q = byId.get(id);
   return !!q && String(q.answer) === option;
 }
+
+/** The level and the right option of question `id`, for the host's screen. */
+export function hostDetails(id: string): { level: Level; answer: string } | null {
+  const q = byId.get(id);
+  return q ? { level: q.level, answer: String(q.answer) } : null;
+}

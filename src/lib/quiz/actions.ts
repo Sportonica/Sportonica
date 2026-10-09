@@ -5,12 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { clientIp, underRateLimit } from "@/lib/security/abuse";
 import { isValidLocalPhone, normalizePhone, PHONE_ERROR } from "@/lib/validation/identity";
-import { MAX_SCORE, QUIZ, type PlayerQuestion } from "./quiz";
-import { isCorrect, pickQuestions } from "./bank";
+import { MAX_SCORE, NO_ANSWER, QUIZ, type HostQuestion, type PlayerQuestion } from "./quiz";
+import { hostDetails, isCorrect, pickQuestions } from "./bank";
 import { todayStartsAt } from "./leaderboard";
 
-// The quiz at /quiz. Entries live in public.quiz_entries, which has RLS
-// on and no policies: only these actions (service role) read or write it.
+// The quiz at /quiz (players on their own phones) and /platform/quiz/host
+// (a host reads the questions out and taps what the player says). Entries
+// live in public.quiz_entries, which has RLS on and no policies: only
+// these actions (service role) read or write it.
 
 export type QuizResult =
   | { ok: true; name: string; score: number; max: number; seconds: number; rankToday: number; winnerCode: string | null }
@@ -39,10 +41,28 @@ const limited = async () => !(await underRateLimit("quiz", await clientIp(), IP_
  * a faster time. Only this player's four questions are sent.
  */
 export async function startQuiz(input: { name: string; phone: string; consent: boolean }): Promise<{ questions: PlayerQuestion[] } | { message: string }> {
+  const begun = await beginEntry(input, "Tick the box to agree before you start.");
+  return "message" in begun ? begun : { questions: pickQuestions(begun.phone) };
+}
+
+/**
+ * Host mode: the same entry, clock and rules, started by a signed-in
+ * platform admin for the player in front of them. The host's screen also
+ * gets each question's level and right answer, to call it out as soon as
+ * the player has answered.
+ */
+export async function hostStartQuiz(input: { name: string; phone: string; consent: boolean }): Promise<{ questions: HostQuestion[] } | { message: string }> {
+  if (!(await isSuperAdmin())) return { message: "Only platform admins can host the quiz. Sign in again." };
+  const begun = await beginEntry(input, "Read the consent line to the player and tick that they agreed.");
+  if ("message" in begun) return begun;
+  return { questions: pickQuestions(begun.phone).map((q) => ({ ...q, ...hostDetails(q.id)! })) };
+}
+
+async function beginEntry(input: { name: string; phone: string; consent: boolean }, noConsent: string): Promise<{ phone: string } | { message: string }> {
   const name = cleanName(input.name);
-  if (!name) return { message: "Enter your full name." };
+  if (!name) return { message: "Enter the full name." };
   if (!isValidLocalPhone(input.phone)) return { message: PHONE_ERROR };
-  if (input.consent !== true) return { message: "Tick the box to agree before you start." };
+  if (input.consent !== true) return { message: noConsent };
   if (await limited()) return { message: "Too many tries. Wait a few minutes." };
   const phone = normalizePhone(input.phone);
   const sb = createServiceClient();
@@ -54,7 +74,7 @@ export async function startQuiz(input: { name: string; phone: string; consent: b
     // 23505: the same phone started a moment ago on another device; that clock stands
     if (insertError && insertError.code !== "23505") return { message: "Could not start the quiz. Try again." };
   }
-  return { questions: pickQuestions(phone) };
+  return { phone };
 }
 
 export async function submitQuiz(input: { phone: string; answers: Record<string, string> }): Promise<QuizResult> {
@@ -67,7 +87,8 @@ export async function submitQuiz(input: { phone: string; answers: Record<string,
   const answers: Record<string, string> = {};
   for (const q of questions) {
     const pick = input.answers?.[q.id];
-    if (typeof pick !== "string" || !q.options.some((o) => o.id === pick)) return { ok: false, message: "Answer all four questions." };
+    // NO_ANSWER: the player told the host they did not know (scored as wrong)
+    if (typeof pick !== "string" || (pick !== NO_ANSWER && !q.options.some((o) => o.id === pick))) return { ok: false, message: "Answer all four questions." };
     answers[q.id] = pick;
   }
   const score = questions.filter((q) => isCorrect(q.id, answers[q.id])).length * QUIZ.pointsPerQuestion;

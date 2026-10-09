@@ -19,3 +19,12 @@ export interface PlayerQuestion {
   text: string;
   options: { id: string; label: string }[];
 }
+
+/** Sent for a question the player could not answer (host mode): scored as wrong. */
+export const NO_ANSWER = "none";
+
+/** What the host sees: the level, and the right option, to call it out straight away. */
+export interface HostQuestion extends PlayerQuestion {
+  level: "easy" | "medium" | "hard";
+  answer: string;
+}
