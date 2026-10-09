@@ -15,6 +15,7 @@ import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS, TOURNAMENT_FORMATS, HOST_PAYMENT_METHODS, HOST_PAYMENT_METHOD_LABELS } from "@/lib/tournaments/types";
 import type { Tournament, TournamentFormat, HostPaymentMethod } from "@/lib/tournaments/types";
 import { shrinkImage, IMAGE_MAX } from "@/lib/images/shrink";
+import Link from "next/link";
 
 const KTM_OFFSET = "+05:45";
 const todayKTM = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" });
@@ -476,7 +477,7 @@ export default function TournamentForm({
                 {mode === "platform" ? (
                   <>No venues listed on the platform yet. Switch to &quot;Unlisted venue&quot; above, or add one under Venues first.</>
                 ) : (
-                  <>No partnered venues yet. <a href="/organize/partnerships" style={{ color: "#006241" }}>Invite one</a>, or switch to &quot;My own venue&quot; above.</>
+                  <>No partnered venues yet. <Link href="/organize/partnerships" style={{ color: "#006241" }}>Invite one</Link>, or switch to &quot;My own venue&quot; above.</>
                 )}
               </p>
             ) : (

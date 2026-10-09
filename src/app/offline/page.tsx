@@ -28,6 +28,8 @@ export default function OfflinePage() {
           Check your network and try again.
         </p>
 
+        {/* a full page load on purpose: it retries the network, where a client-side link would stay offline */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a href="/discover" style={{
           display: "inline-block", background: "#006241", color: "#ffffff",
           padding: "13px 26px", borderRadius: 12, fontWeight: 700,
