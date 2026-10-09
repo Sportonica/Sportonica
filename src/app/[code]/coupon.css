@@ -1,0 +1,30 @@
+.cp {
+  min-height: 80vh; display: grid; place-items: center; padding: 40px 16px;
+  background: radial-gradient(ellipse at top, rgba(0, 98, 65, 0.35), transparent 60%), var(--bg);
+}
+.cp-confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50; }
+.cp-card {
+  width: 100%; max-width: 460px; text-align: center; padding: 32px 22px; border-radius: 22px;
+  background: var(--inkSoft); border: 1px solid var(--border-line); color: var(--chalk);
+  animation: cp-pop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.cp-kicker { font-size: 13px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-primary-light); margin: 0 0 10px; }
+.cp-title { font-size: clamp(26px, 7vw, 36px); font-weight: 800; line-height: 1.15; margin: 0 0 8px; }
+.cp-title span { color: var(--color-primary-light); }
+.cp-at { font-size: 15px; color: var(--muted); margin: 0 0 24px; }
+.cp-at b { color: var(--chalk); }
+.cp-code {
+  display: grid; gap: 8px; justify-items: center; padding: 18px; border-radius: 16px;
+  border: 2px dashed var(--color-primary-light); background: var(--inkMid); margin-bottom: 22px;
+}
+.cp-code-label { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.cp-code-value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(26px, 8vw, 34px); font-weight: 800; letter-spacing: 0.14em; }
+.cp-copy {
+  font: inherit; font-size: 13px; font-weight: 700; padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  border: 0; background: var(--color-primary); color: #fff;
+}
+.cp-steps { text-align: left; font-size: 14px; color: var(--muted); margin: 0 0 14px; padding-left: 20px; display: grid; gap: 6px; }
+.cp-fine { font-size: 12px; color: var(--faint); margin: 0 0 22px; }
+.cp-home { display: inline-block; font-size: 14px; font-weight: 700; color: var(--color-primary-light); text-decoration: none; }
+@keyframes cp-pop { from { opacity: 0; transform: scale(0.9) translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .cp-card { animation: none; } }
