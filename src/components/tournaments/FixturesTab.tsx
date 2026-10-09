@@ -3,13 +3,14 @@
 import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, X, History, Pencil, Search, ChevronDown, Check } from "lucide-react";
+import { Plus, Trash2, X, History, Pencil, Search, ChevronDown, ChevronUp, Check } from "lucide-react";
 import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
   getTeamRoster, getMatchPlayerStats, recordMatchPlayerStats,
   generateKnockoutBracket, generateKnockoutFromGroups, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
-  recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound, updateLiveScore,
+  recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound, updateLiveScore, swapBracketSlots,
 } from "@/lib/tournaments/actions";
+import { bracketPositions, sortByBracket, feederOf, bracketNumber, slotSource } from "@/lib/tournaments/bracket";
 import { isActionError } from "@/lib/actionError";
 import { friendlyTournamentError } from "@/lib/tournaments/types";
 import { getSportKind, type SportKind } from "@/lib/sports";
@@ -69,41 +70,6 @@ function winnerOptions(matches: TournamentMatch[], teamName: (id: string | null)
     byId.set(m.winner_team_id, entry);
   }
   return [...byId.values()];
-}
-
-// A match's place in the bracket tree, read off the next_match links:
-// the Final is 0, its slot-a feeder 0 and slot-b feeder 1, and so on
-// down (position = parent * 2 + slot). Sorting a round by it puts the
-// two matches that meet next side by side, so "QF1 and QF2 feed SF1"
-// is visible on the page. Unlinked (hand-built) matches get no entry.
-function bracketPositions(matches: TournamentMatch[]): Map<string, number> {
-  const byId = new Map(matches.map((m) => [m.id, m]));
-  const pos = new Map<string, number>();
-  // A root only counts if something feeds it (a Final, not a loose match).
-  const roots = matches.filter((x) => !x.next_match_id && matches.some((f) => f.next_match_id === x.id));
-  const visit = (m: TournamentMatch, seen: Set<string>): number | null => {
-    if (pos.has(m.id)) return pos.get(m.id)!;
-    if (seen.has(m.id)) return null;
-    seen.add(m.id);
-    const next = m.next_match_id ? byId.get(m.next_match_id) : undefined;
-    let p: number | null;
-    if (next) {
-      const parent = visit(next, seen);
-      p = parent === null ? null : parent * 2 + (m.next_match_slot === "b" ? 1 : 0);
-    } else {
-      const i = roots.findIndex((x) => x.id === m.id);
-      p = i < 0 ? null : i;
-    }
-    if (p !== null) pos.set(m.id, p);
-    return p;
-  };
-  for (const m of matches) visit(m, new Set());
-  return pos;
-}
-
-// The match whose winner fills `slot` of `match`, if the bracket links one.
-function feederOf(matches: TournamentMatch[], match: TournamentMatch, slot: "a" | "b") {
-  return matches.find((f) => f.next_match_id === match.id && f.next_match_slot === slot) ?? null;
 }
 
 // For a knockout round after the first, who can play in it: the
@@ -483,10 +449,15 @@ export default function FixturesTab({
   }
   // Linked knockout rounds in bracket order; everything else as loaded.
   const positions = bracketPositions(matches);
-  for (const ms of rounds.values()) {
-    if (!ms.some((m) => positions.has(m.id))) continue;
-    ms.sort((x, y) => (positions.get(x.id) ?? Number.MAX_SAFE_INTEGER) - (positions.get(y.id) ?? Number.MAX_SAFE_INTEGER));
-  }
+  for (const [label, ms] of rounds) rounds.set(label, sortByBracket(ms, positions));
+  // The bracket neighbours of a match (whole round, not just the search
+  // hits), for moving it up or down a place.
+  const neighbours = (m: TournamentMatch) => {
+    if (!positions.has(m.id)) return { up: null, down: null };
+    const round = sortByBracket(matches.filter((x) => x.stage === m.stage && x.round_label === m.round_label), positions);
+    const i = round.findIndex((x) => x.id === m.id);
+    return { up: round[i - 1] ?? null, down: round[i + 1] ?? null };
+  };
 
   const REGEN_MESSAGES: Record<string, string> = {
     REBUILT: "Fixtures rebuilt from the current team list.",
@@ -770,7 +741,7 @@ export default function FixturesTab({
                 </tr>
               </thead>
               <tbody>
-                {ms.map((m) => (
+                {ms.map((m) => { const nb = neighbours(m); return (
                   <MatchRow
                     // Score in the key so the row's inputs pick up a live score
                     // saved elsewhere (another admin, or the +1 buttons) after refresh.
@@ -805,8 +776,10 @@ export default function FixturesTab({
                       if (!window.confirm(`Delete ${teamName(m.team_a_id)} vs ${teamName(m.team_b_id)}? This can't be undone.${note}`)) return;
                       run(() => deleteMatch(m.id));
                     }}
+                    onMoveUp={nb.up ? () => run(() => swapBracketSlots(m.id, nb.up!.id)) : undefined}
+                    onMoveDown={nb.down ? () => run(() => swapBracketSlots(m.id, nb.down!.id)) : undefined}
                   />
-                ))}
+                ); })}
               </tbody>
             </table>
           </div>
@@ -1071,7 +1044,7 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, onMoveUp, onMoveDown, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -1108,6 +1081,10 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   onSetStatus: (status: SettableStatus) => void;
   onUpdateTeams: (teamAId: string, teamBId?: string) => void;
   onDelete: () => void;
+  // Swap this match's place in the bracket with its neighbour (who it
+  // meets next changes; a winner already through moves with it).
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   pending: boolean;
 }) {
   // An empty slot fed by an earlier bracket match names that match
@@ -1117,14 +1094,10 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   const feederBPending = !!feederB && !DONE.has(feederB.status);
   const sideName = (slot: "a" | "b") => {
     const id = slot === "a" ? match.team_a_id : match.team_b_id;
-    const f = id ? null : feederOf(matches, match, slot);
-    if (!f || f.status === "cancelled") return teamName(id);
-    if (f.team_a_id && f.team_b_id) return `Winner of ${teamName(f.team_a_id)} v ${teamName(f.team_b_id)}`;
-    const sameRound = matches
-      .filter((x) => x.round_label === f.round_label && positions.has(x.id))
-      .sort((x, y) => positions.get(x.id)! - positions.get(y.id)!);
-    return `Winner of ${f.round_label} ${sameRound.findIndex((x) => x.id === f.id) + 1}`;
+    return id ? teamName(id) : slotSource(matches, positions, match, slot, teamName) ?? teamName(null);
   };
+  const nextMatch = match.next_match_id ? matches.find((x) => x.id === match.next_match_id) : undefined;
+  const nextNumber = nextMatch ? bracketNumber(matches, positions, nextMatch) : null;
   const [editingTime, setEditingTime] = useState(false);
   const [editingTeams, setEditingTeams] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -1246,6 +1219,27 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
             >
               <Pencil size={12} />
             </button>
+            {(onMoveUp || onMoveDown) && (
+              <>
+                <button
+                  aria-label="Move up in the bracket" title="Move up in the bracket" disabled={pending || !onMoveUp} onClick={onMoveUp}
+                  style={{ background: "none", border: "none", color: "inherit", opacity: onMoveUp ? 0.5 : 0.15, cursor: onMoveUp ? "pointer" : "default", padding: 2, display: "flex" }}
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  aria-label="Move down in the bracket" title="Move down in the bracket" disabled={pending || !onMoveDown} onClick={onMoveDown}
+                  style={{ background: "none", border: "none", color: "inherit", opacity: onMoveDown ? 0.5 : 0.15, cursor: onMoveDown ? "pointer" : "default", padding: 2, display: "flex" }}
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {nextMatch && (
+          <div className="tc-dim" style={{ fontSize: 11.5, marginTop: 2 }}>
+            Winner goes to {nextMatch.round_label}{nextNumber ? ` ${nextNumber}` : ""}
           </div>
         )}
         {match.status === "walkover" && <span className="tc-badge warn">Walkover: {teamName(match.winner_team_id)}</span>}
