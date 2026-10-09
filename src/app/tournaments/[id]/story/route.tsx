@@ -132,7 +132,7 @@ export async function GET(
 
             {/* stats: 2x1 */}
             <div style={{ display: "flex" }}>
-              <Cell label="REGISTRATION FEE" value={tournament.fee > 0 ? money(tournament.fee) : "Free"} color={accent} C={C} />
+              {tournament.fee > 0 ? <Cell label="REGISTRATION FEE" value={money(tournament.fee)} color={accent} C={C} /> : null}
               <Cell
                 label={isSingleEvent ? "SPOTS" : "MAX TEAMS"}
                 value={tournament.max_teams == null ? "Unlimited" : String(tournament.max_teams)}

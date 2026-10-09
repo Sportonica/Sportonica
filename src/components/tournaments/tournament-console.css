@@ -11,8 +11,9 @@
 .tc-card-t { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 15.5px; margin-bottom: 4px; }
 .tc-card-sub { font-size: 12.5px; opacity: 0.6; margin-bottom: 4px; }
 
-.tc-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
-@media (max-width: 720px) { .tc-stats { grid-template-columns: repeat(2, 1fr); } }
+/* one row however many cards there are (the fee card is left out when there is no fee) */
+.tc-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; margin-bottom: 18px; }
+@media (max-width: 720px) { .tc-stats { grid-template-columns: repeat(2, 1fr); grid-auto-flow: row; } }
 .tc-stat {
   background: rgba(255,255,255,0.03); border: 1px solid rgba(242,237,230,0.1);
   border-radius: 13px; padding: 14px 16px;
