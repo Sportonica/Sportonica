@@ -3,13 +3,14 @@
 import { useState, useTransition, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, X, History, Pencil, Search, ChevronDown, Check } from "lucide-react";
+import { Plus, Trash2, X, History, Pencil, Search, ChevronDown, ChevronUp, Check } from "lucide-react";
 import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
   getTeamRoster, getMatchPlayerStats, recordMatchPlayerStats,
-  generateKnockoutBracket, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
-  recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound, updateLiveScore,
+  generateKnockoutBracket, generateKnockoutFromGroups, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
+  recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound, updateLiveScore, swapBracketSlots,
 } from "@/lib/tournaments/actions";
+import { bracketPositions, sortByBracket, feederOf, bracketNumber, slotSource } from "@/lib/tournaments/bracket";
 import { isActionError } from "@/lib/actionError";
 import { friendlyTournamentError } from "@/lib/tournaments/types";
 import { getSportKind, type SportKind } from "@/lib/sports";
@@ -422,6 +423,14 @@ export default function FixturesTab({
   const canAddMatches = registrationClosed && teams.length >= 1;
   const canGenerateBracket =
     tournament.format === "knockout" && tournament.status === "registration_closed" && matches.length === 0 && teams.length >= 2;
+  // Groups done (or under way): offer to build the linked knockout
+  // bracket from the standings, once, before any knockout match exists.
+  const groupMatches = matches.filter((m) => m.stage === "group");
+  const groupsLeft = groupMatches.filter((m) => !DONE.has(m.status)).length;
+  const canGenerateKnockout =
+    tournament.format === "group_knockout" && tournament.status === "live"
+    && groupMatches.length > 0 && !matches.some((m) => m.stage === "knockout");
+  const [advancePerGroup, setAdvancePerGroup] = useState("2");
 
   if (!canAddMatches && matches.length === 0) {
     return (
@@ -438,6 +447,17 @@ export default function FixturesTab({
     if (!rounds.has(m.round_label)) rounds.set(m.round_label, []);
     rounds.get(m.round_label)!.push(m);
   }
+  // Linked knockout rounds in bracket order; everything else as loaded.
+  const positions = bracketPositions(matches);
+  for (const [label, ms] of rounds) rounds.set(label, sortByBracket(ms, positions));
+  // The bracket neighbours of a match (whole round, not just the search
+  // hits), for moving it up or down a place.
+  const neighbours = (m: TournamentMatch) => {
+    if (!positions.has(m.id)) return { up: null, down: null };
+    const round = sortByBracket(matches.filter((x) => x.stage === m.stage && x.round_label === m.round_label), positions);
+    const i = round.findIndex((x) => x.id === m.id);
+    return { up: round[i - 1] ?? null, down: round[i + 1] ?? null };
+  };
 
   const REGEN_MESSAGES: Record<string, string> = {
     REBUILT: "Fixtures rebuilt from the current team list.",
@@ -575,6 +595,39 @@ export default function FixturesTab({
         </div>
       )}
 
+      {canGenerateKnockout && (
+        <div className="tc-card" style={{ marginBottom: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Generate the knockout stage</div>
+          <div className="tc-card-sub" style={{ marginBottom: 10 }}>
+            Builds the bracket from the group standings, all the way to the Final, and moves each winner on automatically.
+            Group winners play a runner-up from another group, and two teams from the same group can only meet again in the Final.
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
+              Teams through from each group
+              <input
+                type="number" min={1} value={advancePerGroup} onChange={(e) => setAdvancePerGroup(e.target.value)}
+                style={{ ...inputStyle, width: 60 }} aria-label="Teams through from each group"
+              />
+            </label>
+            <button
+              className="tc-btn primary" disabled={pending || groupsLeft > 0 || !(Number(advancePerGroup) >= 1)}
+              onClick={() => {
+                if (!window.confirm(`Generate the knockout stage with the top ${advancePerGroup} of each group?`)) return;
+                run(() => generateKnockoutFromGroups(tournament.id, Number(advancePerGroup)));
+              }}
+            >
+              Generate knockout stage
+            </button>
+            {groupsLeft > 0 && (
+              <span className="tc-dim" style={{ fontSize: 12 }}>
+                {groupsLeft} group {groupsLeft === 1 ? "match needs" : "matches need"} a result first.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {canGenerateBracket && mode === "choose" ? (
         <FixtureModeChooser onChoose={setMode} />
       ) : (
@@ -688,7 +741,7 @@ export default function FixturesTab({
                 </tr>
               </thead>
               <tbody>
-                {ms.map((m) => (
+                {ms.map((m) => { const nb = neighbours(m); return (
                   <MatchRow
                     // Score in the key so the row's inputs pick up a live score
                     // saved elsewhere (another admin, or the +1 buttons) after refresh.
@@ -723,8 +776,10 @@ export default function FixturesTab({
                       if (!window.confirm(`Delete ${teamName(m.team_a_id)} vs ${teamName(m.team_b_id)}? This can't be undone.${note}`)) return;
                       run(() => deleteMatch(m.id));
                     }}
+                    onMoveUp={nb.up ? () => run(() => swapBracketSlots(m.id, nb.up!.id)) : undefined}
+                    onMoveDown={nb.down ? () => run(() => swapBracketSlots(m.id, nb.down!.id)) : undefined}
                   />
-                ))}
+                ); })}
               </tbody>
             </table>
           </div>
@@ -989,7 +1044,7 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, onMoveUp, onMoveDown, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -1026,8 +1081,23 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   onSetStatus: (status: SettableStatus) => void;
   onUpdateTeams: (teamAId: string, teamBId?: string) => void;
   onDelete: () => void;
+  // Swap this match's place in the bracket with its neighbour (who it
+  // meets next changes; a winner already through moves with it).
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
   pending: boolean;
 }) {
+  // An empty slot fed by an earlier bracket match names that match
+  // ("Winner of Afghanistan v Nepal") instead of a bare TBD.
+  const positions = useMemo(() => bracketPositions(matches), [matches]);
+  const feederB = feederOf(matches, match, "b");
+  const feederBPending = !!feederB && !DONE.has(feederB.status);
+  const sideName = (slot: "a" | "b") => {
+    const id = slot === "a" ? match.team_a_id : match.team_b_id;
+    return id ? teamName(id) : slotSource(matches, positions, match, slot, teamName) ?? teamName(null);
+  };
+  const nextMatch = match.next_match_id ? matches.find((x) => x.id === match.next_match_id) : undefined;
+  const nextNumber = nextMatch ? bracketNumber(matches, positions, nextMatch) : null;
   const [editingTime, setEditingTime] = useState(false);
   const [editingTeams, setEditingTeams] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -1141,7 +1211,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           </div>
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <div style={{ fontWeight: 600 }}>{teamName(match.team_a_id)} <span className="tc-dim">vs</span> {teamName(match.team_b_id)}</div>
+            <div style={{ fontWeight: 600 }}>{sideName("a")} <span className="tc-dim">vs</span> {sideName("b")}</div>
             <button
               aria-label="Edit teams" disabled={pending}
               onClick={() => { setTeamAId(match.team_a_id ?? ""); setTeamBId(match.team_b_id ?? ""); setEditingTeams(true); }}
@@ -1149,6 +1219,27 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
             >
               <Pencil size={12} />
             </button>
+            {(onMoveUp || onMoveDown) && (
+              <>
+                <button
+                  aria-label="Move up in the bracket" title="Move up in the bracket" disabled={pending || !onMoveUp} onClick={onMoveUp}
+                  style={{ background: "none", border: "none", color: "inherit", opacity: onMoveUp ? 0.5 : 0.15, cursor: onMoveUp ? "pointer" : "default", padding: 2, display: "flex" }}
+                >
+                  <ChevronUp size={14} />
+                </button>
+                <button
+                  aria-label="Move down in the bracket" title="Move down in the bracket" disabled={pending || !onMoveDown} onClick={onMoveDown}
+                  style={{ background: "none", border: "none", color: "inherit", opacity: onMoveDown ? 0.5 : 0.15, cursor: onMoveDown ? "pointer" : "default", padding: 2, display: "flex" }}
+                >
+                  <ChevronDown size={14} />
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {nextMatch && (
+          <div className="tc-dim" style={{ fontSize: 11.5, marginTop: 2 }}>
+            Winner goes to {nextMatch.round_label}{nextNumber ? ` ${nextNumber}` : ""}
           </div>
         )}
         {match.status === "walkover" && <span className="tc-badge warn">Walkover: {teamName(match.winner_team_id)}</span>}
@@ -1245,7 +1336,10 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           // above already uses — this just makes it a one-click action
           // instead of something you'd only find by opening that editor
           // and noticing Team B's "TBD / bye" placeholder.
-          match.team_a_id && !done ? (
+          // A bracket match still to be played fills the slot, so no bye.
+          feederBPending ? (
+            <span className="tc-dim" style={{ fontSize: 12 }}>Waiting for {sideName("b").replace(/^Winner/, "the winner")}.</span>
+          ) : match.team_a_id && !done ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span className="tc-dim" style={{ fontSize: 12 }}>No opponent assigned.</span>
               <button

@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Check, Trophy } from "lucide-react";
 import { sideScore, type TournamentMatch, type TournamentTeam } from "@/lib/tournaments/types";
+import { bracketPositions, bracketNumber, slotSource, sortByBracket } from "@/lib/tournaments/bracket";
 
 const DONE_STATUSES = new Set(["completed", "walkover", "cancelled"]);
 const KTM = "Asia/Kathmandu";
@@ -28,9 +29,13 @@ export default function BracketBoard({ matches, team, onMatchClick, emptyLabel =
   const trackRef = useRef<HTMLDivElement | null>(null);
 
   const rounds = [...new Set(knockout.map((m) => m.round))].sort((a, b) => a - b);
+  // Bracket order (matches 1 and 2 feed the next round's match 1, ...),
+  // falling back to creation order for a round that isn't linked.
+  const positions = bracketPositions(knockout);
   const byRound = rounds.map((r) =>
-    knockout.filter((m) => m.round === r).sort((a, b) => a.created_at.localeCompare(b.created_at))
+    sortByBracket(knockout.filter((m) => m.round === r).sort((a, b) => a.created_at.localeCompare(b.created_at)), positions)
   );
+  const teamName = (id: string) => team(id)?.name ?? "TBD";
 
   // Same "land one round before the interesting one" idea as before —
   // a completed bracket opens on Semifinal *and* Final together, not
@@ -146,16 +151,29 @@ export default function BracketBoard({ matches, team, onMatchClick, emptyLabel =
             <div key={ri} className="brk-col">
               <div className="brk-col-head">{ms[0]?.round_label ?? `Round ${rounds[ri]}`}</div>
               <div className="brk-col-list">
-                {ms.map((m, i) => (
-                  <MatchCard
-                    key={m.id} match={m} team={team}
-                    isFinal={ri === rounds.length - 1}
-                    delayMs={Math.min(i * 35, 260)}
-                    fallbackA={tbdLabel(byRound, ri, m.id, "a")}
-                    fallbackB={tbdLabel(byRound, ri, m.id, "b")}
-                    onClick={onMatchClick ? () => onMatchClick(m) : undefined}
-                  />
-                ))}
+                {pairsOf(ms).map((pair, pi) => {
+                  const next = pair[0].next_match_id ? knockout.find((x) => x.id === pair[0].next_match_id) : undefined;
+                  const paired = pair.length === 2 && !!next && pair[1].next_match_id === next.id;
+                  const nextNo = next ? bracketNumber(knockout, positions, next) : null;
+                  const cards = pair.map((m, j) => (
+                    <MatchCard
+                      key={m.id} match={m} team={team}
+                      isFinal={ri === rounds.length - 1}
+                      delayMs={Math.min((pi * 2 + j) * 35, 260)}
+                      fallbackA={slotSource(knockout, positions, m, "a", teamName) ?? "TBD"}
+                      fallbackB={slotSource(knockout, positions, m, "b", teamName) ?? "TBD"}
+                      onClick={onMatchClick ? () => onMatchClick(m) : undefined}
+                    />
+                  ));
+                  // Two matches whose winners meet next sit together,
+                  // joined by a bracket line, with where they meet.
+                  return paired ? (
+                    <div key={pair[0].id} className="brk-pair">
+                      <div className="brk-pair-cards">{cards}</div>
+                      <div className="brk-pair-next">Winners meet in {next.round_label}{nextNo && next.round_label !== "Final" ? ` ${nextNo}` : ""}</div>
+                    </div>
+                  ) : cards;
+                })}
               </div>
             </div>
           ))}
@@ -165,14 +183,11 @@ export default function BracketBoard({ matches, team, onMatchClick, emptyLabel =
   );
 }
 
-// A TBD slot is more useful as "Winner of Round of 16" than a bare
-// "TBD" when we can actually identify the match it's waiting on —
-// found by finding the previous round's match whose next_match_id/
-// next_match_slot points at this one.
-function tbdLabel(byRound: TournamentMatch[][], ri: number, matchId: string, slot: "a" | "b"): string {
-  if (ri === 0) return "TBD";
-  const feeder = byRound[ri - 1].find((pm) => pm.next_match_id === matchId && pm.next_match_slot === slot);
-  return feeder ? `Winner of ${feeder.round_label}` : "TBD";
+// A round in twos (1+2, 3+4, ...): the matches whose winners meet next.
+function pairsOf(ms: TournamentMatch[]): TournamentMatch[][] {
+  const out: TournamentMatch[][] = [];
+  for (let i = 0; i < ms.length; i += 2) out.push(ms.slice(i, i + 2));
+  return out;
 }
 
 function cardDate(m: TournamentMatch): string {
@@ -356,6 +371,23 @@ const BRACKET_CSS = `
   width: 28px; height: 3px; border-radius: 999px; background: #00875a; opacity: 0.55;
 }
 .brk-col-list { display: flex; flex-direction: column; gap: 14px; }
+
+/* A pair of matches whose winners meet next: a bracket line joins the
+   two cards (desktop, where the next column sits alongside), and a
+   caption says where they meet (always, so it reads on a phone too). */
+.brk-pair { display: flex; flex-direction: column; gap: 8px; }
+.brk-pair-cards { position: relative; display: flex; flex-direction: column; gap: 14px; }
+.brk-pair-next { font-size: 11.5px; font-weight: 600; opacity: 0.55; text-align: center; }
+@media (min-width: 720px) {
+  .brk-pair-cards::after {
+    content: ""; position: absolute; right: -14px; top: 25%; bottom: 25%; width: 10px;
+    border: 1.5px solid rgba(128,128,128,0.45); border-left: none; border-radius: 0 8px 8px 0;
+  }
+  .brk-pair-cards::before {
+    content: ""; position: absolute; right: -24px; top: 50%; width: 10px;
+    border-top: 1.5px solid rgba(128,128,128,0.45);
+  }
+}
 
 /* Round-progress dots — a compact "3 of 5" without spelling it out,
    doubles as a direct jump-to-round control alongside the arrows. */

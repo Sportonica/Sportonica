@@ -1100,6 +1100,36 @@ export async function generateKnockoutBracket(tournamentId: string): Promise<Tou
   return data as Tournament;
 }
 
+// Swaps two matches' places in a knockout round: each takes the
+// other's next-round slot, and a winner already through moves with it.
+// Refused once either next-round match has started.
+export async function swapBracketSlots(matchId: string, otherMatchId: string): Promise<true | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("swap_bracket_slots", { p_match_id: matchId, p_other_match_id: otherMatchId });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  const tournamentId = (data as { tournament_id: string } | null)?.tournament_id;
+  if (tournamentId) {
+    revalidatePath(`/organize/tournaments/${tournamentId}`);
+    revalidatePath(`/platform/tournaments/${tournamentId}`);
+    revalidatePath(`/tournaments/${tournamentId}`);
+  }
+  return true;
+}
+
+// The knockout stage of a group_knockout tournament, built from the
+// group standings with the winners already linked through to the Final.
+export async function generateKnockoutFromGroups(tournamentId: string, advancePerGroup: number): Promise<Tournament | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("generate_knockout_from_groups", { p_tournament_id: tournamentId, p_advance_per_group: advancePerGroup });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  revalidatePath(`/organize/tournaments/${tournamentId}`);
+  revalidatePath(`/platform/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return data as Tournament;
+}
+
 // Rebuilds fixtures from the current confirmed team list — a no-op if
 // nothing's generated yet, a real result already exists, or (for
 // group_knockout) a confirmed team still has no group. Returns which of
