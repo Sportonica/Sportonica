@@ -8,6 +8,7 @@ import { changePassword as changePasswordAction } from "@/lib/auth/password";
 import { isActionError } from "@/lib/actionError";
 import { useCaptcha, CAPTCHA_FAILED } from "@/lib/captcha/useCaptcha";
 import { PASSWORD_MIN } from "@/lib/validation/password";
+import Link from "next/link";
 
 const PASSWORD_ERRORS: Record<string, string> = {
   WRONG_PASSWORD: "That's not your current password.",
@@ -121,7 +122,7 @@ export default function SecuritySettings({ name, hasPassword }: { name: string; 
             {pwCode === "WRONG_PASSWORD" && (
               <>
                 {" "}
-                <a href="/forgot-password" style={{ color: "#006241", fontWeight: 600 }}>Forgot it?</a>
+                <Link href="/forgot-password" style={{ color: "#006241", fontWeight: 600 }}>Forgot it?</Link>
               </>
             )}
           </div>
