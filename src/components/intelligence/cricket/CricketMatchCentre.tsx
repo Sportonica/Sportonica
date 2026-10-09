@@ -93,10 +93,13 @@ function MatchHeader({ contest }: { contest: ContestView }) {
   const s = contest.state as CricketState;
   const rules = contest.rules as unknown as CricketRules;
   const ctx = contest.context;
-  const live = openInnings(s);
+  // a match ended before its innings closed (rain, a declared result) has no one batting
+  const over = contest.status !== "live" && contest.status !== "paused";
+  const live = over ? null : openInnings(s);
   const n = live ? liveNumbers(live, rules) : null;
-  const rows = sideScores(s, ctx, rules);
+  const rows = sideScores(s, ctx, rules).map((r) => (over ? { ...r, batting: false } : r));
   const decided = contest.summary.resultText;
+  const winner = (contest.summary.result ?? s.result)?.winner;
   return (
     <section className="ck-match" aria-live="polite">
       <div className="ck-head-top">
@@ -106,7 +109,7 @@ function MatchHeader({ contest }: { contest: ContestView }) {
       </div>
       <div className="ck-match-sides">
         {rows.map((r) => (
-          <div key={r.side} className={`ck-match-side${r.batting ? " batting" : ""}${s.result?.winner === r.side ? " won" : ""}`}>
+          <div key={r.side} className={`ck-match-side${r.batting ? " batting" : ""}${winner === r.side ? " won" : ""}`}>
             <span className="ck-match-name">{r.batting ? <i className="ck-dot" aria-label="Batting" /> : null}{r.name}</span>
             <span className="ck-match-score">{r.score ?? <span className="ck-muted">Yet to bat</span>}</span>
             <span className="ck-match-overs">{r.overs ? `${r.overs} ov` : ""}</span>
@@ -143,7 +146,7 @@ function Overview({ contest, items, onAll }: { contest: ContestView; items: Retu
   const s = contest.state as CricketState;
   const rules = contest.rules as unknown as CricketRules;
   const ctx = contest.context;
-  const live = openInnings(s);
+  const live = contest.status === "live" || contest.status === "paused" ? openInnings(s) : null;
   const last = latestInnings(s);
   const recent = last ? last.overs.slice(-2).flatMap((o) => o.balls) : [];
 

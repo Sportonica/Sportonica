@@ -560,3 +560,53 @@ section("cricket partnership records: highest for each wicket", () => {
   const best = bestByWicket([p(1, 40, 30, "a"), p(2, 74, 50, "b"), p(1, 87, 60, "c"), p(2, 74, 44, "d"), p(3, 10, 9, "e")]);
   assert.deepEqual(best.map((x) => [x.wicket, x.runs, x.batters[0]]), [[1, 87, "c"], [2, 74, "d"], [3, 10, "e"]], "level on runs: fewer balls first");
 });
+
+section("cricket: the organiser ends a match the score has not decided", () => {
+  const m = firstInnings();
+  m.push("INNINGS_START", { batting: "b", striker: "b1", nonStriker: "b2" });
+  ball(m, "b1", "b2", "a1", { runsBat: 4 });
+  m.refuses("MATCH_COMPLETE", {}, /not decided/, "no result yet");
+  m.refuses("MATCH_COMPLETE", { result: { outcome: "win", winner: "b" } }, /why/, "a declared result needs a reason");
+  m.refuses("MATCH_COMPLETE", { result: { outcome: "win" }, reason: "Rain" }, /which side/, "a win needs a winner");
+  m.refuses("MATCH_COMPLETE", { result: { outcome: "draw" }, reason: "Rain" }, /win or a tie/, "only a win or a tie");
+  m.push("MATCH_COMPLETE", { result: { outcome: "win", winner: "a", margin: "on run rate" }, reason: "Rain, no more play" });
+  assert.equal(m.env.status, "completed");
+  assert.deepEqual(m.env.result, { outcome: "win", winner: "a", method: "played", margin: "on run rate" });
+  assert.equal(m.summary().resultText, "Alpha won (on run rate)");
+  assert.deepEqual(m.summary().view.score, { a: "21/3", b: "4/0" }, "the scorecard stays as it was");
+  m.assertReconstructs("ended early");
+
+  // a ball edited after the match: the figures change, the declared result stands
+  const four = m.events.find((e) => e.type === "DELIVERY" && e.payload.striker === "b1");
+  m.correct("replace", four.id, "It was a six", "DELIVERY", { ...four.payload, runsBat: 6 });
+  assert.equal(m.env.status, "completed");
+  assert.equal(m.env.sport.innings[1].batters.b1.runs, 6);
+  assert.equal(m.env.result.winner, "a");
+  m.assertReconstructs("edited after the match");
+
+  const tie = firstInnings();
+  tie.push("MATCH_COMPLETE", { result: { outcome: "tie" }, reason: "Bad light" });
+  assert.deepEqual(tie.env.result, { outcome: "tie", winner: null, method: "played", margin: "match ended early" });
+});
+
+section("cricket: a ball edited after a decided match re-works the result", () => {
+  const m = firstInnings();
+  m.push("INNINGS_START", { batting: "b", striker: "b1", nonStriker: "b2" });
+  for (const r of [6, 6, 6, 4]) ball(m, "b1", "b2", "a1", { runsBat: r });
+  assert.equal(m.env.sport.result.winner, "b");
+  m.push("MATCH_COMPLETE");
+  // the runs belonged to the other batter: who faced it can change after the match
+  const first = m.events.find((e) => e.type === "DELIVERY" && e.payload.bowler === "a1");
+  m.correct("replace", first.id, "Wrong batter", "DELIVERY", { ...first.payload, striker: "b2", nonStriker: "b1" });
+  assert.deepEqual([m.env.sport.innings[1].batters.b1.runs, m.env.sport.innings[1].batters.b2.runs], [16, 6]);
+  assert.equal(m.env.status, "completed");
+  // the same ball edited again: it replaces the edit, and the original does not come back
+  const edited = m.events.at(-1);
+  m.correct("replace", edited.id, "It was b1 after all", "DELIVERY", { ...edited.payload, striker: "b1", nonStriker: "b2" });
+  assert.deepEqual([m.env.sport.innings[1].balls, m.env.sport.innings[1].batters.b1.runs, m.env.sport.innings[1].batters.b2.runs], [4, 22, 0], "four balls, not five");
+  m.assertReconstructs("edited twice");
+  // an edit that leaves the match undecided is refused, not half applied
+  const last = m.events.filter((e) => e.type === "DELIVERY").at(-1);
+  assert.throws(() => m.correct("replace", last.id, "It was a dot", "DELIVERY", { ...last.payload, runsBat: 0 }), /not possible/);
+  m.assertReconstructs("after the edit");
+});

@@ -39,6 +39,19 @@ export function newEnvelope<R, S>(engine: SportIntelligenceEngine<R, S>, ctx: Ma
 const reasonOf = (ev: EngineEvent): string | null =>
   typeof ev.payload.reason === "string" && ev.payload.reason.trim() ? ev.payload.reason.trim() : null;
 
+/** A result named by the organiser on MATCH_COMPLETE, or why it cannot stand. */
+function declaredResult(ev: EngineEvent, ctx: MatchContext): MatchResult | string {
+  if (!ctx.sides) return "A race cannot be ended with a declared result";
+  if (!reasonOf(ev)) return "Say why the match is ending before it is decided";
+  const r = ev.payload.result as { outcome?: unknown; winner?: unknown; margin?: unknown } | null;
+  if (!r || typeof r !== "object") return "Say how the match ended";
+  const margin = typeof r.margin === "string" && r.margin.trim() ? r.margin.trim().slice(0, 80) : "match ended early";
+  if (r.outcome === "tie") return { outcome: "tie", winner: null, method: "played", margin };
+  if (r.outcome !== "win") return "The result is a win or a tie";
+  if (!isSide(r.winner)) return "Say which side won";
+  return { outcome: "win", winner: r.winner, method: "played", margin };
+}
+
 /**
  * Apply one event to a draft envelope. Returns null when applied, or the
  * reason it is impossible (the draft is then left untouched).
@@ -100,6 +113,14 @@ export function applyEvent<R, S>(
         return null;
       case "MATCH_COMPLETE": {
         if (st !== "live" && st !== "paused") return "Only a match in progress can be completed";
+        // the organiser ends it before the score decides it (rain, light, time up) and names the result
+        if (ev.payload.result !== undefined) {
+          const declared = declaredResult(ev, ctx);
+          if (typeof declared === "string") return declared;
+          env.status = "completed"; env.completedAt = ev.occurredAt; env.statusReason = reasonOf(ev);
+          env.result = declared;
+          return null;
+        }
         const why = engine.validateMatchCompletion(env.sport, ctx, rules);
         if (why) return why;
         env.status = "completed"; env.completedAt = ev.occurredAt; env.statusReason = null;
@@ -196,6 +217,17 @@ export function effectiveEvents(events: StoredEvent[]): { list: StoredEvent[]; i
       dead.add(ev.id);
     } else {
       dead.add(target);
+      // Replacing a replacement replaces the whole chain: the original must
+      // not come back because the edit that replaced it is itself replaced.
+      // (A void of a replacement does bring it back: that is undoing the edit.)
+      if (ev.replacesEventId) {
+        for (let x = t, hops = 0; x.replacesEventId && hops < 1000; hops++) {
+          dead.add(x.replacesEventId);
+          const next = byId.get(x.replacesEventId);
+          if (!next) break;
+          x = next;
+        }
+      }
     }
   }
 
@@ -292,7 +324,12 @@ export function describe<R, S>(engine: SportIntelligenceEngine<R, S>, ev: Engine
     case "MATCH_FORFEIT": return isSide(ev.payload.side) ? `${sideName(ctx, ev.payload.side)} forfeited` : "Forfeit";
     case "MATCH_RESTART": return `Match restarted${reasonOf(ev) ? `: ${reasonOf(ev)}` : ""}`;
     case "MATCH_REOPEN": return `Match reopened${reasonOf(ev) ? `: ${reasonOf(ev)}` : ""}`;
-    case "MATCH_COMPLETE": return "Match completed";
+    case "MATCH_COMPLETE": {
+      const r = ev.payload.result as { outcome?: unknown; winner?: unknown } | undefined;
+      if (!r) return "Match completed";
+      const what = r.outcome === "tie" ? "declared a tie" : isSide(r.winner) ? `${sideName(ctx, r.winner)} declared the winner` : "result declared";
+      return `Match ended early, ${what}${reasonOf(ev) ? `: ${reasonOf(ev)}` : ""}`;
+    }
     case CORRECTION_VOID: return "Correction: event reversed";
     default: return engine.describeEvent(ev, ctx, rules);
   }

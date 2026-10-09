@@ -82,7 +82,10 @@ function snapshot(engine: SportIntelligenceEngine, env: MatchEnvelope, ctx: Matc
   const summary = summarize(engine, env, ctx, rules);
   const mirror: MirrorScore | null = engine.mirrorScore(env.sport, ctx, rules);
   // raw counters are kept for finished contests only
-  const lines: StatLine[] | null = env.status === "completed" ? engine.calculateStatistics(env.sport, ctx, rules).lines : null;
+  // a team's win follows the match result, which a forfeit or a declared result sets without the score deciding it
+  const lines: StatLine[] | null = env.status === "completed"
+    ? engine.calculateStatistics(env.sport, ctx, rules).lines.map((l) => (l.subject === "team" && "wins" in l.raw && env.result ? { ...l, raw: { ...l.raw, wins: env.result.winner === l.side ? 1 : 0 } } : l))
+    : null;
   return { summary, mirror, lines };
 }
 

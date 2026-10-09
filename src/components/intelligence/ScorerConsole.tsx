@@ -19,7 +19,8 @@ import type { ContestView, TimelineEntry } from "@/lib/intelligence/types";
 import { useLiveContest } from "./useLiveContest";
 import { ScoreCard, Timeline } from "./views";
 import { PADS } from "./pads";
-import { CricketScorerHeader, CricketScorerSide } from "./cricket/scorer";
+import { CricketScorerHeader, CricketScorerSide, EndMatchEarly } from "./cricket/scorer";
+import { getEngine } from "@/lib/intelligence/registry";
 import { SIDE_KEYS } from "./pads/shared";
 import RuleFields from "./RuleFields";
 import "./intelligence.css";
@@ -185,6 +186,8 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
   const sides = contest.context.sides;
   const inPlay = st === "live" || st === "paused";
   const cricket = contest.sport === "cricket";
+  // cricket ends early with a result the organiser names; elsewhere Complete match says why it cannot yet
+  const undecided = cricket && inPlay && !!completionBlocked(shown);
   const padUndo = { last: findLast, run: (e: TimelineEntry) => void correct(e, "Undone by the scorer"), disabled: busy || queue.length > 0 || contest.lastSeq === 0 };
 
   return (
@@ -221,7 +224,8 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
               {st === "live" ? <button type="button" className="si-btn" onClick={() => withReason("MATCH_PAUSE", "Reason for the pause (optional)")}>Pause</button> : null}
               {st === "paused" ? <button type="button" className="si-btn primary" onClick={() => send("MATCH_RESUME")}>Resume</button> : null}
               {/* basketball finishes from its pad ("Finish game"), which appears once the last quarter is over */}
-              {inPlay && contest.sport !== "basketball" ? <button type="button" className="si-btn primary" onClick={() => { if (window.confirm("Complete the match? The result becomes final.")) send("MATCH_COMPLETE"); }}>Complete match</button> : null}
+              {undecided ? <EndMatchEarly contest={shown} onEnd={(result, reason) => send("MATCH_COMPLETE", { result, reason })} /> : null}
+              {inPlay && contest.sport !== "basketball" && !undecided ? <button type="button" className="si-btn primary" onClick={() => { if (window.confirm("Complete the match? The result becomes final.")) send("MATCH_COMPLETE"); }}>Complete match</button> : null}
               {/* cricket's pad has its own "Undo last ball" by the run keys */}
               {cricket && st === "live" ? null : <button type="button" className="si-btn" disabled={busy || queue.length > 0 || contest.lastSeq === 0} onClick={() => void undo()}>Undo last</button>}
             </div>
@@ -232,7 +236,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
               : st === "postponed" ? <div className="si-info">This match is postponed. Start it when it is played.</div>
               : (
                 <div className="si-grid" style={{ gap: 8 }}>
-                  <div className="si-info">This match is over. Events can still be corrected below; every correction is recorded. To add something that was missed, reopen it.</div>
+                  <div className="si-info">This match is over. Events can still be corrected{cricket ? ": tap Edit on any ball" : " below"}; every correction is recorded. To add something that was missed, reopen it.</div>
                   {st === "completed" ? (
                     <div className="si-row">
                       <button type="button" className="si-btn" onClick={() => withReason("MATCH_REOPEN", "Why is the match being reopened? Its result stays on the fixture until you complete it again.", {}, true)}>Reopen to edit</button>
@@ -292,6 +296,16 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
       </div>
     </div>
   );
+}
+
+/** Why the engine would refuse Complete match now, or null when it would accept. */
+function completionBlocked(c: ContestView): string | null {
+  try {
+    const engine = getEngine(c.sport);
+    return engine.validateMatchCompletion(c.state, c.context, engine.resolveRules(c.rules));
+  } catch {
+    return null;
+  }
 }
 
 // This match's own rules: fixed when it was set up, changed here when they
