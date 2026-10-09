@@ -37,3 +37,19 @@ export const getLeaderboard = unstable_cache(
   ["quiz-leaderboard", QUIZ.id],
   { revalidate: 15 },
 );
+
+// ── stall games (src/lib/games): each phone's best attempt ───────
+
+export interface GameRow { rank: number; name: string; score: number }
+
+async function gameTop(game: string, since: string | null, limit: number): Promise<GameRow[]> {
+  const { data, error } = await createServiceClient().rpc("stall_game_board", { p_game: game, p_since: since, p_limit: limit });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { full_name: string; score: number }[]).map((r, i) => ({ rank: i + 1, name: shortName(r.full_name), score: r.score }));
+}
+
+export const getGameBoard = unstable_cache(
+  async (game: string, since: string) => ({ today: await gameTop(game, since, 10), allTime: await gameTop(game, null, 10) }),
+  ["stall-game-board"],
+  { revalidate: 15 },
+);

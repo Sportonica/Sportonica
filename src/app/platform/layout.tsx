@@ -32,6 +32,7 @@ export default async function PlatformLayout({ children }: { children: React.Rea
           <Link href="/platform/users">Users</Link>
           <Link href="/platform/reports">Reports</Link>
           <Link href="/platform/quiz">Quiz</Link>
+          <Link href="/platform/games">Stall games</Link>
           <Link href="/discover">↗ App</Link>
         </nav>
       </header>

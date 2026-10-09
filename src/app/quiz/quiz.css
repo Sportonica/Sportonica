@@ -95,3 +95,8 @@ a.qz-btn { display: block; text-align: center; text-decoration: none; }
 .qz-verdict.right { color: var(--qz-teal-text); }
 .qz-verdict.wrong { color: var(--qz-coral); }
 .qz-host-row { display: grid; gap: 8px; }
+/* leaderboard tabs: the quiz, then each stall game */
+.qz-tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.qz-tabs a { padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 700; text-decoration: none; color: inherit; background: var(--inkSoft); border: 1px solid var(--border-line); }
+.qz-tabs a.on { background: var(--qz-indigo); border-color: var(--qz-indigo); color: #fff; }
+.qz-rows-game li { grid-template-columns: 34px 1fr auto; }
