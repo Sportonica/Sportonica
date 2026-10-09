@@ -156,15 +156,23 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
   const [out, setOut] = useState<string>(p.wicket?.player ?? striker);
   const [fielder, setFielder] = useState<string>(p.wicket?.fielder ?? "");
   const [reason, setReason] = useState("");
+  // the runs were put against the wrong batter: the other one at the crease faced it
+  const [faced, setFaced] = useState<string>(striker);
+  const other = faced === striker ? nonStriker : striker;
   const nm = (id: string) => participant(ctx, id)?.name ?? "";
   const d = DISMISSALS.find((x) => x.key === wkt);
   const ex = extra === "none" ? null : extra;
-  const payload = deliveryPayload({ striker, nonStriker, bowler }, runs, ex,
-    d ? { type: d.key, player: d.anyBatter ? out : striker, fielder: d.fielder ? fielder : "" } : null, p.commentary);
+  const payload = deliveryPayload({ striker: faced, nonStriker: other, bowler }, runs, ex,
+    d ? { type: d.key, player: d.anyBatter ? out : faced, fielder: d.fielder ? fielder : "" } : null, p.commentary);
   const preview = describeDelivery(payload as DeliveryPayload, ctx);
   return (
     <Sheet title={`Edit ${parseBallLabel(entry.label)?.superOver ? "super over " : ""}ball ${parseBallLabel(entry.label)?.ball ?? ""}`} onClose={onClose}>
-      <div className="ck-muted" style={{ fontSize: 13 }}>{nm(bowler)} to {nm(striker)}</div>
+      <div className="ck-muted" style={{ fontSize: 13 }}>{nm(bowler)} to {nm(faced)}</div>
+      {nonStriker ? (
+        <Field label="Faced by">
+          <Choice value={faced} onChange={setFaced} options={[{ key: striker, label: nm(striker) }, { key: nonStriker, label: nm(nonStriker) }]} />
+        </Field>
+      ) : null}
       <Field label="Extra">
         <Choice value={extra} onChange={(v) => { setExtra(v); if ((v === "bye" || v === "leg_bye") && runs === 0) setRuns(1); }}
           options={[{ key: "none" as const, label: "None" }, ...(Object.keys(EXTRA_LABEL) as Extra[]).map((k) => ({ key: k, label: EXTRA_LABEL[k] }))]} />
