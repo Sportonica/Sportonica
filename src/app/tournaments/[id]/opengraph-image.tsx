@@ -77,9 +77,11 @@ export default async function OG({ params }: { params: Promise<{ id: string }> }
               </div>
               <div style={{ display: "flex", fontSize: 30, fontWeight: 700 }}>Sportonica</div>
             </div>
-            <div style={{ display: "flex", fontSize: 30, fontWeight: 800, color: accent }}>
-              {tournament.fee > 0 ? money(tournament.fee) : "Free"}
-            </div>
+            {tournament.fee > 0 ? (
+              <div style={{ display: "flex", fontSize: 30, fontWeight: 800, color: accent }}>
+                {money(tournament.fee)}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

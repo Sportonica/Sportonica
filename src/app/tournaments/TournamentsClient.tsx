@@ -141,7 +141,8 @@ export default function TournamentsClient({ items }: { items: TournamentBrowseIt
                       {item.kind === "tournament"
                         ? <span className="tc-foot-meta"><Users size={13} /> {item.maxTeams == null ? "Unlimited teams" : `Up to ${item.maxTeams} teams`}</span>
                         : <span className="tc-foot-meta"><Users size={13} /> {item.slotsRemaining} spots left</span>}
-                      <span className={`tc-foot-price${item.fee === 0 ? " free" : ""}`}>{item.fee === 0 ? "Free" : `Rs ${item.fee}`}</span>
+                      {/* no fee: nothing shown (not "Free": it may be collected outside Sportonica) */}
+                      {item.fee > 0 ? <span className="tc-foot-price">Rs {item.fee}</span> : null}
                     </div>
                   </div>
                 </Link>

@@ -304,10 +304,12 @@ export default function TournamentRegisterTab({
         <h2 className="rgt-hero-title">{tournament.name}</h2>
       </div>
       <div className="rgt-hero-facts">
-        <div className="rgt-fact">
-          <Wallet size={13} />
-          <span>{paid ? rs(tournament.fee) : "Free"}</span>
-        </div>
+        {paid ? (
+          <div className="rgt-fact">
+            <Wallet size={13} />
+            <span>{rs(tournament.fee)}</span>
+          </div>
+        ) : null}
         <div className="rgt-fact">
           <CalendarDays size={13} />
           <span>Closes {dateLabel(tournament.registration_closes_at)}</span>
