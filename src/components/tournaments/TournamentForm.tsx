@@ -16,6 +16,8 @@ import { FORMAT_LABELS, TOURNAMENT_FORMATS, HOST_PAYMENT_METHODS, HOST_PAYMENT_M
 import type { Tournament, TournamentFormat, HostPaymentMethod } from "@/lib/tournaments/types";
 import { shrinkImage, IMAGE_MAX } from "@/lib/images/shrink";
 import Link from "next/link";
+// its own field styles: the pages that show it do not all load them (the platform Settings tab did not)
+import "@/app/platform/events/events.css";
 
 const KTM_OFFSET = "+05:45";
 const todayKTM = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kathmandu" });

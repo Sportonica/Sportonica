@@ -8,6 +8,8 @@
 import { useState } from "react";
 import type { SportKey } from "@/lib/intelligence/core/types";
 import { RULE_GROUPS, RULE_PRESETS, type RuleField } from "@/lib/intelligence/ruleFields";
+// its own field styles: the pages that show it do not all load them (the platform Settings tab did not)
+import "@/app/platform/events/events.css";
 
 type Rules = Record<string, unknown>;
 interface Phase { name: string; from: number; to: number }
