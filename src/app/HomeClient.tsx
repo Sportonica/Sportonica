@@ -11,6 +11,7 @@ import "@/components/home/rails.css";
 import type { getHomeRails } from "@/lib/play/homeRails";
 import { useCity, inCity } from "@/lib/city";
 import { useLiveRefresh } from "@/lib/hooks/useLiveRefresh";
+import QuizBanner from "@/components/QuizBanner";
 
 type HomeRails = Awaited<ReturnType<typeof getHomeRails>>;
 
@@ -388,6 +389,9 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
             picker so it's the first "something's actually happening"
             signal on the page.
         ══════════════════════════════════ */}
+        {/* the sports quiz, for the event: remove this line and the component after it */}
+        <QuizBanner />
+
         {rails && rails.matches.length > 0 && <MatchesRail matches={rails.matches} />}
 
         {/* ══════════════════════════════════

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { findCoupon } from "@/lib/coupons";
-import Confetti from "./Confetti";
+import Confetti from "@/components/Confetti";
 import CopyCode from "./CopyCode";
 import "./coupon.css";
 

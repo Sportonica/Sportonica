@@ -2,7 +2,6 @@
   min-height: 80vh; display: grid; place-items: center; padding: 40px 16px;
   background: radial-gradient(ellipse at top, rgba(0, 98, 65, 0.35), transparent 60%), var(--bg);
 }
-.cp-confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 50; }
 .cp-card {
   width: 100%; max-width: 460px; text-align: center; padding: 32px 22px; border-radius: 22px;
   background: var(--inkSoft); border: 1px solid var(--border-line); color: var(--chalk);
