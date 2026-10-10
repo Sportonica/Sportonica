@@ -392,7 +392,7 @@ function TableTab({
   const teamLogo = (id: string) => teams.find((t) => t.id === id)?.logo_url ?? null;
   const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
   // One compact row per team, like a league table: played, won, drawn (where the sport has
-  // draws), lost, scored for and against (wide screens), difference and points. The top 2
+  // draws), lost, scored for and against, difference and points. The top 2
   // of each group are marked, the usual qualifying places.
   return (
     <div>

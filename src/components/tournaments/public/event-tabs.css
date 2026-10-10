@@ -690,6 +690,7 @@
 }
 .ev2-st-badge img { width: 100%; height: 100%; object-fit: cover; }
 .ev2-st-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ev2-st .wide { display: none; }
-@media (min-width: 640px) { .ev2-st .wide { display: table-cell; } .ev2-st th, .ev2-st td { padding-left: 9px; padding-right: 9px; } }
-@media (max-width: 380px) { .ev2-st th, .ev2-st td { padding-left: 4px; padding-right: 4px; } .ev2-st-badge { display: none; } }
+/* goals for and against show on phones too: the columns tighten instead */
+@media (min-width: 640px) { .ev2-st th, .ev2-st td { padding-left: 9px; padding-right: 9px; } }
+@media (max-width: 639px) { .ev2-st th, .ev2-st td { padding-left: 4px; padding-right: 4px; } .ev2-st td { font-size: 13px; } .ev2-st .rk { padding-left: 8px; } }
+@media (max-width: 380px) { .ev2-st th, .ev2-st td { padding-left: 3px; padding-right: 3px; } .ev2-st-badge { display: none; } }
