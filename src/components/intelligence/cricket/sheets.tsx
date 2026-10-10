@@ -145,11 +145,14 @@ export function WicketSheet({ striker, nonStriker, extra, fielders, fieldingSide
  * stay those of that ball (not whoever is on now), so an old ball keeps
  * its place in the innings.
  */
-export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
+export function EditDeliverySheet({ entry, ctx, onSave, onClose, insert = false }: {
   entry: TimelineEntry; ctx: MatchContext;
   onSave: (payload: Record<string, unknown>, reason: string) => void; onClose: () => void;
+  // add a missed ball just before this one, with its batters and bowler
+  insert?: boolean;
 }) {
-  const p = entry.payload as DeliveryPayload;
+  // a missed ball starts blank, with the batters and bowler of the ball it goes before
+  const p = (insert ? { striker: entry.payload.striker, nonStriker: entry.payload.nonStriker, bowler: entry.payload.bowler } : entry.payload) as DeliveryPayload;
   const striker = p.striker ?? "", nonStriker = p.nonStriker ?? "", bowler = p.bowler ?? "";
   const fieldingSide: Side = ctx.sides?.a.players.some((x) => x.id === bowler) ? "a" : "b";
   const fielders = ctx.sides?.[fieldingSide].players ?? [];
@@ -178,7 +181,7 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
       : `${nm(wasOut)} stays in: the batter who came in for this wicket is taken out, and ${nm(wasOut)} gets their later balls.`
     : null;
   return (
-    <Sheet title={`Edit ${parseBallLabel(entry.label)?.superOver ? "super over " : ""}ball ${parseBallLabel(entry.label)?.ball ?? ""}`} onClose={onClose}>
+    <Sheet title={`${insert ? "Add a missed ball before" : "Edit"} ${parseBallLabel(entry.label)?.superOver ? "super over " : ""}ball ${parseBallLabel(entry.label)?.ball ?? ""}`} onClose={onClose}>
       <div className="ck-muted" style={{ fontSize: 13 }}>{nm(bowler)} to {nm(faced)}</div>
       {nonStriker ? (
         <Field label="Faced by">
@@ -216,10 +219,10 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
       {knockOn ? <div className="ck-muted" style={{ fontSize: 13 }}>{knockOn}</div> : null}
       <label className="ck-field">
         <span className="ck-label">Reason (kept in the record)</span>
-        <input className="si-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Wrong runs entered" />
+        <input className="si-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={insert ? "Ball was missed" : "Wrong runs entered"} />
       </label>
       <div className="ck-preview"><span className={`ck-ball ${preview.tone}`}>{preview.badge}</span> {preview.text}</div>
-      <button type="button" className="ck-cta" onClick={() => onSave(payload, reason.trim() || "Edited by the scorer")}>Save this ball</button>
+      <button type="button" className="ck-cta" onClick={() => onSave(payload, reason.trim() || (insert ? "Missed ball added" : "Edited by the scorer"))}>{insert ? "Add this ball" : "Save this ball"}</button>
     </Sheet>
   );
 }
