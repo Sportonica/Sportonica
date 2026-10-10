@@ -1086,7 +1086,7 @@ export async function getMatchHighlights(tournamentId: string): Promise<Record<s
 export async function getCricketMatchFacts(tournamentId: string): Promise<CricketMatchFacts | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.from("si_contests")
-    .select("match_id, status, i0:state->innings->0->>batting, m0:state->innings->0->maxBalls, i1:state->innings->1->>batting, m1:state->innings->1->maxBalls")
+    .select("match_id, status, i0:state->sport->innings->0->>batting, m0:state->sport->innings->0->maxBalls, i1:state->sport->innings->1->>batting, m1:state->sport->innings->1->maxBalls")
     .eq("tournament_id", tournamentId).eq("sport", "cricket").not("match_id", "is", null);
   if (error) return fail(error.message);
   const out: CricketMatchFacts = {};
@@ -1110,7 +1110,7 @@ export async function getCricketRecords(tournamentId: string): Promise<{ lines: 
   const sb = await createClient();
   const [{ data: lineRows, error }, { data: contests, error: cErr }] = await Promise.all([
     sb.from("si_stat_lines").select("contest_id, team_player_id, subject_key, team_id, raw").eq("tournament_id", tournamentId).eq("subject", "player").eq("sport", "cricket").limit(5000),
-    sb.from("si_contests").select("id, status, context, b0:state->innings->0->>batting, p0:state->innings->0->partnerships, b1:state->innings->1->>batting, p1:state->innings->1->partnerships")
+    sb.from("si_contests").select("id, status, context, b0:state->sport->innings->0->>batting, p0:state->sport->innings->0->partnerships, b1:state->sport->innings->1->>batting, p1:state->sport->innings->1->partnerships")
       .eq("tournament_id", tournamentId).eq("sport", "cricket"),
   ]);
   if (error || cErr) return fail((error ?? cErr)!.message);
