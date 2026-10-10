@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/server";
 import { actionError, isActionError, safeActionError, type ActionError } from "@/lib/actionError";
 import { friendlyTournamentError, type TournamentMatch } from "@/lib/tournaments/types";
 import {
-  EngineError, applyCorrection, applyCorrections, describe, effectiveEvents, newEnvelope, reconstruct, recordEvent, summarize,
+  EngineError, applyCorrection, applyCorrections, applyInsertion, describe, effectiveEvents, newEnvelope, reconstruct, recordEvent, summarize,
   type MatchEnvelope,
 } from "./core/engine";
 import {
@@ -230,6 +230,7 @@ export async function getContestEvents(
   let page: EventRow[];
   let all: EventRow[] | null = null;
   let labels: Record<number, string> = {};
+  let positions: Map<string, number> | null = null;
   let hasMore: boolean;
 
   if (engine.eventLabel) {
@@ -238,6 +239,7 @@ export async function getContestEvents(
     if (isActionError(loaded)) return loaded;
     all = loaded;
     labels = reconstruct(engine, row.context, rules, loaded.map(toStored)).labels;
+    positions = effectiveEvents(loaded.map(toStored)).positions;
     const desc = [...loaded].reverse().filter((e) => opts.before === undefined || e.seq < opts.before);
     page = desc.slice(0, limit);
     hasMore = desc.length > limit;
@@ -292,6 +294,7 @@ export async function getContestEvents(
       id: e.id, seq: e.seq, type: e.type,
       text: describe(engine, ev, row.context, rules),
       label: labels[e.seq] ?? null,
+      ...(positions ? { position: positions.get(e.id) ?? e.seq } : {}),
       occurredAt: e.occurred_at,
       recordedBy: e.recorded_by ? nameOf.get(e.recorded_by) ?? "Scorer" : null,
       superseded: supersededIds.has(e.id),
@@ -660,6 +663,48 @@ async function correctWithFollowOn(
     ? `${name((removed.target.payload as { player?: unknown }).player)} no longer comes in here; the ${moved} ball${moved === 1 ? "" : "s"} after it ${moved === 1 ? "was" : "were"} moved to the batter who stays in.`
     : `The two batters swapped from this ball on (${moved} event${moved === 1 ? "" : "s"} moved).`;
   return { contest: toView(res.contest), duplicate: res.duplicate, warning: [note, fixture].filter(Boolean).join(" ") };
+}
+
+/**
+ * A ball the scorer missed, put in its place: just before `beforeEventId`.
+ * The match is replayed with it, and refused if that makes it impossible.
+ */
+export async function insertContestEvent(
+  contestId: string, beforeEventId: string, input: { type: string; payload: Record<string, unknown> }, reason: string, clientId: string,
+): Promise<RecordEventResult | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  if (!UUID.test(clientId) || !UUID.test(beforeEventId)) return actionError("Missing event id. Reload and try again.");
+  if (!reason.trim()) return fail("REASON_REQUIRED");
+  const row = await loadContest(sb, contestId);
+  if (isActionError(row)) return row;
+  const loaded = await loadEvents(sb, contestId);
+  if (isActionError(loaded)) return loaded;
+  const engine = getEngine(row.sport as SportKey);
+  const target = loaded.find((e) => e.id === beforeEventId);
+  if (!target) return fail("EVENT_NOT_FOUND");
+  const payload = { ...input.payload, insertBefore: beforeEventId };
+  const ev: StoredEvent = { id: randomUUID(), seq: row.last_seq + 1, type: input.type, payload, occurredAt: iso(target.occurred_at), recordedBy: user.id, clientId };
+
+  let rules: unknown, env: MatchEnvelope;
+  try {
+    rules = engine.resolveRules(row.rules);
+    env = applyInsertion(engine, row.context, rules, loaded.map(toStored), ev).envelope;
+  } catch (e) {
+    if (e instanceof EngineError || e instanceof RulesError) return actionError(e.message);
+    return safeActionError(e, "That ball could not be added.");
+  }
+  const snap = snapshot(engine, env, row.context, rules);
+  const { data, error } = await sb.rpc("si_append_event", {
+    p_contest_id: contestId, p_expected_seq: row.last_seq, p_type: input.type, p_payload: payload,
+    p_client_id: clientId, p_occurred_at: ev.occurredAt, p_voids_event_id: null, p_replaces_event_id: null, p_reason: reason.trim(),
+    p_status: env.status, p_state: env, p_summary: snap.summary, p_lines: snap.lines, p_mirror: snap.mirror,
+  });
+  if (error) return fail(error.message);
+  const res = data as { duplicate: boolean; contest: ContestRow };
+  const warning = res.duplicate ? null : await syncFixture(sb, row, env, snap.mirror);
+  reval(row.tournament_id, contestId);
+  return { contest: toView(res.contest), duplicate: res.duplicate, warning };
 }
 
 /** Cricket: the overs bowled so far and who bowled each, for "change the bowler of an over". */

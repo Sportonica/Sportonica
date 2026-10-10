@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { bulkCorrectContest, correctContestEvent, getContestEvents, getRuleDefaults, recalculateContest, recordContestEvent, setContestRules } from "@/lib/intelligence/actions";
+import { bulkCorrectContest, correctContestEvent, getContestEvents, insertContestEvent, getRuleDefaults, recalculateContest, recordContestEvent, setContestRules } from "@/lib/intelligence/actions";
 import type { CricketBulkEdit } from "@/lib/intelligence/sports/cricketEdits";
 import { isActionError } from "@/lib/actionError";
 import type { Issue } from "@/lib/intelligence/core/types";
@@ -65,9 +65,22 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
   }, [queue, storageKey]);
 
   const refreshTimeline = useCallback(async () => {
-    // cricket's commentary lists the balls, so it reads further back
-    const res = await getContestEvents(initial.id, { limit: initial.sport === "cricket" ? 120 : 30 });
-    if (!isActionError(res)) setEntries(res.entries);
+    if (initial.sport !== "cricket") {
+      const res = await getContestEvents(initial.id, { limit: 30 });
+      if (!isActionError(res)) setEntries(res.entries);
+      return;
+    }
+    // cricket's commentary lists every ball, and any of them can be edited: read the whole match
+    const all: TimelineEntry[] = [];
+    let before: number | undefined;
+    for (let page = 0; page < 20; page++) {
+      const res = await getContestEvents(initial.id, { limit: 200, before });
+      if (isActionError(res)) return;
+      all.push(...res.entries);
+      if (!res.hasMore || !res.entries.length) break;
+      before = res.entries[res.entries.length - 1].seq;
+    }
+    setEntries(all);
   }, [initial.id, initial.sport]);
   // Server actions from one tab run one at a time, so a timeline fetch
   // after every tap would queue in front of the next tap. Refresh once
@@ -126,6 +139,17 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
     setBusy(false);
   };
 
+  // cricket: a ball the scorer missed, put in its place
+  const insertBall = async (before: TimelineEntry, payload: Record<string, unknown>, reason: string) => {
+    setBusy(true);
+    try {
+      const res = await insertContestEvent(initial.id, before.id, { type: "DELIVERY", payload }, reason, newId());
+      if (isActionError(res)) setError(res.message);
+      else { setError(null); setWarning(res.warning); setContest(res.contest); await refreshTimeline(); }
+    } catch { setError("No connection. The ball was not added. Try again."); }
+    setBusy(false);
+  };
+
   // cricket: the wrong player or bowler fixed across many balls at once
   const bulkFix = async (edit: CricketBulkEdit, reason: string) => {
     setBusy(true);
@@ -159,7 +183,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
   const findLast = async (): Promise<TimelineEntry | null> => {
     const fresh = await getContestEvents(initial.id, { limit: 30 });
     if (isActionError(fresh)) { setError(fresh.message); return null; }
-    setEntries(fresh.entries);
+    // only to find it: the list on screen keeps the whole match (it is refreshed after the undo)
     return fresh.entries.find((e) => !e.superseded && !e.correction && e.type !== "CORRECTION_VOID") ?? null;
   };
 
@@ -282,7 +306,8 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
             <CricketScorerSide contest={shown} entries={entries} busy={busy}
               onEdit={(e, payload, reason) => void correct(e, reason, { type: "DELIVERY", payload })}
               onRemove={(e) => { if (window.confirm(`Remove "${e.text}" from the match? It stays in the record as removed.`)) void correct(e, "Removed by the scorer"); }}
-              onBulkFix={(edit, reason) => void bulkFix(edit, reason)}>
+              onBulkFix={(edit, reason) => void bulkFix(edit, reason)}
+              onInsert={(before, payload, reason) => void insertBall(before, payload, reason)}>
               <details className="si-more">
                 <summary>Full event log and recalculation</summary>
                 <Timeline entries={entries} onCorrect={busy ? undefined : onCorrect} />

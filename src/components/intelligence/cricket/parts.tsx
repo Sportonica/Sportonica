@@ -249,14 +249,14 @@ export function commentaryFrom(entries: TimelineEntry[], ctx: MatchContext): Com
     if (e.superseded) continue;
     if (NOTE_EVENTS.has(e.type)) {
       // the innings is filled in from the balls around it, below
-      items.push({ entry: e, innings: 0, ball: "", badge: "", tone: "note", headline: "", text: e.text, after: e.derived.filter((t) => t !== e.text && !t.startsWith("Overs changed")), note: true, at: e.seq });
+      items.push({ entry: e, innings: 0, ball: "", badge: "", tone: "note", headline: "", text: e.text, after: e.derived.filter((t) => t !== e.text && !t.startsWith("Overs changed")), note: true, at: e.position ?? e.seq });
       continue;
     }
     if (e.type !== "DELIVERY") continue;
     const at = parseBallLabel(e.label);
     if (!at) continue;
     const d = describeDelivery(e.payload as DeliveryPayload, ctx);
-    items.push({ entry: e, innings: at.innings, superOver: at.superOver, ball: at.ball, ...d, after: e.derived, at: e.correction?.kind === "replace" && e.correction.targetSeq ? e.correction.targetSeq : e.seq });
+    items.push({ entry: e, innings: at.innings, superOver: at.superOver, ball: at.ball, ...d, after: e.derived, at: e.position ?? (e.correction?.kind === "replace" && e.correction.targetSeq ? e.correction.targetSeq : e.seq) });
   }
   items.sort((x, y) => y.at - x.at);
   for (let i = 0; i < items.length; i++) {
@@ -270,8 +270,9 @@ export function commentaryFrom(entries: TimelineEntry[], ctx: MatchContext): Com
   return items;
 }
 
-export function Commentary({ items, onEdit, onRemove, compact = false }: {
-  items: CommentaryItem[]; onEdit?: (e: TimelineEntry) => void; onRemove?: (e: TimelineEntry) => void; compact?: boolean;
+export function Commentary({ items, onEdit, onRemove, onInsert, compact = false }: {
+  items: CommentaryItem[]; onEdit?: (e: TimelineEntry) => void; onRemove?: (e: TimelineEntry) => void;
+  onInsert?: (e: TimelineEntry) => void; compact?: boolean;
 }) {
   if (!items.length) return <div className="ck-empty">Ball-by-ball commentary appears here once play starts.</div>;
   return (
@@ -292,12 +293,14 @@ export function Commentary({ items, onEdit, onRemove, compact = false }: {
               <div className="ck-comm-body">
                 <b>{c.headline}</b>
                 <p>{c.text}</p>
-                {c.entry.correction?.kind === "replace" ? <small className="ck-muted">Corrected by the scorer</small> : null}
+                {c.entry.correction?.kind === "replace" ? <small className="ck-muted">Corrected by the scorer</small>
+                  : typeof c.entry.payload?.insertBefore === "string" ? <small className="ck-muted">Added later by the scorer</small> : null}
               </div>
-              {onEdit || onRemove ? (
+              {onEdit || onRemove || onInsert ? (
                 <span className="ck-comm-tools">
                   {onEdit ? <button type="button" className="ck-link" onClick={() => onEdit(c.entry)}>Edit</button> : null}
                   {onRemove ? <button type="button" className="ck-link danger" onClick={() => onRemove(c.entry)}>Remove</button> : null}
+                  {onInsert ? <button type="button" className="ck-link" onClick={() => onInsert(c.entry)} title="A ball was missed just before this one">Add ball before</button> : null}
                 </span>
               ) : null}
             </li>}

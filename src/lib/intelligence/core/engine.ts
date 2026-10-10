@@ -169,7 +169,7 @@ export interface Reconstruction<S = unknown> {
  * duplicates removed, voids and replacements resolved, and a
  * replacement placed where the event it replaces was.
  */
-export function effectiveEvents(events: StoredEvent[]): { list: StoredEvent[]; issues: Issue[]; superseded: string[] } {
+export function effectiveEvents(events: StoredEvent[]): { list: StoredEvent[]; issues: Issue[]; superseded: string[]; positions: Map<string, number> } {
   const issues: Issue[] = [];
   const bySeq = [...events].sort((x, y) => x.seq - y.seq);
 
@@ -232,13 +232,17 @@ export function effectiveEvents(events: StoredEvent[]): { list: StoredEvent[]; i
   }
 
   // A replacement sits where the original sat; chains resolve to the root.
-  const position = (ev: StoredEvent): number => {
+  // An event recorded late (a missed ball) names the event it goes before
+  // (payload.insertBefore) and sits just ahead of it.
+  const position = (ev: StoredEvent, depth = 0): number => {
     let cur = ev;
     for (let hops = 0; cur.replacesEventId && hops < 1000; hops++) {
       const t = byId.get(cur.replacesEventId);
       if (!t) break;
       cur = t;
     }
+    const before = byId.get(insertBeforeOf(cur) ?? "");
+    if (before && before.seq < cur.seq && depth < 1000) return position(before, depth + 1) - 0.5 ** (depth + 1);
     return cur.seq;
   };
 
@@ -248,7 +252,34 @@ export function effectiveEvents(events: StoredEvent[]): { list: StoredEvent[]; i
     .sort((x, y) => x.pos - y.pos || x.e.seq - y.e.seq)
     .map((x) => x.e);
 
-  return { list, issues, superseded: [...dead] };
+  const positions = new Map(unique.map((e) => [e.id, position(e)]));
+  return { list, issues, superseded: [...dead], positions };
+}
+
+/** The event a late-recorded event goes before, if it names one. */
+export function insertBeforeOf(ev: StoredEvent): string | null {
+  const v = (ev.payload as { insertBefore?: unknown } | undefined)?.insertBefore;
+  return typeof v === "string" && v ? v : null;
+}
+
+/**
+ * A missed event recorded in its place: it goes before an event still in
+ * force, and must not leave the match impossible from there on.
+ */
+export function applyInsertion<R, S>(
+  engine: SportIntelligenceEngine<R, S>, ctx: MatchContext, rules: R, events: StoredEvent[], ev: StoredEvent,
+): Reconstruction<S> {
+  const targetId = insertBeforeOf(ev);
+  if (!targetId) throw new EngineError("Say which event this goes before");
+  const target = events.find((e) => e.id === targetId);
+  if (!target) throw new EngineError("The event it goes before is not in this match");
+  const { superseded } = effectiveEvents(events);
+  if (superseded.includes(targetId) || target.type === CORRECTION_VOID) throw new EngineError("That event has been corrected. Insert before the corrected one");
+  const before = new Set(reconstruct(engine, ctx, rules, events).issues.filter((i) => i.severity === "error").map(errorKey));
+  const after = reconstruct(engine, ctx, rules, [...events, ev]);
+  const introduced = after.issues.find((i) => i.severity === "error" && !before.has(errorKey(i)));
+  if (introduced) throw new EngineError(`This ball cannot go there: ${introduced.message}`);
+  return after;
 }
 
 /** recalculateScore: rebuild the whole match from its events. */
