@@ -26,7 +26,7 @@ import {
   type EngineEvent, type MatchAnswer, type MatchContext, type MirrorScore, type Side, type SideContext, type SportIntelligenceEngine, type SportKey, type StatLine, type StoredEvent,
 } from "./core/types";
 import { getEngine, isSportKey, listIntelligenceSportsSync, sportKeyFor } from "./registry";
-import { oversOf, planBulkEdit, type CricketBulkEdit, type OverRef } from "./sports/cricketEdits";
+import { oversOf, planBulkEdit, planWicketFollowOn, type CricketBulkEdit, type FollowOn, type OverRef } from "./sports/cricketEdits";
 import { aggregate } from "./aggregate";
 import type { CricketMatchFacts } from "@/lib/tournaments/standings";
 import type { CricketLine, PartnershipRecord } from "@/lib/tournaments/cricketRecords";
@@ -526,6 +526,9 @@ export async function correctContestEvent(
   const now = new Date().toISOString();
 
   const target = loaded.find((e) => e.id === targetEventId);
+  // cricket: a wicket edited away (or put on the other batter) changes who batted after it
+  const follow = row.sport === "cricket" && replacement?.type === "DELIVERY" ? planWicketFollowOn(loaded.map(toStored), targetEventId, replacement.payload) : [];
+  if (follow.length && replacement) return correctWithFollowOn(sb, user.id, row, loaded, targetEventId, replacement, follow, reason.trim(), clientId);
   const correction: StoredEvent = {
     id: randomUUID(), seq: row.last_seq + 1, occurredAt: replacement && target ? iso(target.occurred_at) : now, recordedBy: user.id, clientId, reason: reason.trim(),
     ...(replacement
@@ -616,6 +619,49 @@ export async function setContestRules(contestId: string, input: Record<string, u
  * (duplicates, gaps, impossible events, broken invariants) and whether
  * the snapshot had drifted from what the events say.
  */
+/** A ball edit plus its knock-on changes, saved as one (see planWicketFollowOn). */
+async function correctWithFollowOn(
+  sb: Sb, userId: string, row: ContestRow, loaded: EventRow[], targetEventId: string,
+  replacement: { type: string; payload: Record<string, unknown> }, follow: FollowOn[], reason: string, clientId: string,
+): Promise<RecordEventResult | ActionError> {
+  const engine = getEngine("cricket");
+  const stored = loaded.map(toStored);
+  const target = stored.find((e) => e.id === targetEventId);
+  if (!target) return fail("EVENT_NOT_FOUND");
+  const name = (id: unknown) => row.context.sides ? [...row.context.sides.a.players, ...row.context.sides.b.players].find((p) => p.id === id)?.name ?? "a batter" : "a batter";
+  const all = [{ target, payload: replacement.payload } as FollowOn, ...follow];
+  const corrections: StoredEvent[] = all.map((f, i) => ({
+    id: randomUUID(), seq: row.last_seq + 1 + i, occurredAt: f.target.occurredAt, recordedBy: userId,
+    clientId: i === 0 ? clientId : randomUUID(), reason,
+    ...("remove" in f ? { type: CORRECTION_VOID, payload: {}, voidsEventId: f.target.id } : { type: f.target.type, payload: f.payload, replacesEventId: f.target.id }),
+  }));
+
+  let rules: unknown, env: MatchEnvelope;
+  try {
+    rules = engine.resolveRules(row.rules);
+    env = applyCorrections(engine, row.context, rules, stored, corrections).envelope;
+  } catch (e) {
+    if (e instanceof EngineError || e instanceof RulesError) return actionError(e.message);
+    return safeActionError(e, "That correction could not be applied.");
+  }
+  const snap = snapshot(engine, env, row.context, rules);
+  const { data, error } = await sb.rpc("si_append_events", {
+    p_contest_id: row.id, p_expected_seq: row.last_seq,
+    p_events: corrections.map((c) => ({ type: c.type, payload: c.payload, client_id: c.clientId, occurred_at: c.occurredAt, replaces_event_id: c.replacesEventId ?? null, voids_event_id: c.voidsEventId ?? null, reason: c.reason })),
+    p_status: env.status, p_state: env, p_summary: snap.summary, p_lines: snap.lines, p_mirror: snap.mirror,
+  });
+  if (error) return fail(error.message);
+  const res = data as { duplicate: boolean; contest: ContestRow };
+  const fixture = res.duplicate ? null : await syncFixture(sb, row, env, snap.mirror);
+  reval(row.tournament_id, row.id);
+  const removed = follow.find((f) => "remove" in f);
+  const moved = follow.filter((f) => !("remove" in f)).length;
+  const note = removed
+    ? `${name((removed.target.payload as { player?: unknown }).player)} no longer comes in here; the ${moved} ball${moved === 1 ? "" : "s"} after it ${moved === 1 ? "was" : "were"} moved to the batter who stays in.`
+    : `The two batters swapped from this ball on (${moved} event${moved === 1 ? "" : "s"} moved).`;
+  return { contest: toView(res.contest), duplicate: res.duplicate, warning: [note, fixture].filter(Boolean).join(" ") };
+}
+
 /** Cricket: the overs bowled so far and who bowled each, for "change the bowler of an over". */
 export async function getCricketOvers(contestId: string): Promise<OverRef[] | ActionError> {
   const sb = await createClient();

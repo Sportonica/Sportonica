@@ -363,9 +363,10 @@ export function applyCorrection<R, S>(
 }
 
 /**
- * Several replacements as one correction (a player renamed across the
- * match, the bowler of an over): each must replace an event that is still
- * in force, and together they must not leave the match impossible.
+ * Several corrections as one (a player renamed across the match, the
+ * bowler of an over, a wicket taken away with the batter who came in for
+ * it): each must replace or reverse an event that is still in force, and
+ * together they must not leave the match impossible.
  */
 export function applyCorrections<R, S>(
   engine: SportIntelligenceEngine<R, S>, ctx: MatchContext, rules: R, events: StoredEvent[], corrections: StoredEvent[],
@@ -374,9 +375,10 @@ export function applyCorrections<R, S>(
   const { superseded } = effectiveEvents(events);
   const targets = new Set<string>();
   for (const c of corrections) {
-    if (!c.replacesEventId) throw new EngineError("Each change must name the event it replaces");
+    const targetId = c.replacesEventId ?? c.voidsEventId;
+    if (!targetId) throw new EngineError("Each change must name the event it corrects");
     if (!c.reason || !c.reason.trim()) throw new EngineError("A correction needs a reason");
-    const target = events.find((e) => e.id === c.replacesEventId);
+    const target = events.find((e) => e.id === targetId);
     if (!target) throw new EngineError("The event being corrected is not in this match");
     if (superseded.includes(target.id) || targets.has(target.id)) throw new EngineError("That event has already been corrected");
     targets.add(target.id);

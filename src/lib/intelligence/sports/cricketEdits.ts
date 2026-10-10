@@ -103,3 +103,43 @@ export function planBulkEdit<R, S>(
 function withoutAudit(payload: Record<string, unknown> | undefined): Record<string, unknown> {
   return Object.fromEntries(Object.entries(payload ?? {}).filter(([k]) => k !== "audit"));
 }
+
+/** A knock-on change from editing one ball: replace a later event, or take it out. */
+export type FollowOn = { target: StoredEvent; payload: Record<string, unknown> } | { target: StoredEvent; remove: true };
+
+const outOf = (p: Record<string, unknown> | undefined): string | null => {
+  const w = p?.wicket as { player?: unknown } | null | undefined;
+  if (!w) return null;
+  return typeof w.player === "string" ? w.player : typeof p?.striker === "string" ? p.striker : null;
+};
+
+/**
+ * Editing a ball's wicket changes who bats after it. A wicket taken away:
+ * the batter who came in for it never did, and the reinstated batter faced
+ * their balls. The wrong batter out: the two swap from that ball on. Only
+ * the rest of that innings is touched. Adding a wicket is left to the
+ * scorer (who came in is not known).
+ */
+export function planWicketFollowOn(events: StoredEvent[], targetId: string, payload: Record<string, unknown>): FollowOn[] {
+  const { list } = effectiveEvents(events);
+  const at = list.findIndex((e) => e.id === targetId);
+  if (at < 0 || list[at].type !== "DELIVERY") return [];
+  const before = outOf(list[at].payload), after = outOf(payload);
+  if (!before || before === after) return [];
+  const rest: StoredEvent[] = [];
+  for (const ev of list.slice(at + 1)) {
+    if (ev.type === "INNINGS_START" || ev.type === "SUPER_OVER_START") break;
+    rest.push(ev);
+  }
+  const batting = keysFor("batting");
+  const swap = (from: StoredEvent[], a: string, b: string): FollowOn[] => from
+    .filter((ev) => mentions(ev.payload, [a, b], batting))
+    .map((ev) => ({ target: ev, payload: swapIds(ev.payload ?? {}, a, b, batting) as Record<string, unknown> }));
+
+  if (after) return swap(rest, before, after);
+  const came = rest.findIndex((ev) => ev.type === "NEW_BATTER");
+  if (came < 0) return [];
+  const incoming = String((rest[came].payload as { player?: unknown }).player ?? "");
+  if (!incoming) return [];
+  return [{ target: rest[came], remove: true }, ...swap(rest.slice(came + 1), incoming, before)];
+}

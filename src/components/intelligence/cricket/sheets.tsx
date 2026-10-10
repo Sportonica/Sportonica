@@ -167,6 +167,14 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
   const payload = deliveryPayload({ striker: faced, nonStriker: other, bowler }, runs, ex,
     d ? { type: d.key, player: d.anyBatter ? out : faced, fielder: d.fielder ? fielder : "" } : null, p.commentary);
   const preview = describeDelivery(payload as DeliveryPayload, ctx);
+  // a wicket taken away, or put on the other batter, changes who batted after this ball
+  const wasOut = p.wicket ? (p.wicket.player ?? striker) : null;
+  const nowOut = d ? (d.anyBatter ? out : faced) : null;
+  const knockOn = wasOut && wasOut !== nowOut
+    ? nowOut
+      ? `${nm(wasOut)} and ${nm(nowOut)} swap for the rest of the innings.`
+      : `${nm(wasOut)} stays in: the batter who came in for this wicket is taken out, and ${nm(wasOut)} gets their later balls.`
+    : null;
   return (
     <Sheet title={`Edit ${parseBallLabel(entry.label)?.superOver ? "super over " : ""}ball ${parseBallLabel(entry.label)?.ball ?? ""}`} onClose={onClose}>
       <div className="ck-muted" style={{ fontSize: 13 }}>{nm(bowler)} to {nm(faced)}</div>
@@ -197,6 +205,7 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
           <JerseyPick players={fielders} side={fieldingSide} value={fielder} onPick={setFielder} />
         </Field>
       ) : null}
+      {knockOn ? <div className="ck-muted" style={{ fontSize: 13 }}>{knockOn}</div> : null}
       <label className="ck-field">
         <span className="ck-label">Reason (kept in the record)</span>
         <input className="si-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Wrong runs entered" />
