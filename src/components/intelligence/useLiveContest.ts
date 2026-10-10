@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getContest } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
-import { toView, type ContestRow } from "@/lib/intelligence/view";
+import { fromPush, type ContestRow } from "@/lib/intelligence/view";
 import type { ContestView } from "@/lib/intelligence/types";
 
 // Keeps one contest current. Supabase Realtime pushes the row the
@@ -21,6 +21,8 @@ export function useLiveContest(initial: ContestView, hold = false): [ContestView
   const id = initial.id;
   const holding = useRef(hold);
   const held = useRef<ContestView | null>(null);
+  const latest = useRef(initial);
+  useEffect(() => { latest.current = contest; }, [contest]);
 
   const newer = (c: ContestView) => setContest((cur) => (c.lastSeq > cur.lastSeq || (c.lastSeq === cur.lastSeq && c.updatedAt > cur.updatedAt) ? c : cur));
 
@@ -39,7 +41,7 @@ export function useLiveContest(initial: ContestView, hold = false): [ContestView
     const channel = sb
       .channel(`si-contest-${id}`)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "si_contests", filter: `id=eq.${id}` },
-        (payload) => offer(toView(payload.new as ContestRow)))
+        (payload) => offer(fromPush(payload.new as Partial<ContestRow>, latest.current)))
       .subscribe((status) => { live = status === "SUBSCRIBED"; });
 
     // every 15s without a socket; every 90s with one (a missed push is rare)
