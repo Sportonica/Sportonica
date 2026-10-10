@@ -30,3 +30,15 @@ export function toView(row: ContestRow): ContestView {
     startedAt: row.started_at, completedAt: row.completed_at, updatedAt: row.updated_at,
   };
 }
+
+// Postgres leaves a large (TOASTed) column out of a change record when the
+// update did not touch it, so a Realtime push can arrive without the rosters
+// (context), or without the state after a roster edit. Keep what the viewer has.
+export function fromPush(row: Partial<ContestRow>, cur: ContestView): ContestView {
+  const view = toView(row as ContestRow);
+  return {
+    ...view,
+    context: row.context ?? cur.context, rules: row.rules ?? cur.rules, summary: row.summary ?? cur.summary,
+    state: row.state === undefined ? cur.state : view.state,
+  };
+}
