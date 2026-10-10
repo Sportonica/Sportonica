@@ -9,6 +9,8 @@ import { createPortal } from "react-dom";
 import type { MatchContext, Participant, Side } from "@/lib/intelligence/core/types";
 import type { TimelineEntry } from "@/lib/intelligence/types";
 import { describeDelivery, parseBallLabel, participant, type DeliveryPayload } from "@/lib/intelligence/sports/cricketView";
+import type { CricketState } from "@/lib/intelligence/sports/cricket";
+import type { CricketBulkEdit, OverRef, PlayerRole } from "@/lib/intelligence/sports/cricketEdits";
 import { Jersey, teamColor } from "../pads/shared";
 
 export type Extra = "wide" | "no_ball" | "bye" | "leg_bye";
@@ -165,6 +167,14 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
   const payload = deliveryPayload({ striker: faced, nonStriker: other, bowler }, runs, ex,
     d ? { type: d.key, player: d.anyBatter ? out : faced, fielder: d.fielder ? fielder : "" } : null, p.commentary);
   const preview = describeDelivery(payload as DeliveryPayload, ctx);
+  // a wicket taken away, or put on the other batter, changes who batted after this ball
+  const wasOut = p.wicket ? (p.wicket.player ?? striker) : null;
+  const nowOut = d ? (d.anyBatter ? out : faced) : null;
+  const knockOn = wasOut && wasOut !== nowOut
+    ? nowOut
+      ? `${nm(wasOut)} and ${nm(nowOut)} swap for the rest of the innings.`
+      : `${nm(wasOut)} stays in: the batter who came in for this wicket is taken out, and ${nm(wasOut)} gets their later balls.`
+    : null;
   return (
     <Sheet title={`Edit ${parseBallLabel(entry.label)?.superOver ? "super over " : ""}ball ${parseBallLabel(entry.label)?.ball ?? ""}`} onClose={onClose}>
       <div className="ck-muted" style={{ fontSize: 13 }}>{nm(bowler)} to {nm(faced)}</div>
@@ -195,12 +205,124 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
           <JerseyPick players={fielders} side={fieldingSide} value={fielder} onPick={setFielder} />
         </Field>
       ) : null}
+      {knockOn ? <div className="ck-muted" style={{ fontSize: 13 }}>{knockOn}</div> : null}
       <label className="ck-field">
         <span className="ck-label">Reason (kept in the record)</span>
         <input className="si-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Wrong runs entered" />
       </label>
       <div className="ck-preview"><span className={`ck-ball ${preview.tone}`}>{preview.badge}</span> {preview.text}</div>
       <button type="button" className="ck-cta" onClick={() => onSave(payload, reason.trim() || "Edited by the scorer")}>Save this ball</button>
+    </Sheet>
+  );
+}
+
+/**
+ * Fixes across many balls: the wrong player picked (their batting, bowling
+ * or fielding moves to the right player, or the two swap if both played)
+ * and the wrong bowler for a whole over. Kept in the record like any edit.
+ */
+export function BulkFixSheet({ ctx, state, overs, onSave, onClose }: {
+  ctx: MatchContext; state: CricketState; overs: OverRef[] | null;
+  onSave: (edit: CricketBulkEdit, reason: string) => void; onClose: () => void;
+}) {
+  const [tab, setTab] = useState<"player" | "over">("player");
+  const [side, setSide] = useState<Side>("a");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [role, setRole] = useState<PlayerRole>("batting");
+  const [over, setOver] = useState("");
+  const [bowler, setBowler] = useState("");
+  const [reason, setReason] = useState("");
+  const sides = ctx.sides;
+  if (!sides) return null;
+  const nm = (id: string) => participant(ctx, id)?.name ?? "";
+
+  // who did what in this match, per player
+  const did = new Map<string, Set<PlayerRole>>();
+  const mark = (id: string | null | undefined, r: PlayerRole) => { if (id) (did.get(id) ?? did.set(id, new Set()).get(id)!).add(r); };
+  for (const inn of state.innings ?? []) {
+    Object.keys(inn.batters ?? {}).forEach((id) => mark(id, "batting"));
+    Object.keys(inn.bowlers ?? {}).forEach((id) => mark(id, "bowling"));
+    Object.keys(inn.fielding ?? {}).forEach((id) => mark(id, "fielding"));
+  }
+  const roster = sides[side].players;
+  const appeared = roster.filter((p) => did.has(p.id));
+  const pickFrom = (id: string) => {
+    setFrom(id); setTo("");
+    const r = did.get(id);
+    if (r) setRole(r.has("batting") ? "batting" : r.has("bowling") ? "bowling" : "fielding");
+  };
+  const roleText = role === "all" ? "records" : role;
+  const has = (id: string) => (role === "all" ? (did.get(id)?.size ?? 0) > 0 : !!did.get(id)?.has(role));
+  const fromHas = !!from && has(from), toHas = !!to && has(to);
+
+  const o = overs?.find((x) => x.key === over);
+  const fieldingSide: Side | null = o ? (sides.a.players.some((p) => p.id === o.bowler) ? "a" : "b") : null;
+
+  const ready = reason.trim().length > 0 && (tab === "player" ? !!from && !!to && (fromHas || toHas) : !!o && !!bowler && bowler !== o.bowler);
+  const save = () => {
+    if (!ready) return;
+    onSave(tab === "player" ? { kind: "player", from, to, role } : { kind: "overBowler", over, bowler }, reason.trim());
+  };
+
+  return (
+    <Sheet title="Fix a player or bowler" onClose={onClose}>
+      <Choice value={tab} onChange={setTab} options={[{ key: "player" as const, label: "Wrong player" }, { key: "over" as const, label: "Wrong bowler for an over" }]} />
+      {tab === "player" ? (
+        <>
+          <Field label="Team">
+            <Choice value={side} onChange={(v) => { setSide(v); setFrom(""); setTo(""); }} options={(["a", "b"] as const).map((s) => ({ key: s, label: sides[s].name }))} />
+          </Field>
+          <Field label="Recorded as (the wrong name)">
+            {appeared.length ? <JerseyPick players={appeared} side={side} value={from} onPick={pickFrom} /> : <div className="ck-muted">No one from this team has played yet.</div>}
+          </Field>
+          {from ? (
+            <>
+              <Field label="Should be">
+                <JerseyPick players={roster.filter((p) => p.id !== from)} side={side} value={to} onPick={setTo} />
+              </Field>
+              <Field label="Move their">
+                <Choice value={role} onChange={setRole} options={[
+                  { key: "batting" as const, label: "Batting", disabled: !did.get(from)?.has("batting") && !did.get(to)?.has("batting") },
+                  { key: "bowling" as const, label: "Bowling", disabled: !did.get(from)?.has("bowling") && !did.get(to)?.has("bowling") },
+                  { key: "fielding" as const, label: "Catches, run outs", disabled: !did.get(from)?.has("fielding") && !did.get(to)?.has("fielding") },
+                  { key: "all" as const, label: "Everything" },
+                ]} />
+              </Field>
+              {to ? (
+                <div className="ck-muted" style={{ fontSize: 13 }}>
+                  {fromHas && toHas ? <>Both have {roleText}: {nm(from)} and {nm(to)} swap theirs.</>
+                    : fromHas ? <>{nm(from)}&apos;s {roleText} moves to {nm(to)}.</>
+                    : toHas ? <>{nm(to)}&apos;s {roleText} moves to {nm(from)}.</>
+                    : <>Neither has any {roleText} in this match.</>}
+                  {(fromHas || toHas) && role !== "all" ? " Nothing else changes." : ""}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <Field label="Over">
+            {overs === null ? <div className="ck-muted">Loading the overs…</div> : overs.length ? (
+              <select className="si-input" value={over} onChange={(e) => { setOver(e.target.value); setBowler(""); }}>
+                <option value="">Choose the over</option>
+                {overs.map((x) => <option key={x.key} value={x.key}>{x.label}: {nm(x.bowler)}</option>)}
+              </select>
+            ) : <div className="ck-muted">No overs bowled yet.</div>}
+          </Field>
+          {o && fieldingSide ? (
+            <Field label={`Bowled by (now ${nm(o.bowler)})`}>
+              <JerseyPick players={sides[fieldingSide].players.filter((p) => p.id !== o.bowler)} side={fieldingSide} value={bowler} onPick={setBowler} />
+            </Field>
+          ) : null}
+        </>
+      )}
+      <label className="ck-field">
+        <span className="ck-label">Reason (kept in the record)</span>
+        <input className="si-input" value={reason} onChange={(e) => setReason(e.target.value)} placeholder={tab === "player" ? "Wrong player picked" : "Wrong bowler entered"} />
+      </label>
+      <button type="button" className="ck-cta" disabled={!ready} onClick={save}>Save the fix</button>
     </Sheet>
   );
 }
