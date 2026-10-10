@@ -38,6 +38,8 @@ export interface TimelineEntry {
   // what the rules worked out from this event (game won, side out ...)
   derived: string[];
   payload: Record<string, unknown>;
+  // where it sits in the match (an edit where the ball it replaced was, a missed ball just before the ball it was recorded ahead of); sports that number their events only
+  position?: number;
 }
 
 export interface ContestIntelligence {

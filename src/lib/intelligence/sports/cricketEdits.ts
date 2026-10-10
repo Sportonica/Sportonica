@@ -8,6 +8,7 @@
 import { effectiveEvents, reconstruct } from "../core/engine";
 import type { MatchContext, SportIntelligenceEngine, StoredEvent } from "../core/types";
 import { sideOfPlayer } from "../core/util";
+import { mentions, swapIds } from "../core/edits";
 import { parseBallLabel } from "./cricketView";
 
 /** Which of a player's records move: their batting, their bowling, their catches and run outs, or all. */
@@ -28,21 +29,6 @@ const ROLE_KEYS: Record<Exclude<PlayerRole, "all">, string[]> = {
 };
 const keysFor = (role: PlayerRole): Set<string> =>
   new Set(role === "all" ? Object.values(ROLE_KEYS).flat() : ROLE_KEYS[role]);
-
-/** The ids under those keys swapped, a for b and b for a (a player who never appeared there is simply replaced). */
-function swapIds(value: unknown, a: string, b: string, keys: Set<string>, key = ""): unknown {
-  if (typeof value === "string") return keys.has(key) ? (value === a ? b : value === b ? a : value) : value;
-  if (Array.isArray(value)) return value.map((v) => swapIds(v, a, b, keys, key));
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([k]) => k !== "audit").map(([k, v]) => [k, swapIds(v, a, b, keys, k)]));
-  }
-  return value;
-}
-
-const mentions = (value: unknown, ids: string[], keys: Set<string>, key = ""): boolean =>
-  typeof value === "string" ? keys.has(key) && ids.includes(value)
-    : Array.isArray(value) ? value.some((v) => mentions(v, ids, keys, key))
-    : !!value && typeof value === "object" && Object.entries(value).some(([k, v]) => k !== "audit" && mentions(v, ids, keys, k));
 
 /** The over a ball belongs to, from the label the engine gives it ("2nd innings 3.4" -> over 4 of the 2nd innings). */
 function overKey(label: string | null): { key: string; label: string } | null {

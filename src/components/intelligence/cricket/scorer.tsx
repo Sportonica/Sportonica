@@ -43,11 +43,12 @@ export function CricketScorerHeader({ contest }: { contest: ContestView }) {
   );
 }
 
-export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, onBulkFix, children }: {
+export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, onBulkFix, onInsert, children }: {
   contest: ContestView; entries: TimelineEntry[]; busy: boolean;
   onEdit: (e: TimelineEntry, payload: Record<string, unknown>, reason: string) => void;
   onRemove: (e: TimelineEntry) => void;
   onBulkFix?: (edit: CricketBulkEdit, reason: string) => void;
+  onInsert?: (before: TimelineEntry, payload: Record<string, unknown>, reason: string) => void;
   children?: React.ReactNode;
 }) {
   const s = contest.state as CricketState;
@@ -55,6 +56,7 @@ export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, on
   const inn = latestInnings(s);
   const [view, setView] = useState<"balls" | "overs">("balls");
   const [editing, setEditing] = useState<TimelineEntry | null>(null);
+  const [inserting, setInserting] = useState<TimelineEntry | null>(null);
   const [fixing, setFixing] = useState(false);
   const [overs, setOvers] = useState<OverRef[] | null>(null);
   const openFix = async () => {
@@ -75,7 +77,7 @@ export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, on
         <>
           {editable ? (
             <div className="ck-muted" style={{ fontSize: 12.5 }}>
-              Tap Edit on any ball to change it. The innings is worked out again from that ball on
+              Tap Edit on any ball to change it, or Add ball before for one that was missed. The innings is worked out again from that ball on
               {contest.status === "completed" ? ", and the result and everyone's figures are updated" : ""}.
             </div>
           ) : null}
@@ -84,13 +86,18 @@ export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, on
               Fix a player or bowler
             </button>
           ) : null}
-          <Commentary items={items} compact onEdit={editable && !busy ? setEditing : undefined} onRemove={editable && !busy ? onRemove : undefined} />
+          <Commentary items={items} compact onEdit={editable && !busy ? setEditing : undefined} onRemove={editable && !busy ? onRemove : undefined}
+            onInsert={editable && !busy && onInsert ? setInserting : undefined} />
         </>
       ) : inn ? <OversList inn={inn} ctx={ctx} /> : <div className="ck-muted">No overs bowled yet.</div>}
       {children}
       {fixing && onBulkFix && s ? (
         <BulkFixSheet ctx={ctx} state={s} overs={overs} onClose={() => setFixing(false)}
           onSave={(edit, reason) => { onBulkFix(edit, reason); setFixing(false); }} />
+      ) : null}
+      {inserting && onInsert ? (
+        <EditDeliverySheet insert entry={inserting} ctx={ctx} onClose={() => setInserting(null)}
+          onSave={(payload, reason) => { onInsert(inserting, payload, reason); setInserting(null); }} />
       ) : null}
       {editing ? (
         <EditDeliverySheet entry={editing} ctx={ctx} onClose={() => setEditing(null)}
