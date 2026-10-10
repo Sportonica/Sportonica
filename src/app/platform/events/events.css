@@ -35,3 +35,14 @@
   font-family: inherit;
 }
 .ev-btn:disabled { opacity: 0.6; }
+.ev-entry-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 520px) { .ev-entry-toggle { grid-template-columns: 1fr; } }
+.ev-entry-toggle button {
+  display: flex; align-items: flex-start; gap: 10px; text-align: left;
+  padding: 12px 14px; border-radius: 11px; cursor: pointer; font-family: inherit;
+  background: transparent; color: inherit; font-size: 13.5px; font-weight: 700;
+  border: 1px solid rgba(128,128,128,0.28);
+}
+.ev-entry-toggle button small { display: block; font-size: 11.5px; font-weight: 500; opacity: 0.6; margin-top: 2px; }
+.ev-entry-toggle button.on { border-color: #006241; background: rgba(0,98,65,0.08); box-shadow: 0 0 0 3px rgba(0,98,65,0.1); }
+.ev-field textarea { resize: vertical; min-height: 84px; }

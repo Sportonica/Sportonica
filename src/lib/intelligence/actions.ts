@@ -626,6 +626,30 @@ export async function recalculateContest(contestId: string): Promise<Recalculati
 
   let rules: unknown;
   try { rules = engine.resolveRules(row.rules); } catch (e) { return safeActionError(e, "This match has invalid rules."); }
+  // pick up players added to the teams, and rule changes saved for the
+  // tournament (overs, bowler limit), since the match was opened
+  let ctxNow = row.context;
+  const old = row.context.sides;
+  if (old) {
+    const [a, b] = await Promise.all([sideContext(sb, old.a.teamId), sideContext(sb, old.b.teamId)]);
+    if (!isActionError(a) && !isActionError(b)
+      && (a.players.length !== old.a.players.length || b.players.length !== old.b.players.length)) {
+      ctxNow = { sport: row.context.sport, sides: { a, b } };
+    }
+  }
+  const { data: tour } = await sb.from("tournaments").select("scoring_rules").eq("id", row.tournament_id).maybeSingle();
+  let rulesNow: unknown = rules;
+  const saved = (tour as { scoring_rules?: Record<string, unknown> | null } | null)?.scoring_rules;
+  if (saved && Object.keys(saved).length) {
+    try { rulesNow = engine.resolveRules(saved); } catch { /* keep the match's own rules */ }
+  }
+  if (ctxNow !== row.context || JSON.stringify(sortKeys(rulesNow)) !== JSON.stringify(sortKeys(rules))) {
+    const { data: upd, error: uErr } = await sb.rpc("si_refresh_roster", { p_contest_id: contestId, p_context: ctxNow, p_rules: rulesNow });
+    if (uErr) return fail(uErr.message);
+    row.context = (upd as ContestRow).context;
+    row.rules = (upd as ContestRow).rules;
+    rules = rulesNow;
+  }
   const rebuilt = reconstruct(engine, row.context, rules, loaded.map(toStored));
   const env = rebuilt.envelope as MatchEnvelope;
   // compare as stored JSON: undefined keys and key order do not survive the database
