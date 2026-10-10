@@ -391,38 +391,63 @@ function TableTab({
   }
   const teamLogo = (id: string) => teams.find((t) => t.id === id)?.logo_url ?? null;
   const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
+  // One compact row per team, like a league table: played, won, drawn (where the sport has
+  // draws), lost, scored for and against (wide screens), difference and points. The top 2
+  // of each group are marked, the usual qualifying places.
   return (
     <div>
       {groups.map((g) => {
         const rows = standingsByGroup[g];
         if (rows.length === 0) return null;
         return (
-          <div key={g} className="ev2-standings">
+          <section key={g} className="ev2-st-block">
             {tournament.format === "group_knockout" && <div className="ev2-card-t">Group {g}</div>}
-            {rows.map((r, i) => {
-              const logo = teamLogo(r.team_id);
-              return (
-                <div key={r.team_id} className={`ev2-srow${i < 2 ? " top3" : ""}`}>
-                  <span className="ev2-srow-rank">{i + 1}</span>
-                  <span className="ev2-srow-badge">
-                    {logo
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={logo} alt="" />
-                      : look ? <SportCrest name={r.team_name} px={34} /> : r.team_name.charAt(0).toUpperCase()}
-                  </span>
-                  <span className="ev2-srow-name">{r.team_name}</span>
-                  <div className="ev2-srow-stats">
-                    <div className="ev2-schip"><span className="l">Points</span><span className="v">{r.points}</span></div>
-                    <div className="ev2-schip"><span className="l">Won</span><span className="v">{r.won}</span></div>
-                    <div className="ev2-schip"><span className="l">Lost</span><span className="v">{r.lost}</span></div>
-                    {scheme.draws && !scheme.diffIsRate
-                      ? <div className="ev2-schip"><span className="l">Drawn</span><span className="v">{r.drawn}</span></div>
-                      : <div className="ev2-schip" title={scheme.diffName}><span className="l">{scheme.diffLabel}</span><span className="v">{diffText(scheme, r.goal_diff)}</span></div>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            <table className="ev2-st" aria-label={tournament.format === "group_knockout" ? `Group ${g} standings` : "Standings"}>
+              <thead>
+                <tr>
+                  <th className="rk" scope="col">#</th>
+                  <th className="tm" scope="col">Team</th>
+                  <th scope="col" title="Played">P</th>
+                  <th scope="col" title="Won">W</th>
+                  {scheme.draws ? <th scope="col" title="Drawn">D</th> : null}
+                  <th scope="col" title="Lost">L</th>
+                  <th className="wide" scope="col" title={scheme.forName}>{scheme.forLabel}</th>
+                  <th className="wide" scope="col" title={scheme.againstName}>{scheme.againstLabel}</th>
+                  <th scope="col" title={scheme.diffName}>{scheme.diffLabel}</th>
+                  <th className="pts" scope="col" title="Points">Pts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const logo = teamLogo(r.team_id);
+                  return (
+                    <tr key={r.team_id} className={i < 2 ? "in" : undefined}>
+                      <td className="rk">{i + 1}</td>
+                      <td className="tm">
+                        <span className="ev2-st-team">
+                          <span className="ev2-st-badge">
+                            {logo
+                              // eslint-disable-next-line @next/next/no-img-element
+                              ? <img src={logo} alt="" />
+                              : look ? <SportCrest name={r.team_name} px={24} /> : r.team_name.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="ev2-st-name">{r.team_name}</span>
+                        </span>
+                      </td>
+                      <td>{r.played}</td>
+                      <td>{r.won}</td>
+                      {scheme.draws ? <td>{r.drawn}</td> : null}
+                      <td>{r.lost}</td>
+                      <td className="wide">{r.goals_for}</td>
+                      <td className="wide">{r.goals_against}</td>
+                      <td>{diffText(scheme, r.goal_diff)}</td>
+                      <td className="pts">{r.points}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
         );
       })}
     </div>
