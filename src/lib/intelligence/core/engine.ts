@@ -361,3 +361,29 @@ export function applyCorrection<R, S>(
   if (introduced) throw new EngineError(`This correction is not possible: ${introduced.message}`);
   return after;
 }
+
+/**
+ * Several replacements as one correction (a player renamed across the
+ * match, the bowler of an over): each must replace an event that is still
+ * in force, and together they must not leave the match impossible.
+ */
+export function applyCorrections<R, S>(
+  engine: SportIntelligenceEngine<R, S>, ctx: MatchContext, rules: R, events: StoredEvent[], corrections: StoredEvent[],
+): Reconstruction<S> {
+  if (!corrections.length) throw new EngineError("Nothing to change");
+  const { superseded } = effectiveEvents(events);
+  const targets = new Set<string>();
+  for (const c of corrections) {
+    if (!c.replacesEventId) throw new EngineError("Each change must name the event it replaces");
+    if (!c.reason || !c.reason.trim()) throw new EngineError("A correction needs a reason");
+    const target = events.find((e) => e.id === c.replacesEventId);
+    if (!target) throw new EngineError("The event being corrected is not in this match");
+    if (superseded.includes(target.id) || targets.has(target.id)) throw new EngineError("That event has already been corrected");
+    targets.add(target.id);
+  }
+  const before = new Set(reconstruct(engine, ctx, rules, events).issues.filter((i) => i.severity === "error").map(errorKey));
+  const after = reconstruct(engine, ctx, rules, [...events, ...corrections]);
+  const introduced = after.issues.find((i) => i.severity === "error" && !before.has(errorKey(i)));
+  if (introduced) throw new EngineError(`This change is not possible: ${introduced.message}`);
+  return after;
+}

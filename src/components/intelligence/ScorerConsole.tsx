@@ -11,7 +11,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { correctContestEvent, getContestEvents, getRuleDefaults, recalculateContest, recordContestEvent, setContestRules } from "@/lib/intelligence/actions";
+import { bulkCorrectContest, correctContestEvent, getContestEvents, getRuleDefaults, recalculateContest, recordContestEvent, setContestRules } from "@/lib/intelligence/actions";
+import type { CricketBulkEdit } from "@/lib/intelligence/sports/cricketEdits";
 import { isActionError } from "@/lib/actionError";
 import type { Issue } from "@/lib/intelligence/core/types";
 import { withQueued, type QueuedEvent as Queued } from "@/lib/intelligence/optimistic";
@@ -122,6 +123,17 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
       if (isActionError(res)) setError(res.message);
       else { setError(null); setWarning(res.warning); setContest(res.contest); await refreshTimeline(); }
     } catch { setError("No connection. The correction was not saved. Try again."); }
+    setBusy(false);
+  };
+
+  // cricket: the wrong player or bowler fixed across many balls at once
+  const bulkFix = async (edit: CricketBulkEdit, reason: string) => {
+    setBusy(true);
+    try {
+      const res = await bulkCorrectContest(initial.id, edit, reason, newId());
+      if (isActionError(res)) setError(res.message);
+      else { setError(null); setWarning(res.warning); setContest(res.contest); await refreshTimeline(); }
+    } catch { setError("No connection. The fix was not saved. Try again."); }
     setBusy(false);
   };
 
@@ -269,7 +281,8 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
           {cricket ? (
             <CricketScorerSide contest={shown} entries={entries} busy={busy}
               onEdit={(e, payload, reason) => void correct(e, reason, { type: "DELIVERY", payload })}
-              onRemove={(e) => { if (window.confirm(`Remove "${e.text}" from the match? It stays in the record as removed.`)) void correct(e, "Removed by the scorer"); }}>
+              onRemove={(e) => { if (window.confirm(`Remove "${e.text}" from the match? It stays in the record as removed.`)) void correct(e, "Removed by the scorer"); }}
+              onBulkFix={(edit, reason) => void bulkFix(edit, reason)}>
               <details className="si-more">
                 <summary>Full event log and recalculation</summary>
                 <Timeline entries={entries} onCorrect={busy ? undefined : onCorrect} />

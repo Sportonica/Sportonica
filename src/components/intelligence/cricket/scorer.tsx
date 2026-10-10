@@ -12,7 +12,10 @@ import type { CricketRules, CricketState } from "@/lib/intelligence/sports/crick
 import { latestInnings, sideScores } from "@/lib/intelligence/sports/cricketView";
 import { StatusPill } from "../views";
 import { Commentary, LiveScore, OversList, commentaryFrom } from "./parts";
-import { EditDeliverySheet } from "./sheets";
+import { BulkFixSheet, EditDeliverySheet } from "./sheets";
+import { getCricketOvers } from "@/lib/intelligence/actions";
+import { isActionError } from "@/lib/actionError";
+import type { CricketBulkEdit, OverRef } from "@/lib/intelligence/sports/cricketEdits";
 
 export function CricketScorerHeader({ contest }: { contest: ContestView }) {
   const s = contest.state as CricketState;
@@ -40,10 +43,11 @@ export function CricketScorerHeader({ contest }: { contest: ContestView }) {
   );
 }
 
-export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, children }: {
+export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, onBulkFix, children }: {
   contest: ContestView; entries: TimelineEntry[]; busy: boolean;
   onEdit: (e: TimelineEntry, payload: Record<string, unknown>, reason: string) => void;
   onRemove: (e: TimelineEntry) => void;
+  onBulkFix?: (edit: CricketBulkEdit, reason: string) => void;
   children?: React.ReactNode;
 }) {
   const s = contest.state as CricketState;
@@ -51,6 +55,13 @@ export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, ch
   const inn = latestInnings(s);
   const [view, setView] = useState<"balls" | "overs">("balls");
   const [editing, setEditing] = useState<TimelineEntry | null>(null);
+  const [fixing, setFixing] = useState(false);
+  const [overs, setOvers] = useState<OverRef[] | null>(null);
+  const openFix = async () => {
+    setFixing(true); setOvers(null);
+    const res = await getCricketOvers(contest.id);
+    setOvers(isActionError(res) ? [] : res);
+  };
   const items = useMemo(() => commentaryFrom(entries, ctx), [entries, ctx]);
   // a finished match too: a corrected ball re-works the result and sends it to the fixture
   const editable = contest.status === "live" || contest.status === "paused" || contest.status === "completed";
@@ -68,10 +79,19 @@ export function CricketScorerSide({ contest, entries, busy, onEdit, onRemove, ch
               {contest.status === "completed" ? ", and the result and everyone's figures are updated" : ""}.
             </div>
           ) : null}
+          {editable && onBulkFix && entries.length ? (
+            <button type="button" className="si-btn small" style={{ justifySelf: "start" }} disabled={busy} onClick={() => void openFix()}>
+              Fix a player or bowler
+            </button>
+          ) : null}
           <Commentary items={items} compact onEdit={editable && !busy ? setEditing : undefined} onRemove={editable && !busy ? onRemove : undefined} />
         </>
       ) : inn ? <OversList inn={inn} ctx={ctx} /> : <div className="ck-muted">No overs bowled yet.</div>}
       {children}
+      {fixing && onBulkFix && s ? (
+        <BulkFixSheet ctx={ctx} state={s} overs={overs} onClose={() => setFixing(false)}
+          onSave={(edit, reason) => { onBulkFix(edit, reason); setFixing(false); }} />
+      ) : null}
       {editing ? (
         <EditDeliverySheet entry={editing} ctx={ctx} onClose={() => setEditing(null)}
           onSave={(payload, reason) => { onEdit(editing, payload, reason); setEditing(null); }} />
