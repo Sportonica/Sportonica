@@ -22,7 +22,7 @@ export interface Sport {
 
 export const SPORTS: Sport[] = [
   { name: "Futsal",     color: "#2E7D5B", squad: 5,  tagline: "Floodlit nights, fast feet" },
-  { name: "Cricket",    color: "#f97316", squad: 8,  tagline: "Box cages after dark",
+  { name: "Cricket",    color: "#f97316", squad: 8,  tagline: "Box cages after dark", team: { onCourt: 10, substitutes: 2 },
     positions: [
       { code: "Batter", name: "Batter" }, { code: "Bowler", name: "Bowler" }, { code: "All-rounder", name: "All-rounder" },
       { code: "Wicket-keeper", name: "Wicket-keeper" },
