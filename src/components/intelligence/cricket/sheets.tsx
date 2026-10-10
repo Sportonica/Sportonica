@@ -39,7 +39,7 @@ export function deliveryPayload(base: { striker: string; nonStriker: string; bow
   return p;
 }
 
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", esc);
@@ -60,7 +60,7 @@ function Sheet({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function Choice<T extends string | number>({ value, options, onChange }: { value: T; options: { key: T; label: string; disabled?: boolean }[]; onChange: (v: T) => void }) {
+export function Choice<T extends string | number>({ value, options, onChange }: { value: T; options: { key: T; label: string; disabled?: boolean }[]; onChange: (v: T) => void }) {
   return (
     <div className="ck-choice" role="radiogroup">
       {options.map((o) => (
@@ -71,11 +71,11 @@ function Choice<T extends string | number>({ value, options, onChange }: { value
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="ck-field"><span className="ck-label">{label}</span>{children}</div>;
 }
 
-function JerseyPick({ players, side, value, onPick }: { players: Participant[]; side: Side; value: string; onPick: (id: string) => void }) {
+export function JerseyPick({ players, side, value, onPick }: { players: Participant[]; side: Side; value: string; onPick: (id: string) => void }) {
   return (
     <div className="si-jerseys">
       {players.map((p) => <Jersey key={p.id} p={p} color={teamColor(side)} on={value === p.id} onClick={() => onPick(value === p.id ? "" : p.id)} />)}

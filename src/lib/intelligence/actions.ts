@@ -26,6 +26,7 @@ import {
   type EngineEvent, type MatchAnswer, type MatchContext, type MirrorScore, type Side, type SideContext, type SportIntelligenceEngine, type SportKey, type StatLine, type StoredEvent,
 } from "./core/types";
 import { getEngine, isSportKey, listIntelligenceSportsSync, sportKeyFor } from "./registry";
+import { planBasketballPlayerSwap } from "./sports/basketballEdits";
 import { oversOf, planBulkEdit, planWicketFollowOn, type CricketBulkEdit, type FollowOn, type OverRef } from "./sports/cricketEdits";
 import { aggregate } from "./aggregate";
 import type { CricketMatchFacts } from "@/lib/tournaments/standings";
@@ -721,9 +722,10 @@ export async function getCricketOvers(contestId: string): Promise<OverRef[] | Ac
 }
 
 /**
- * Cricket: one fix across many balls, stored as one correction. The wrong
- * player picked (every ball they batted, bowled or fielded on moves to the
- * right one, or the two swap if both played) or the wrong bowler for an over.
+ * One fix across many events, stored as one correction. The wrong player
+ * picked (cricket: their batting, bowling or fielding; basketball: every
+ * event that names them; the two swap if both played) or, in cricket, the
+ * wrong bowler for an over.
  */
 export async function bulkCorrectContest(
   contestId: string, edit: CricketBulkEdit, reason: string, clientId: string,
@@ -735,16 +737,19 @@ export async function bulkCorrectContest(
 
   const row = await loadContest(sb, contestId);
   if (isActionError(row)) return row;
-  if (row.sport !== "cricket") return actionError("This fix is for cricket matches.");
+  if (row.sport !== "cricket" && row.sport !== "basketball") return actionError("This fix is for cricket and basketball matches.");
+  if (row.sport === "basketball" && edit.kind !== "player") return actionError("Basketball has no overs.");
   const loaded = await loadEvents(sb, contestId);
   if (isActionError(loaded)) return loaded;
-  const engine = getEngine("cricket");
+  const engine = getEngine(row.sport as SportKey);
   const stored = loaded.map(toStored);
 
   let rules: unknown, env: MatchEnvelope, corrections: StoredEvent[];
   try {
     rules = engine.resolveRules(row.rules);
-    const plan = planBulkEdit(engine, row.context, rules, stored, edit);
+    const plan = row.sport === "basketball" && edit.kind === "player"
+      ? planBasketballPlayerSwap(stored, row.context, edit.from, edit.to)
+      : planBulkEdit(engine, row.context, rules, stored, edit);
     corrections = plan.map((x, i) => ({
       id: randomUUID(), seq: row.last_seq + 1 + i, type: x.target.type, payload: x.payload, occurredAt: x.target.occurredAt,
       recordedBy: user.id, clientId: i === 0 ? clientId : randomUUID(), replacesEventId: x.target.id, reason: reason.trim(),

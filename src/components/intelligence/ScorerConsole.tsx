@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { bulkCorrectContest, correctContestEvent, getContestEvents, insertContestEvent, getRuleDefaults, recalculateContest, recordContestEvent, setContestRules } from "@/lib/intelligence/actions";
+import { BasketballScorerSide } from "./basketball/BasketballScorerSide";
 import type { CricketBulkEdit } from "@/lib/intelligence/sports/cricketEdits";
 import { isActionError } from "@/lib/actionError";
 import type { Issue } from "@/lib/intelligence/core/types";
@@ -65,12 +66,12 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
   }, [queue, storageKey]);
 
   const refreshTimeline = useCallback(async () => {
-    if (initial.sport !== "cricket") {
+    if (initial.sport !== "cricket" && initial.sport !== "basketball") {
       const res = await getContestEvents(initial.id, { limit: 30 });
       if (!isActionError(res)) setEntries(res.entries);
       return;
     }
-    // cricket's commentary lists every ball, and any of them can be edited: read the whole match
+    // cricket's commentary and basketball's play by play list every event, and any of them can be edited: read the whole match
     const all: TimelineEntry[] = [];
     let before: number | undefined;
     for (let page = 0; page < 20; page++) {
@@ -139,18 +140,18 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
     setBusy(false);
   };
 
-  // cricket: a ball the scorer missed, put in its place
-  const insertBall = async (before: TimelineEntry, payload: Record<string, unknown>, reason: string) => {
+  // a ball (cricket) or event (basketball) the scorer missed, put in its place
+  const insertBall = async (before: TimelineEntry, payload: Record<string, unknown>, reason: string, type = "DELIVERY") => {
     setBusy(true);
     try {
-      const res = await insertContestEvent(initial.id, before.id, { type: "DELIVERY", payload }, reason, newId());
+      const res = await insertContestEvent(initial.id, before.id, { type, payload }, reason, newId());
       if (isActionError(res)) setError(res.message);
       else { setError(null); setWarning(res.warning); setContest(res.contest); await refreshTimeline(); }
     } catch { setError("No connection. The ball was not added. Try again."); }
     setBusy(false);
   };
 
-  // cricket: the wrong player or bowler fixed across many balls at once
+  // the wrong player (or, in cricket, bowler) fixed across many events at once
   const bulkFix = async (edit: CricketBulkEdit, reason: string) => {
     setBusy(true);
     try {
@@ -317,6 +318,21 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
                 {report ? <RecalcReport report={report} /> : null}
               </details>
             </CricketScorerSide>
+          ) : contest.sport === "basketball" ? (
+            <BasketballScorerSide contest={shown} entries={entries} busy={busy}
+              onEdit={(e, type, payload, reason) => void correct(e, reason, { type, payload })}
+              onRemove={(e) => { if (window.confirm(`Remove "${e.text}" from the game? It stays in the record as removed.`)) void correct(e, "Removed by the scorer"); }}
+              onInsert={(before, type, payload, reason) => void insertBall(before, payload, reason, type)}
+              onBulkFix={(edit, reason) => void bulkFix(edit, reason)}>
+              <details className="si-more">
+                <summary>Full event log and recalculation</summary>
+                <Timeline entries={entries} onCorrect={busy ? undefined : onCorrect} />
+                <div className="si-row" style={{ marginTop: 12 }}>
+                  <button type="button" className="si-btn small" disabled={busy} onClick={recalc}>Recalculate from events</button>
+                </div>
+                {report ? <RecalcReport report={report} /> : null}
+              </details>
+            </BasketballScorerSide>
           ) : (
           <div className="si-card">
             <div className="si-chart-head">
