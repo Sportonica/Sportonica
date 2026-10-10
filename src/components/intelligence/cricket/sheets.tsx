@@ -28,10 +28,11 @@ export const DISMISSALS: { key: string; label: string; fielder?: string; anyBatt
 ];
 
 /** Runs entered on a key go off the bat, or as extras on a wide, bye or leg bye. */
+// `noBallByes`: on a no-ball the runs were run as byes, not hit off the bat
 export function deliveryPayload(base: { striker: string; nonStriker: string; bowler: string }, runs: number, extra: Extra | null,
-  wicket: { type: string; player?: string; fielder?: string } | null, note?: string): Record<string, unknown> {
+  wicket: { type: string; player?: string; fielder?: string } | null, note?: string, noBallByes = false): Record<string, unknown> {
   const p: Record<string, unknown> = { ...base };
-  if (extra === "wide" || extra === "bye" || extra === "leg_bye") p.extraRuns = runs; else p.runsBat = runs;
+  if (extra === "wide" || extra === "bye" || extra === "leg_bye" || (extra === "no_ball" && noBallByes)) p.extraRuns = runs; else p.runsBat = runs;
   if (extra) p.extra = extra;
   if (wicket) p.wicket = { type: wicket.type, player: wicket.player || base.striker, ...(wicket.fielder ? { fielder: wicket.fielder } : {}) };
   if (note?.trim()) p.commentary = note.trim();
@@ -153,7 +154,8 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
   const fieldingSide: Side = ctx.sides?.a.players.some((x) => x.id === bowler) ? "a" : "b";
   const fielders = ctx.sides?.[fieldingSide].players ?? [];
   const [extra, setExtra] = useState<Extra | "none">(p.extra ?? "none");
-  const [runs, setRuns] = useState<number>(p.extra === "wide" || p.extra === "bye" || p.extra === "leg_bye" ? p.extraRuns ?? 0 : p.runsBat ?? 0);
+  const [nbByes, setNbByes] = useState(p.extra === "no_ball" && (p.extraRuns ?? 0) > 0);
+  const [runs, setRuns] = useState<number>(p.extra === "wide" || p.extra === "bye" || p.extra === "leg_bye" || (p.extra === "no_ball" && (p.extraRuns ?? 0) > 0) ? p.extraRuns ?? 0 : p.runsBat ?? 0);
   const [wkt, setWkt] = useState<string>(p.wicket?.type ?? "none");
   const [out, setOut] = useState<string>(p.wicket?.player ?? striker);
   const [fielder, setFielder] = useState<string>(p.wicket?.fielder ?? "");
@@ -165,7 +167,7 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
   const d = DISMISSALS.find((x) => x.key === wkt);
   const ex = extra === "none" ? null : extra;
   const payload = deliveryPayload({ striker: faced, nonStriker: other, bowler }, runs, ex,
-    d ? { type: d.key, player: d.anyBatter ? out : faced, fielder: d.fielder ? fielder : "" } : null, p.commentary);
+    d ? { type: d.key, player: d.anyBatter ? out : faced, fielder: d.fielder ? fielder : "" } : null, p.commentary, ex === "no_ball" && nbByes);
   const preview = describeDelivery(payload as DeliveryPayload, ctx);
   // a wicket taken away, or put on the other batter, changes who batted after this ball
   const wasOut = p.wicket ? (p.wicket.player ?? striker) : null;
@@ -187,7 +189,13 @@ export function EditDeliverySheet({ entry, ctx, onSave, onClose }: {
         <Choice value={extra} onChange={(v) => { setExtra(v); if ((v === "bye" || v === "leg_bye") && runs === 0) setRuns(1); }}
           options={[{ key: "none" as const, label: "None" }, ...(Object.keys(EXTRA_LABEL) as Extra[]).map((k) => ({ key: k, label: EXTRA_LABEL[k] }))]} />
       </Field>
-      <Field label={ex === "wide" ? "Runs run on the wide" : ex === "bye" || ex === "leg_bye" ? "Runs run" : "Runs off the bat"}>
+      {ex === "no_ball" ? (
+        <Field label="Runs on the no-ball were">
+          <Choice value={nbByes ? "byes" : "bat"} onChange={(v) => setNbByes(v === "byes")}
+            options={[{ key: "bat" as const, label: "Off the bat" }, { key: "byes" as const, label: "Byes" }]} />
+        </Field>
+      ) : null}
+      <Field label={ex === "wide" ? "Runs run on the wide" : ex === "bye" || ex === "leg_bye" || (ex === "no_ball" && nbByes) ? "Runs run" : "Runs off the bat"}>
         <Choice value={runs} onChange={setRuns}
           options={[0, 1, 2, 3, 4, 5, 6].map((r) => ({ key: r, label: String(r), disabled: (ex === "bye" || ex === "leg_bye") && r === 0 }))} />
       </Field>

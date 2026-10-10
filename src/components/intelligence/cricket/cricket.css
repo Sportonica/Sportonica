@@ -98,6 +98,7 @@
 .ck-extras-keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 1.3fr); gap: 6px; }
 .ck-key.small { min-height: 48px; font-size: 13px; font-weight: 800; }
 .ck-key.small.on { background: var(--ck-extra); border-color: var(--ck-extra); color: #fff; }
+.ck-nb-runs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .ck-key.wicket { background: var(--ck-wicket); border-color: var(--ck-wicket); color: #fff; letter-spacing: .04em; text-transform: uppercase; }
 @media (max-width: 420px) {
   .ck-runs { grid-template-columns: repeat(3, minmax(0, 1fr)); }

@@ -127,6 +127,8 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
   const [bowler, setBowler] = useState("");
   const [swapped, setSwapped] = useState(false);
   const [extra, setExtra] = useState<Extra | null>(null);
+  // on a no-ball: the runs were run as byes, not hit off the bat
+  const [nbByes, setNbByes] = useState(false);
   const [wicketOpen, setWicketOpen] = useState(false);
   const [note, setNote] = useState("");
 
@@ -230,10 +232,11 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
   const currentBowler = midOver ? over.bowler : bowler && bowler !== inn.lastOverBowler ? bowler : "";
   const base = { striker, nonStriker, bowler: currentBowler };
 
-  const reset = () => { setExtra(null); setNote(""); setSwapped(false); };
-  const deliver = (runs: number) => { send("DELIVERY", deliveryPayload(base, runs, extra, null, note)); reset(); };
+  const reset = () => { setExtra(null); setNbByes(false); setNote(""); setSwapped(false); };
+  const byesOnNoBall = extra === "no_ball" && nbByes;
+  const deliver = (runs: number) => { send("DELIVERY", deliveryPayload(base, runs, extra, null, note, byesOnNoBall)); reset(); };
   const recordWicket = (w: WicketInput) => {
-    send("DELIVERY", deliveryPayload(base, w.runs, extra, { type: w.type, player: w.player, fielder: w.fielder }, note));
+    send("DELIVERY", deliveryPayload(base, w.runs, extra, { type: w.type, player: w.player, fielder: w.fielder }, note, byesOnNoBall));
     if (w.newBatter) send("NEW_BATTER", { player: w.newBatter });
     setWicketOpen(false); reset();
   };
@@ -249,7 +252,7 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
 
   const maxBalls = rules.maxOversPerBowler === null ? null : rules.maxOversPerBowler * rules.ballsPerOver;
   const canBowl = field.filter((p) => p.id !== inn.lastOverBowler && (maxBalls === null || (inn.bowlers[p.id]?.balls ?? 0) < maxBalls));
-  const runLabel = extra === "wide" ? "Runs run on the wide" : extra === "bye" || extra === "leg_bye" ? `Runs run (${EXTRA_LABEL[extra].toLowerCase()}s)` : extra === "no_ball" ? "Runs off the bat on the no ball" : null;
+  const runLabel = extra === "wide" ? "Runs run on the wide" : extra === "bye" || extra === "leg_bye" ? `Runs run (${EXTRA_LABEL[extra].toLowerCase()}s)` : extra === "no_ball" ? (nbByes ? "Byes run on the no ball" : "Runs off the bat on the no ball") : null;
 
   return (
     <div className="si-pad ck-pad">
@@ -293,7 +296,7 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
           <div className={`ck-runs${extra ? " with-extra" : ""}`}>
             {runLabel ? <div className="ck-runs-label">{runLabel}</div> : null}
             {[0, 1, 2, 3, 4, 6].map((r) => (
-              <button type="button" key={r} className={`ck-key r${r}`} disabled={(extra === "bye" || extra === "leg_bye") && r === 0} onClick={() => deliver(r)}>
+              <button type="button" key={r} className={`ck-key r${r}`} disabled={(extra === "bye" || extra === "leg_bye" || byesOnNoBall) && r === 0} onClick={() => deliver(r)}>
                 {extra ? <small>{EXTRA_KEYS.find((x) => x.key === extra)!.short}{r ? "+" : ""}</small> : null}{extra && r === 0 ? "" : r}
               </button>
             ))}
@@ -307,6 +310,12 @@ export default function CricketPad({ contest, send, undo }: PadProps) {
             ))}
             <button type="button" className="ck-key small wicket" onClick={() => setWicketOpen(true)}>Wicket</button>
           </div>
+          {extra === "no_ball" ? (
+            <div className="ck-nb-runs" role="group" aria-label="Runs on the no ball">
+              <button type="button" aria-pressed={!nbByes} className={`ck-key small${!nbByes ? " on" : ""}`} onClick={() => setNbByes(false)}>Off the bat</button>
+              <button type="button" aria-pressed={nbByes} className={`ck-key small${nbByes ? " on" : ""}`} onClick={() => setNbByes(true)}>Byes</button>
+            </div>
+          ) : null}
           {extra ? <div className="ck-muted" style={{ fontSize: 12.5 }}>{EXTRA_LABEL[extra]} applies to the next tap. Tap it again to cancel.</div> : null}
         </>
       )}
