@@ -484,6 +484,7 @@ export const TOURNAMENT_ERROR_MESSAGES: Record<string, string> = {
   NOT_ENOUGH_TEAMS: "Not enough confirmed teams to generate fixtures.",
   GROUP_STAGE_INCOMPLETE: "Every group match needs a result before the knockout stage can be generated.",
   INVALID_ADVANCE_COUNT: "Enter how many teams advance from each group.",
+  INVALID_PICKS: "Each qualifier must be a confirmed team of its own group, picked once.",
   MATCH_NOT_FOUND: "Match not found.",
   TEAMS_NOT_SET: "Both teams for this match aren't set yet.",
   MATCH_ALREADY_DONE: "This match is already finished.",

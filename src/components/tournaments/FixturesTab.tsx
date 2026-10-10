@@ -7,11 +7,12 @@ import { Plus, Trash2, X, History, Pencil, Search, ChevronDown, ChevronUp, Check
 import {
   recordMatchResult, setMatchTime, createMatch, deleteMatch, updateMatchTeams, getMatchAudit,
   getTeamRoster, getMatchPlayerStats, recordMatchPlayerStats,
-  generateKnockoutBracket, generateKnockoutFromGroups, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
+  generateKnockoutBracket, generateKnockoutFromGroups, generateKnockoutFromPicks, setTeamSeed, setMatchStatus, regenerateTournamentFixtures,
   recordCricketResult, getMatchCricketStats, recordCricketPlayerStats, renameRound, updateLiveScore, swapBracketSlots,
 } from "@/lib/tournaments/actions";
 import { bracketPositions, sortByBracket, feederOf, bracketNumber, slotSource } from "@/lib/tournaments/bracket";
 import { isActionError } from "@/lib/actionError";
+import QualifierPicker from "./QualifierPicker";
 import { friendlyTournamentError } from "@/lib/tournaments/types";
 import { getSportKind, type SportKind } from "@/lib/sports";
 import { sportKeyFor } from "@/lib/intelligence/registry";
@@ -431,6 +432,7 @@ export default function FixturesTab({
     tournament.format === "group_knockout" && tournament.status === "live"
     && groupMatches.length > 0 && !matches.some((m) => m.stage === "knockout");
   const [advancePerGroup, setAdvancePerGroup] = useState("2");
+  const [pickQualifiers, setPickQualifiers] = useState(false);
 
   if (!canAddMatches && matches.length === 0) {
     return (
@@ -602,6 +604,13 @@ export default function FixturesTab({
             Builds the bracket from the group standings, all the way to the Final, and moves each winner on automatically.
             Group winners play a runner-up from another group, and two teams from the same group can only meet again in the Final.
           </div>
+          {pickQualifiers ? (
+            <QualifierPicker
+              tournamentId={tournament.id} teams={teams} perGroup={Math.max(1, Number(advancePerGroup) || 2)} groupsLeft={groupsLeft} pending={pending}
+              onGenerate={(picks) => run(() => generateKnockoutFromPicks(tournament.id, picks))}
+              onCancel={() => setPickQualifiers(false)}
+            />
+          ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5 }}>
               Teams through from each group
@@ -625,6 +634,12 @@ export default function FixturesTab({
               </span>
             )}
           </div>
+          )}
+          {!pickQualifiers ? (
+            <button className="tc-btn" disabled={pending} style={{ marginTop: 10, padding: "6px 10px", fontSize: 12 }} onClick={() => setPickQualifiers(true)}>
+              Choose the qualifiers yourself
+            </button>
+          ) : null}
         </div>
       )}
 

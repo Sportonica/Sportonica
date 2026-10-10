@@ -1130,6 +1130,20 @@ export async function generateKnockoutFromGroups(tournamentId: string, advancePe
   return data as Tournament;
 }
 
+// The organizer picks the qualifiers: each group's list in finishing
+// order, any team of that group, even before every group match is played
+// (db/knockout_from_picks.sql). Same bracket as generateKnockoutFromGroups.
+export async function generateKnockoutFromPicks(tournamentId: string, picks: Record<string, string[]>): Promise<Tournament | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("generate_knockout_from_picks", { p_tournament_id: tournamentId, p_picks: picks });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  revalidatePath(`/organize/tournaments/${tournamentId}`);
+  revalidatePath(`/platform/tournaments/${tournamentId}`);
+  revalidatePath(`/tournaments/${tournamentId}`);
+  return data as Tournament;
+}
+
 // Rebuilds fixtures from the current confirmed team list — a no-op if
 // nothing's generated yet, a real result already exists, or (for
 // group_knockout) a confirmed team still has no group. Returns which of
