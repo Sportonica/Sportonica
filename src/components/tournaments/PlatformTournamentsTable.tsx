@@ -27,7 +27,7 @@ export default function PlatformTournamentsTable({ rows }: { rows: PlatformTourn
   function removeSelected() {
     if (!selectedRows.length) return;
     const list = selectedRows.map((r) => `• ${r.name} (${r.venue}, ${r.statusLabel})`).join("\n");
-    if (!window.confirm(`Permanently delete ${selectedRows.length} tournament${selectedRows.length > 1 ? "s" : ""}?\n\n${list}\n\nThis also deletes their teams, matches and scores, and can't be undone.`)) return;
+    if (!window.confirm(`Permanently delete ${selectedRows.length} tournament${selectedRows.length > 1 ? "s" : ""}?\n\n${list}\n\nThis also deletes their teams, matches, scores and payment records, and cannot be undone.`)) return;
     start(async () => {
       const failed: string[] = [];
       for (const r of selectedRows) {
