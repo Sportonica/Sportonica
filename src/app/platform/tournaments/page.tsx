@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listAllTournaments, getDisplayVenueName } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { STATUS_LABELS } from "@/lib/tournaments/types";
+import DeleteTournamentButton from "@/components/tournaments/DeleteTournamentButton";
 import "@/components/tournaments/tournament-console.css";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export default async function PlatformTournamentsPage() {
       ) : (
         <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         <table className="tc-table stk">
-          <thead><tr><th>Name</th><th>Venue</th><th>Sport</th><th>Starts</th><th>Teams</th><th>Status</th></tr></thead>
+          <thead><tr><th>Name</th><th>Venue</th><th>Sport</th><th>Starts</th><th>Teams</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {rows.map((t, i) => (
               <tr key={t.id}>
@@ -46,6 +47,7 @@ export default async function PlatformTournamentsPage() {
                 </td>
                 <td className="tc-num" data-label="Teams">{t.max_teams ?? "∞"}</td>
                 <td data-label="Status"><span className={`tc-badge ${t.status === "pending_approval" ? "warn" : t.status === "cancelled" ? "danger" : t.status === "draft" ? "neutral" : "ok"}`}>{STATUS_LABELS[t.status]}</span></td>
+                <td>{(t.status === "cancelled" || t.status === "draft") && <DeleteTournamentButton id={t.id} name={t.name} />}</td>
               </tr>
             ))}
           </tbody>
