@@ -137,8 +137,8 @@ export async function getHomeRails() {
       .select(MATCH_COLS)
       .eq("status", "live")
       .not("team_a_id", "is", null).not("team_b_id", "is", null)
-      .order("starts_at", { ascending: true })
-      .limit(10),
+      .order("starts_at", { ascending: false })
+      .limit(20),
     sb.from("tournament_matches")
       .select(MATCH_COLS)
       .eq("status", "scheduled")
@@ -265,7 +265,7 @@ export async function getHomeRails() {
     matchTournamentIds.length
       ? sb.from("tournaments").select("id,name,sport,format,status")
           .in("id", matchTournamentIds)
-          .in("status", ["registration_open", "registration_closed", "live", "completed"])
+          .in("status", ["published", "registration_open", "registration_closed", "live", "completed"])
       : Promise.resolve({ data: [] as { id: string; name: string; sport: string; format: string; status: string }[] }),
     matchTeamIds.length
       ? sb.from("tournament_teams").select("id,name,logo_url").in("id", matchTeamIds)

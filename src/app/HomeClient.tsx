@@ -288,9 +288,12 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
   const { city, area } = useCity();
   const heroRef = useRef<HTMLDivElement>(null);
   useLiveRefresh(!!rails?.matches.some((m) => m.status === "live"));
-  const liveMatch = (rails?.matches ?? [])
+  // One live notification per sport (the most recently started), so a live cricket and a
+  // live futsal match both show instead of one hiding the other.
+  const liveMatches = (rails?.matches ?? [])
     .filter((m) => m.status === "live")
-    .sort((a, b) => (b.startsAt ?? "").localeCompare(a.startsAt ?? ""))[0];
+    .sort((a, b) => (b.startsAt ?? "").localeCompare(a.startsAt ?? ""))
+    .filter((m, i, all) => all.findIndex((x) => x.sport === m.sport) === i);
 
   // Which FAQ item is expanded. 0 = first question open by default, so
   // the section doesn't read as an empty wall of collapsed bars.
@@ -344,8 +347,12 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
                   </span>
                 </button>
                 {/* The ongoing match as a live notification, only while one is live (the most
-                    recently started if several are). Nothing otherwise. */}
-                {liveMatch && <LiveMatchToast m={liveMatch} />}
+                    recently started of each sport). Nothing otherwise. */}
+                {liveMatches.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                    {liveMatches.map((m) => <LiveMatchToast key={m.id} m={m} />)}
+                  </div>
+                )}
               </div>
             </div>
 
