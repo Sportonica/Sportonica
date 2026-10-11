@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ArrowLeft, MapPin, ImageIcon, ShieldCheck } from "lucide-react";
+import { ArrowLeft, MapPin, Navigation, ImageIcon, ShieldCheck } from "lucide-react";
 import { getVenueForBooking } from "@/lib/play/queries";
 import BookingFlow from "./BookingFlow";
 import { getVenuePricingRules } from "@/lib/play/pricing";
+import { getMyFavoriteVenueIds } from "@/lib/play/favorites";
+import FavoriteButton from "@/components/FavoriteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -29,9 +31,10 @@ export default async function VenueBookingPage({
   const timeMins = time != null && /^\d+$/.test(time) ? Number(time) : undefined;
   // Independent queries — pricing rules don't depend on the venue lookup's
   // result, so there's no reason to wait on one before starting the other.
-  const [{ venue, courts, hoursByCourt }, pricingRules] = await Promise.all([
+  const [{ venue, courts, hoursByCourt }, pricingRules, favoriteIds] = await Promise.all([
     getVenueForBooking(id),
     getVenuePricingRules(id),
+    getMyFavoriteVenueIds(),
   ]);
   if (!venue) notFound();
 
@@ -72,6 +75,16 @@ export default async function VenueBookingPage({
                   <MapPin size={14} /> View location
                 </a>
               )}
+              {venue.lat != null && venue.lng != null && (
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{ color: "#006241", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5, fontWeight: 600, padding: "10px 0", margin: "-10px 0" }}
+                >
+                  <Navigation size={14} /> Get directions
+                </a>
+              )}
+              <FavoriteButton venueId={venue.id} initialFavorited={favoriteIds.includes(venue.id)} variant="chip" size={14} />
               {venue.verification_status === "verified" && (
                 <span style={{ color: "var(--turf)", display: "inline-flex", alignItems: "center" }}>
                   <ShieldCheck size={14} style={{ display: "inline", verticalAlign: -2, marginRight: 5 }} />Verified venue

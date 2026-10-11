@@ -513,7 +513,7 @@
 }
 .fcard-sports .more { background: transparent; color: var(--accent); border: 1px solid currentColor; }
 
-/* actions — book + distance */
+/* actions — book + directions (shows distance once it's known) */
 .fcard-actions { display: flex; align-items: center; gap: 8px; }
 .fcard-book, .fcard-km {
   display: inline-flex; align-items: center; gap: 5px;
@@ -523,7 +523,8 @@
 }
 .fcard-book { background: var(--accent); color: var(--panel); }
 .fcard:hover .fcard-book, .fcard.is-open .fcard-book { transform: translateY(-1px); }
-.fcard-km { background: var(--chip); color: var(--dim); cursor: inherit; }
+.fcard-km { background: var(--chip); color: var(--dim); }
+.fcard-km:hover { color: var(--fg); transform: translateY(-1px); }
 
 /* ── Phones: one card per row. Two columns left the panel far too
    short, so the buttons were being clipped. ── */

@@ -21,11 +21,20 @@ import { useCity, inCity, kmFrom } from "@/lib/city";
 import { normalizeSport, SPORT_NAMES } from "@/lib/sports";
 import { useTheme } from "@/lib/hooks/useTheme";
 import { getDaySlots } from "@/lib/play/availability";
+import FavoriteButton from "@/components/FavoriteButton";
 import type { Venue, Court } from "@/lib/admin/types";
 
 type VenueWithCourts = Venue & { courts: Court[] };
 
-export default function MosaicGrid({ venues, offers = {}, initialSport = null }: { venues: VenueWithCourts[]; offers?: Record<string, { label: string; amount: number }>; initialSport?: string | null }) {
+export default function MosaicGrid({
+  venues, offers = {}, initialSport = null, favoriteIds = [],
+}: {
+  venues: VenueWithCourts[];
+  offers?: Record<string, { label: string; amount: number }>;
+  initialSport?: string | null;
+  favoriteIds?: string[];
+}) {
+  const favoriteSet = new Set(favoriteIds);
   const router = useRouter();
   const [theme] = useTheme();
   const { city, area } = useCity();
@@ -272,6 +281,11 @@ export default function MosaicGrid({ venues, offers = {}, initialSport = null }:
               const href = `/create/${v.id}?date=${pickDate}${q.time ? `&time=${q.time}` : ""}${q.sport ? `&sport=${encodeURIComponent(q.sport)}` : ""}`;
               // Cards cycle through three skins so a row never looks flat.
               const skin = ["indigo", "chalk", "ink"][i % 3];
+              // Routes from wherever the visitor is, not just a dropped
+              // pin — opens the Google/Apple Maps app on a phone.
+              const maps = v.lat != null && v.lng != null
+                ? `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}`
+                : null;
 
               return (
                 <a
@@ -335,11 +349,17 @@ export default function MosaicGrid({ venues, offers = {}, initialSport = null }:
 
                     <div className="fcard-actions">
                       <span className="fcard-book"><CalendarPlus size={14} /> Book</span>
-                      {km != null && (
-                        <span className="fcard-km">
-                          <Navigation size={13} /> {km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`} away
+                      {maps && (
+                        <span
+                          role="link"
+                          className="fcard-km"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(maps, "_blank"); }}
+                        >
+                          <Navigation size={13} />{" "}
+                          {km == null ? "Directions" : km < 1 ? `${Math.round(km * 1000)} m away` : `${km.toFixed(1)} km away`}
                         </span>
                       )}
+                      <FavoriteButton venueId={v.id} initialFavorited={favoriteSet.has(v.id)} />
                     </div>
                   </div>
                 </a>
