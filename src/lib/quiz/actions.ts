@@ -22,6 +22,7 @@ export type QuizResult =
 const IP_LIMIT = { max: 120, windowSeconds: 600 };
 const ALREADY = "This phone number has already taken the quiz.";
 const NOT_SAVED = "Your answers could not be saved. Try again.";
+const SIGN_IN = "Sign in to play the quiz.";
 // no 0/O/1/I: read out at a busy stall
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const winnerCode = () => `W-${Array.from({ length: 6 }, () => CODE_ALPHABET[randomInt(CODE_ALPHABET.length)]).join("")}`;
@@ -41,6 +42,8 @@ const limited = async () => !(await underRateLimit("quiz", await clientIp(), IP_
  * a faster time. Only this player's four questions are sent.
  */
 export async function startQuiz(input: { name: string; phone: string; consent: boolean }): Promise<{ questions: PlayerQuestion[] } | { message: string }> {
+  // playing on your own phone needs an account; a host at the stall plays for anyone (hostStartQuiz)
+  if (!(await isSignedIn())) return { message: SIGN_IN };
   const begun = await beginEntry(input, "Tick the box to agree before you start.");
   return "message" in begun ? begun : { questions: pickQuestions(begun.phone) };
 }
@@ -78,6 +81,8 @@ async function beginEntry(input: { name: string; phone: string; consent: boolean
 }
 
 export async function submitQuiz(input: { phone: string; answers: Record<string, string> }): Promise<QuizResult> {
+  // the player's own account, or the host's
+  if (!(await isSignedIn())) return { ok: false, message: SIGN_IN };
   if (!isValidLocalPhone(input.phone)) return { ok: false, message: PHONE_ERROR };
   if (await limited()) return { ok: false, message: "Too many tries. Wait a few minutes." };
   const phone = normalizePhone(input.phone);
@@ -125,6 +130,13 @@ export async function submitQuiz(input: { phone: string; answers: Record<string,
 export interface QuizEntry {
   id: string; full_name: string; phone: string; score: number | null; max_score: number; duration_ms: number | null;
   winner_code: string | null; prize_given_at: string | null; prize_note: string | null; created_at: string; finished_at: string | null;
+}
+
+// a real account: a guest (anonymous) session does not count
+async function isSignedIn(): Promise<boolean> {
+  const sb = await createClient();
+  const { data: { user } } = await sb.auth.getUser();
+  return !!user && !user.is_anonymous;
 }
 
 async function isSuperAdmin(): Promise<boolean> {
