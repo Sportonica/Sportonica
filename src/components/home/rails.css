@@ -264,39 +264,57 @@
 
 /* Hero live-match notification (LiveMatchToast). */
 .rc-toast {
-  display: flex; align-items: center; gap: 10px; max-width: min(100%, 320px);
-  padding: 7px 10px 7px 7px; border-radius: 13px; text-decoration: none;
+  --rc-toast-accent: #E5484D;
+  display: flex; align-items: center; gap: 10px; max-width: min(100%, 340px);
+  padding: 8px 12px 8px 8px; border-radius: 20px; text-decoration: none;
   font-family: 'Inter', sans-serif; color: #fff;
-  background: rgba(20,23,30,0.72); border: 1px solid rgba(255,255,255,0.14);
-  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 12px 30px -14px rgba(0,0,0,0.55);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--rc-toast-accent) 22%, transparent), transparent 55%),
+    rgba(20,23,30,0.72);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-left: 3px solid var(--rc-toast-accent);
+  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: 0 14px 34px -16px rgba(0,0,0,0.6);
   animation: rcToastIn .45s cubic-bezier(.22,1,.36,1) both;
-  transition: transform .25s cubic-bezier(.22,1,.36,1);
+  transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s;
 }
-.rc-toast:hover { transform: translateY(-2px); }
+.rc-toast:hover { transform: translateY(-2px); box-shadow: 0 18px 38px -16px color-mix(in srgb, var(--rc-toast-accent) 55%, transparent); }
 [data-theme="paper"] .rc-toast {
-  color: #14171E; background: rgba(255,255,255,0.78); border-color: rgba(20,23,30,0.1);
-  box-shadow: 0 12px 30px -16px rgba(20,23,30,0.35);
+  color: #14171E;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--rc-toast-accent) 12%, transparent), transparent 55%),
+    rgba(255,255,255,0.8);
+  border-color: rgba(20,23,30,0.1); border-left-color: var(--rc-toast-accent);
+  box-shadow: 0 14px 32px -18px rgba(20,23,30,0.4);
 }
 .rc-toast-live {
-  display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0;
-  font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
-  color: #fff; background: rgba(229,72,77,0.92); padding: 4px 7px; border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #fff; background: var(--rc-toast-accent); padding: 4px 8px 4px 7px; border-radius: 999px;
+  box-shadow: 0 0 14px -2px color-mix(in srgb, var(--rc-toast-accent) 70%, transparent);
 }
+/* Solid dot with a ring that pings outward, like a live broadcast light. */
+.rc-toast-dot { position: relative; width: 6px; height: 6px; border-radius: 50%; background: #fff; flex-shrink: 0; }
+.rc-toast-dot::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; background: #fff;
+  animation: rcToastPing 1.5s cubic-bezier(0,0,.2,1) infinite;
+}
+@keyframes rcToastPing { 75%, 100% { transform: scale(2.6); opacity: 0; } }
 .rc-toast-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rc-toast-score { display: flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 12px; font-weight: 700; }
-.rc-toast-score b { flex-shrink: 0; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.rc-toast-score b { flex-shrink: 0; font-size: 13.5px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .rc-toast-team { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .rc-toast-body small {
-  font-size: 10px; font-weight: 600; opacity: 0.6;
+  display: block; font-size: 10px; font-weight: 600; opacity: 0.68;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.rc-toast-sport { display: inline-flex; vertical-align: -3px; margin-right: 5px; color: var(--rc-toast-accent); }
 .rc-toast-go { flex-shrink: 0; opacity: 0.55; }
 @keyframes rcToastIn {
   from { opacity: 0; transform: translateY(-8px); }
   to { opacity: 1; transform: none; }
 }
-@media (prefers-reduced-motion: reduce) { .rc-toast { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .rc-toast, .rc-toast-dot::after { animation: none; } }
 
 .rc-match-foot {
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
