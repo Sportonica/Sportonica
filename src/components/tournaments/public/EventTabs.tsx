@@ -20,7 +20,7 @@ import { BracketIcon, ClipboardIcon, HoopIcon, PlayerAvatar, StumpsIcon } from "
 import type { MatchHighlight } from "@/lib/intelligence/actions";
 import { diffText, standingsScheme } from "@/lib/tournaments/standings";
 import {
-  FORMAT_LABELS, compareStageRound, sideScore,
+  FORMAT_LABELS, compareStageRound, sideScore, tournamentPath,
   type Tournament, type TournamentTeam, type TournamentMatch,
   type TournamentStanding, type TournamentPlayerStatRow, type TournamentAwards, type RaceResultRow, type TournamentCricketStatRow,
 } from "@/lib/tournaments/types";
@@ -249,10 +249,11 @@ export default function EventTabs({
         <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} stacked={isCricketSport || isBasketballSport} />
       )}
       {activeTab === "Player Stats" && (
-        authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
+        // goals sports (futsal, football) are open to anyone, each player linking to their own card
+        !isBasketballSport && !isCricketSport ? <PlayerStatsTab rows={playerStats} teams={teams} basePath={tournamentPath(tournament)} />
+          : authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
           : isBasketballSport ? <BasketballLeadersTab leaders={leaders} />
-          : isCricketSport ? (cricket?.players.length ? <CricketLeaders data={cricket} /> : <div className="ev2-empty">Player stats appear here once match figures are entered.</div>)
-          : <PlayerStatsTab rows={playerStats} teams={teams} />
+          : cricket?.players.length ? <CricketLeaders data={cricket} /> : <div className="ev2-empty">Player stats appear here once match figures are entered.</div>
       )}
       {activeTab === "Results" && <ResultsTab tournamentId={tournament.id} />}
       {activeTab === "Teams" && (
@@ -748,7 +749,7 @@ const STAT_TABS = [
 ] as const;
 type StatKey = (typeof STAT_TABS)[number]["key"];
 
-function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; teams: TournamentTeam[] }) {
+function PlayerStatsTab({ rows, teams, basePath }: { rows: TournamentPlayerStatRow[]; teams: TournamentTeam[]; basePath: string }) {
   const [stat, setStat] = useState<StatKey>("goals");
   if (rows.length === 0) return <div className="ev2-empty">No player stats recorded yet.</div>;
 
@@ -777,7 +778,8 @@ function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; team
           {sorted.map((r, i) => {
             const logo = teams.find((t) => t.id === r.team_id)?.logo_url;
             return (
-              <div key={r.team_player_id} className={`ev2-srow${i < 2 ? " top3" : ""}`}>
+              <Link key={r.team_player_id} href={`${basePath}/players/${r.team_player_id}`} className={`ev2-srow${i < 2 ? " top3" : ""}`}
+                style={{ color: "inherit", textDecoration: "none" }}>
                 <span className="ev2-srow-rank">{i + 1}</span>
                 <TeamCrest name={r.player_name} logoUrl={logo} />
                 <div className="ev2-prow-id">
@@ -785,7 +787,7 @@ function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; team
                   <span className="ev2-prow-team">{r.team_name}</span>
                 </div>
                 <span className="ev2-srow-stat">{r[stat]}</span>
-              </div>
+              </Link>
             );
           })}
         </div>
