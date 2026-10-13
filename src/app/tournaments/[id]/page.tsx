@@ -5,7 +5,7 @@ import { ChevronLeft, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   getTournament, getDisplayVenueName, getMyTeamForTournament, getTournamentMatches, listTournamentTeams,
-  getTournamentStandings, getTournamentPlayerStats, getTournamentAwards, getTournamentCricketStats,
+  getTournamentStandings, getTournamentPlayerStats, getTournamentAwards, getTournamentCricketStats, getTournamentMatchScorers,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS, tournamentPath } from "@/lib/tournaments/types";
@@ -75,11 +75,13 @@ export default async function TournamentDetailPage({
   const isLiveOrDone = tournament.status === "live" || tournament.status === "completed";
   const scored = !!sportKeyFor(tournament.sport);
   const cricketSport = isCricket(tournament.sport) && isLiveOrDone;
+  const goalsSport = isLiveOrDone && !isCricket(tournament.sport) && !isBasketball(tournament.sport)
+    && getSportKind(tournament.sport) !== "individual_race";
   // Every query the page needs, in one round: each one is a trip to the
   // database, and run one after another they added up to most of the
   // page's load time.
   const [venueName, myTeam, matchesRes, teamsRes, playerStatsRes, awardsRes, canScore,
-    contestsRes, leadersRes, cricketRes, highlightsRes, factsRes, recordsRes] = await Promise.all([
+    contestsRes, leadersRes, cricketRes, highlightsRes, factsRes, recordsRes, scorersRes] = await Promise.all([
     getDisplayVenueName(tournament),
     user ? getMyTeamForTournament(id) : Promise.resolve(null),
     isLiveOrDone ? getTournamentMatches(id) : Promise.resolve([]),
@@ -100,6 +102,8 @@ export default async function TournamentDetailPage({
     // who batted first) and the per-match player lines behind the leaderboards and records
     cricketSport ? getCricketMatchFacts(id) : Promise.resolve(null),
     cricketSport ? getCricketRecords(id) : Promise.resolve(null),
+    // goals sports: who scored in each match, opened under a result
+    goalsSport ? getTournamentMatchScorers(id) : Promise.resolve(null),
   ]);
   const matches = isActionError(matchesRes) ? [] : matchesRes;
   const intel: Record<string, MatchIntel> = {};
@@ -112,6 +116,7 @@ export default async function TournamentDetailPage({
   const leaders = leadersRes && !isActionError(leadersRes) ? leadersRes : null;
   const cricketStats = cricketRes && !isActionError(cricketRes) ? cricketRes : [];
   const highlights = highlightsRes && !isActionError(highlightsRes) ? highlightsRes : {};
+  const scorers = scorersRes && !isActionError(scorersRes) ? scorersRes : {};
   const awards = isActionError(awardsRes) ? { winner: null, runnerUp: null, semifinalists: [] } : awardsRes;
 
   const hasStandings = tournament.format === "league" || tournament.format === "group_knockout";
@@ -243,6 +248,7 @@ export default async function TournamentDetailPage({
               cricketStats={cricketStats}
               cricket={cricketData}
               highlights={highlights}
+              scorers={scorers}
               awards={awards}
               myTeam={isActionError(myTeam) ? null : myTeam}
               loggedIn={!!user}

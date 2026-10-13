@@ -694,3 +694,20 @@
 @media (min-width: 640px) { .ev2-st th, .ev2-st td { padding-left: 9px; padding-right: 9px; } }
 @media (max-width: 639px) { .ev2-st th, .ev2-st td { padding-left: 4px; padding-right: 4px; } .ev2-st td { font-size: 13px; } .ev2-st .rk { padding-left: 8px; } }
 @media (max-width: 380px) { .ev2-st th, .ev2-st td { padding-left: 3px; padding-right: 3px; } .ev2-st-badge { display: none; } }
+
+/* goals sports: scorers under a result, each side under its own name */
+.ev2-scorers { display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; font-size: 12.5px; }
+.ev2-scorers > div { display: grid; gap: 4px; align-content: start; }
+.ev2-scorers .side-a { text-align: right; }
+.ev2-scorers a { color: inherit; text-decoration: none; font-weight: 600; }
+.ev2-scorers a:hover { text-decoration: underline; }
+.ev2-balls { font-size: 10px; letter-spacing: 1px; }
+.ev2-bookings { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: 11.5px; opacity: 0.75; }
+.ev2-bookings span { display: inline-flex; align-items: center; gap: 5px; }
+.ev2-bk-card { display: inline-block; width: 8px; height: 11px; border-radius: 1.5px; }
+.ev2-bk-card.yellow { background: #f5c518; }
+.ev2-bk-card.red { background: #d93025; }
+.ev2-mom { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11.5px; opacity: 0.8; }
+.ev2-mom svg { color: #E8B04B; }
+.ev2-mom a { color: inherit; font-weight: 700; }
+@media (max-width: 520px) { .ev2-scorers { column-gap: 14px; font-size: 11.5px; } }

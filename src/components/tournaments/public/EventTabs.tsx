@@ -20,9 +20,9 @@ import { BracketIcon, ClipboardIcon, HoopIcon, PlayerAvatar, StumpsIcon } from "
 import type { MatchHighlight } from "@/lib/intelligence/actions";
 import { diffText, standingsScheme } from "@/lib/tournaments/standings";
 import {
-  FORMAT_LABELS, compareStageRound, sideScore,
+  FORMAT_LABELS, compareStageRound, sideScore, tournamentPath,
   type Tournament, type TournamentTeam, type TournamentMatch,
-  type TournamentStanding, type TournamentPlayerStatRow, type TournamentAwards, type RaceResultRow, type TournamentCricketStatRow,
+  type TournamentStanding, type TournamentPlayerStatRow, type MatchScorer, type TournamentAwards, type RaceResultRow, type TournamentCricketStatRow,
 } from "@/lib/tournaments/types";
 import TournamentRegisterTab from "./TournamentRegisterTab";
 import DayFixturesShareButton from "./DayFixturesShareButton";
@@ -58,7 +58,7 @@ function statusInfo(status: Tournament["status"]): { label: string; cls: string 
 }
 
 export default function EventTabs({
-  tournament, teams, matches, standingsByGroup, playerStats, leaders = null, cricket = null, highlights = {}, awards, myTeam, loggedIn, initialTab, intel = {}, canScore = false,
+  tournament, teams, matches, standingsByGroup, playerStats, leaders = null, cricket = null, highlights = {}, scorers = {}, awards, myTeam, loggedIn, initialTab, intel = {}, canScore = false,
 }: {
   // basketball: per-player figures from its scored games
   leaders?: TournamentLeaders | null;
@@ -68,6 +68,8 @@ export default function EventTabs({
   cricket?: CricketTournamentData | null;
   // match id -> what the scorer recorded for that game (period scores, top performers)
   highlights?: Record<string, MatchHighlight>;
+  // goals sports: match id -> who scored, was booked or player of the match
+  scorers?: Record<string, MatchScorer[]>;
   // match id -> its score in that sport's own terms, for matches scored
   // event by event. Empty for football.
   intel?: Record<string, MatchIntel>;
@@ -246,13 +248,14 @@ export default function EventTabs({
         : <TableTab tournament={tournament} standingsByGroup={standingsByGroup} teams={teams} />)}
       {activeTab === "Knockout" && <KnockoutTab matches={matches} teams={teams} intel={intel} tournamentId={tournament.id} />}
       {activeTab === "Fixtures" && (
-        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} stacked={isCricketSport || isBasketballSport} />
+        <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} scorers={scorers}
+          basePath={tournamentPath(tournament)} stacked={isCricketSport || isBasketballSport} />
       )}
       {activeTab === "Player Stats" && (
         authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
           : isBasketballSport ? <BasketballLeadersTab leaders={leaders} />
           : isCricketSport ? (cricket?.players.length ? <CricketLeaders data={cricket} /> : <div className="ev2-empty">Player stats appear here once match figures are entered.</div>)
-          : <PlayerStatsTab rows={playerStats} teams={teams} />
+          : <PlayerStatsTab rows={playerStats} teams={teams} basePath={tournamentPath(tournament)} />
       )}
       {activeTab === "Results" && <ResultsTab tournamentId={tournament.id} />}
       {activeTab === "Teams" && (
@@ -626,9 +629,11 @@ function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: str
   );
 }
 
-function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {}, stacked = false }: {
+function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {}, scorers = {}, basePath, stacked = false }: {
   tournamentId: string; matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>;
   highlights?: Record<string, MatchHighlight>;
+  scorers?: Record<string, MatchScorer[]>;
+  basePath: string;
   // cricket's and basketball's scores ("180/4 – 156/2", "114 – 113") are too wide to share a phone's line with two names: there the teams stack
   stacked?: boolean;
 }) {
@@ -677,7 +682,8 @@ function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {
             const live = m.status === "live";
             const si = intel[m.id];
             const h = highlights[m.id];
-            const canOpen = !!h && (!!h.periods || !!h.stars.length || !!h.result);
+            const sc = m.status === "completed" || live ? scorers[m.id] : undefined;
+            const canOpen = (!!h && (!!h.periods || !!h.stars.length || !!h.result)) || !!sc?.length;
             const isOpen = canOpen && open.has(m.id);
             return (
               <div key={m.id} className={`ev2-fixture${stacked ? " stack" : ""}${canOpen ? " expandable" : ""}${isOpen ? " open" : ""}`}
@@ -725,7 +731,8 @@ function FixturesPublicTab({ tournamentId, matches, teams, intel, highlights = {
                     <Link href={`/tournaments/${tournamentId}/live/${si.contestId}`} style={{ color: "inherit", fontWeight: 700 }} onClick={(e) => e.stopPropagation()}>Match centre ›</Link>
                   ) : m.round_label}
                 </div>
-                {isOpen ? <GameDetail h={h!} tournamentId={tournamentId} names={[teamAName, teamBName]} /> : null}
+                {isOpen ? (h ? <GameDetail h={h} tournamentId={tournamentId} names={[teamAName, teamBName]} />
+                  : <ScorersDetail rows={sc!} teamA={m.team_a_id} basePath={basePath} />) : null}
               </div>
             );
           })}
@@ -748,7 +755,7 @@ const STAT_TABS = [
 ] as const;
 type StatKey = (typeof STAT_TABS)[number]["key"];
 
-function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; teams: TournamentTeam[] }) {
+function PlayerStatsTab({ rows, teams, basePath }: { rows: TournamentPlayerStatRow[]; teams: TournamentTeam[]; basePath: string }) {
   const [stat, setStat] = useState<StatKey>("goals");
   if (rows.length === 0) return <div className="ev2-empty">No player stats recorded yet.</div>;
 
@@ -777,7 +784,8 @@ function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; team
           {sorted.map((r, i) => {
             const logo = teams.find((t) => t.id === r.team_id)?.logo_url;
             return (
-              <div key={r.team_player_id} className={`ev2-srow${i < 2 ? " top3" : ""}`}>
+              <Link key={r.team_player_id} href={`${basePath}/players/${r.team_player_id}`} className={`ev2-srow${i < 2 ? " top3" : ""}`}
+                style={{ color: "inherit", textDecoration: "none" }}>
                 <span className="ev2-srow-rank">{i + 1}</span>
                 <TeamCrest name={r.player_name} logoUrl={logo} />
                 <div className="ev2-prow-id">
@@ -785,11 +793,48 @@ function PlayerStatsTab({ rows, teams }: { rows: TournamentPlayerStatRow[]; team
                   <span className="ev2-prow-team">{r.team_name}</span>
                 </div>
                 <span className="ev2-srow-stat">{r[stat]}</span>
-              </div>
+              </Link>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Under a goals-sport result, as a match report writes it: each side's scorers under its own name, then bookings and player of the match. */
+function ScorersDetail({ rows, teamA, basePath }: { rows: MatchScorer[]; teamA: string | null; basePath: string }) {
+  const card = (r: MatchScorer) => `${basePath}/players/${r.team_player_id}`;
+  const side = (a: boolean) => rows.filter((r) => r.goals > 0 && (r.team_id === teamA) === a);
+  const booked = rows.filter((r) => r.yellow_cards > 0 || r.red_card);
+  const mom = rows.find((r) => r.is_mom);
+  const goalList = (list: MatchScorer[]) => list.map((r) => (
+    <Link key={r.team_player_id} href={card(r)} onClick={(e) => e.stopPropagation()}>
+      {r.player_name} <span className="ev2-balls" aria-label={`${r.goals} goal${r.goals !== 1 ? "s" : ""}`}>{"⚽".repeat(Math.min(r.goals, 5))}{r.goals > 5 ? ` ×${r.goals}` : ""}</span>
+    </Link>
+  ));
+  const [a, b] = [side(true), side(false)];
+  return (
+    <div className="ev2-fixture-extra">
+      {a.length || b.length ? (
+        <div className="ev2-scorers">
+          <div className="side-a">{goalList(a)}</div>
+          <div className="side-b">{goalList(b)}</div>
+        </div>
+      ) : null}
+      {booked.length ? (
+        <div className="ev2-bookings">
+          {booked.map((r) => (
+            <span key={r.team_player_id}>
+              {r.red_card ? <i className="ev2-bk-card red" aria-label="Red card" /> : <i className="ev2-bk-card yellow" aria-label="Yellow card" />}
+              {r.player_name}{r.yellow_cards > 1 ? ` ×${r.yellow_cards}` : ""}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {mom ? (
+        <div className="ev2-mom"><Star size={12} fill="currentColor" /> Player of the match: <Link href={card(mom)} onClick={(e) => e.stopPropagation()}>{mom.player_name}</Link></div>
+      ) : null}
     </div>
   );
 }

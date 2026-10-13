@@ -270,6 +270,52 @@ export interface TournamentPlayerStatRow {
   mom_count: number;
 }
 
+/** One roster player's public card in a goals sport: who they are, then every match with figures recorded. */
+export interface TournamentPlayerCard {
+  player: {
+    id: string;
+    name: string;
+    jersey_number: number | null;
+    position: string | null;
+    is_captain: boolean;
+    username: string | null;
+    avatar_url: string | null;
+    team_id: string;
+    team_name: string;
+    team_logo_url: string | null;
+    group_name: string | null;
+  };
+  matches: {
+    match_id: string;
+    starts_at: string | null;
+    stage: MatchStage;
+    round_label: string;
+    status: MatchStatus;
+    opponent: string | null;
+    goals_for: number | null;
+    goals_against: number | null;
+    winner_team_id: string | null;
+    goals: number;
+    assists: number;
+    yellow_cards: number;
+    red_card: boolean;
+    is_mom: boolean;
+  }[];
+}
+
+/** A player who did something in one match (goal, assist, card, player of the match), for the scorers under a result. */
+export interface MatchScorer {
+  match_id: string;
+  team_player_id: string;
+  team_id: string;
+  player_name: string;
+  goals: number;
+  assists: number;
+  yellow_cards: number;
+  red_card: boolean;
+  is_mom: boolean;
+}
+
 export interface TournamentAwards {
   winner: string | null;
   runnerUp: string | null;
