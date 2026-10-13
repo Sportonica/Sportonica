@@ -63,3 +63,28 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public.get_tournament_player_card(uuid, uuid) from public;
 grant execute on function public.get_tournament_player_card(uuid, uuid) to anon, authenticated;
+
+-- ────────────────────────────────────────────────────────────────
+-- Who scored in each match of a tournament (goals sports): every player
+-- with a goal, an assist, a card or player of the match, per match. Feeds
+-- the scorers under a result on the public Fixtures tab, like the score
+-- itself it is readable by anyone who can see the tournament.
+-- ────────────────────────────────────────────────────────────────
+
+create or replace function public.get_tournament_match_scorers(p_tournament_id uuid)
+returns table(match_id uuid, team_player_id uuid, team_id uuid, player_name text, goals int, assists int, yellow_cards int, red_card boolean, is_mom boolean)
+language sql stable security definer set search_path = public as $$
+  select s.match_id, tp.id, tp.team_id,
+    coalesce(p.full_name, p.name, p.username, tp.guest_name, 'Player')::text,
+    s.goals::int, s.assists::int, s.yellow_cards::int, s.red_card, s.is_mom
+  from public.tournament_match_player_stats s
+  join public.tournament_matches m on m.id = s.match_id
+  join public.tournament_team_players tp on tp.id = s.team_player_id
+  left join public.profiles p on p.id = tp.user_id
+  where m.tournament_id = p_tournament_id
+    and (s.goals > 0 or s.assists > 0 or s.yellow_cards > 0 or s.red_card or s.is_mom)
+    and public.tournament_visible_to_caller(p_tournament_id)
+  order by s.match_id, s.goals desc, 4;
+$$;
+revoke all on function public.get_tournament_match_scorers(uuid) from public;
+grant execute on function public.get_tournament_match_scorers(uuid) to anon, authenticated;

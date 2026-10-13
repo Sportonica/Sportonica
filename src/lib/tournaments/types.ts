@@ -303,6 +303,19 @@ export interface TournamentPlayerCard {
   }[];
 }
 
+/** A player who did something in one match (goal, assist, card, player of the match), for the scorers under a result. */
+export interface MatchScorer {
+  match_id: string;
+  team_player_id: string;
+  team_id: string;
+  player_name: string;
+  goals: number;
+  assists: number;
+  yellow_cards: number;
+  red_card: boolean;
+  is_mom: boolean;
+}
+
 export interface TournamentAwards {
   winner: string | null;
   runnerUp: string | null;

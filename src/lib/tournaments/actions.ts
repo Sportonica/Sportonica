@@ -10,7 +10,7 @@ import { notifyPaymentReviewed } from "@/lib/mail/notify";
 import type {
   Tournament, TournamentDraftInput, TournamentTeam, TournamentTeamPlayer,
   TournamentMatch, TournamentAnnouncement, TournamentStanding, WalkinMember,
-  TournamentMatchPlayerStat, PlayerScorecard, TournamentPlayerStatRow, TournamentPlayerCard, TournamentAwards,
+  TournamentMatchPlayerStat, PlayerScorecard, TournamentPlayerStatRow, TournamentPlayerCard, MatchScorer, TournamentAwards,
   MatchAuditEntry, TournamentManager,
   TournamentCricketPlayerStat, TournamentCricketStatRow,
   TournamentRaceCategory, TournamentRaceResult, RaceResultRow, RaceResultStatus,
@@ -1059,6 +1059,17 @@ export async function getTournamentPlayerCard(tournamentId: string, teamPlayerId
   const { data, error } = await sb.rpc("get_tournament_player_card", { p_tournament_id: tournamentId, p_team_player_id: teamPlayerId });
   if (error) return dbActionError(error);
   return (data ?? null) as TournamentPlayerCard | null;
+}
+
+// Goals sports: who scored (and was booked, or player of the match) in
+// each match, keyed by match id — public like the score itself.
+export async function getTournamentMatchScorers(tournamentId: string): Promise<Record<string, MatchScorer[]> | ActionError> {
+  const sb = await createClient();
+  const { data, error } = await sb.rpc("get_tournament_match_scorers", { p_tournament_id: tournamentId });
+  if (error) return dbActionError(error);
+  const byMatch: Record<string, MatchScorer[]> = {};
+  for (const r of (data ?? []) as MatchScorer[]) (byMatch[r.match_id] ??= []).push(r);
+  return byMatch;
 }
 
 // "When", not "where" — venue is already fixed for the whole
