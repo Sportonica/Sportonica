@@ -86,6 +86,10 @@ const CSS = `
   .p-hero-lead { flex:0 1 auto; }
   .p-hero-aside { flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:18px; padding-bottom:6px; }
   @media (max-width:900px) { .p-hero-aside { align-items:flex-start; } }
+  /* live matches stack under Book now, right edges lined up with it; sized to the
+     cards themselves, not their untruncated text, which pushed them off to the left */
+  .p-hero-live { display:flex; flex-direction:column; gap:8px; align-items:flex-end; width:340px; max-width:100%; }
+  @media (max-width:900px) { .p-hero-live { align-items:flex-start; } }
 
   /* A single, deliberate call to action. */
   .p-book {
@@ -350,7 +354,7 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
                 {/* The ongoing match as a live notification, only while one is live (the most
                     recently started of each sport). Nothing otherwise. */}
                 {liveMatches.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+                  <div className="p-hero-live">
                     {liveMatches.map((m) => <LiveMatchToast key={m.id} m={m} />)}
                   </div>
                 )}
