@@ -270,24 +270,50 @@ export function MatchCard({ m }: { m: RailMatch }) {
 // The hero's live match as a slim notification rather than a full card:
 // live dot, both teams and the running score on one line, tap through to
 // the match. MatchCard stays the rail's card further down the page.
+// The live toast's accent per sport: crimson for cricket, turf green for football and futsal,
+// the sport's own colour otherwise.
+const TOAST_ACCENT: Record<string, string> = { Cricket: "#FF2D55", Futsal: "#10B981", Football: "#10B981" };
+
+function ToastBall({ sport }: { sport: string }) {
+  if (sport === "Cricket") {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+        <circle cx="12" cy="12" r="10" fill="currentColor" />
+        <path d="M8.5 3.2c2.6 4.9 2.6 12.7 0 17.6M15.5 3.2c-2.6 4.9-2.6 12.7 0 17.6" fill="none" stroke="#fff" strokeWidth="1.4" strokeDasharray="2 1.6" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+      <circle cx="12" cy="12" r="10" fill="currentColor" />
+      <path d="M12 7.6l4 2.9-1.5 4.7h-5L8 10.5z" fill="#fff" />
+      <path d="M12 7.6V2.4M16 10.5l5-1.6M14.5 15.2l3 4.2M9.5 15.2l-3 4.2M8 10.5L3 8.9" stroke="#fff" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
 export function LiveMatchToast({ m }: { m: RailMatch }) {
   const intel = m.intel;
   const a = intel ? intel.a || "0" : m.scoreA ?? 0;
   const b = intel ? intel.b || "0" : m.scoreB ?? 0;
+  const accent = TOAST_ACCENT[m.sport] ?? sportColor(m.sport);
+  // Overs / chase line first when the match is scored ball by ball, then the tournament.
+  const sub = [intel?.brief, m.tournamentName, m.roundLabel].filter(Boolean).join(" · ");
   return (
     <Link
       href={intel ? `/tournaments/${m.tournamentId}/live/${intel.contestId}` : `/tournaments/${m.tournamentId}`}
       className="rc-toast"
-      aria-label={`Live: ${m.teamA.name} ${a}, ${m.teamB.name} ${b}. ${m.tournamentName}`}
+      style={{ "--rc-toast-accent": accent } as React.CSSProperties}
+      aria-label={`Live ${m.sport}: ${m.teamA.name} ${a}, ${m.teamB.name} ${b}. ${m.tournamentName}`}
     >
-      <span className="rc-toast-live"><i className="rc-live-dot" />Live</span>
+      <span className="rc-toast-live"><i className="rc-toast-dot" />Live</span>
       <span className="rc-toast-body">
         <span className="rc-toast-score">
           <span className="rc-toast-team">{m.teamA.name}</span>
           <b>{a} – {b}</b>
           <span className="rc-toast-team">{m.teamB.name}</span>
         </span>
-        <small>{m.tournamentName} · {m.roundLabel}</small>
+        <small>{TOAST_ACCENT[m.sport] && <span className="rc-toast-sport"><ToastBall sport={m.sport} /></span>}{sub}</small>
       </span>
       <ChevronRight size={14} className="rc-toast-go" />
     </Link>
