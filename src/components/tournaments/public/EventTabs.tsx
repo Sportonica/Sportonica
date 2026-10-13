@@ -249,11 +249,10 @@ export default function EventTabs({
         <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} stacked={isCricketSport || isBasketballSport} />
       )}
       {activeTab === "Player Stats" && (
-        // goals sports (futsal, football) are open to anyone, each player linking to their own card
-        !isBasketballSport && !isCricketSport ? <PlayerStatsTab rows={playerStats} teams={teams} basePath={tournamentPath(tournament)} />
-          : authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
+        authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
           : isBasketballSport ? <BasketballLeadersTab leaders={leaders} />
-          : cricket?.players.length ? <CricketLeaders data={cricket} /> : <div className="ev2-empty">Player stats appear here once match figures are entered.</div>
+          : isCricketSport ? (cricket?.players.length ? <CricketLeaders data={cricket} /> : <div className="ev2-empty">Player stats appear here once match figures are entered.</div>)
+          : <PlayerStatsTab rows={playerStats} teams={teams} basePath={tournamentPath(tournament)} />
       )}
       {activeTab === "Results" && <ResultsTab tournamentId={tournament.id} />}
       {activeTab === "Teams" && (

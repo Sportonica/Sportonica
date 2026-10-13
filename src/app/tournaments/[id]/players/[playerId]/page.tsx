@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ChevronLeft, Star } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
 import { getTournament, getTournamentPlayerCard } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { tournamentPath, type TournamentPlayerCard } from "@/lib/tournaments/types";
@@ -9,9 +10,9 @@ import "@/app/p/profile.css";
 
 export const dynamic = "force-dynamic";
 
-// A tournament player's card for a goals sport (futsal, football): open
-// to anyone, no account needed on either side. Walk-in players have no
-// profile, so this is keyed by their roster row.
+// A tournament player's card for a goals sport (futsal, football).
+// Walk-in players have no profile, so this is keyed by their roster row;
+// viewing it needs a sign-in, like the Player Stats tab it links from.
 
 async function load(segment: string, playerId: string) {
   const tournament = await getTournament(segment);
@@ -46,6 +47,9 @@ const day = (iso: string | null) => iso
 
 export default async function TournamentPlayerPage({ params }: { params: Promise<{ id: string; playerId: string }> }) {
   const { id: segment, playerId } = await params;
+  const sb = await createClient();
+  const { data: claims } = await sb.auth.getClaims();
+  if (!claims?.claims?.sub) redirect(`/login?redirect=${encodeURIComponent(`/tournaments/${segment}/players/${playerId}`)}`);
   const got = await load(segment, playerId);
   if (!got) notFound();
   const { tournament, card } = got;
