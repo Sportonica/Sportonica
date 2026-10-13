@@ -477,6 +477,29 @@ const BRACKET_CSS = `
 .brk-pens { font-size: 10.5px; font-weight: 600; opacity: 0.75; }
 .brk-win-check { color: #00875a; }
 
+/* Desktop: columns side by side, so every match sits level with the
+   middle of the two matches that feed it and the bracket lines land on
+   the right card. Each column stretches to the tallest round's height
+   and splits it evenly: every pair takes an equal share, and inside a
+   pair each card is centred in its own half (space-around), so card i
+   of n is always centred at (i + 0.5) / n of the column — the midpoint
+   of its two feeders in the column before. Spacing is symmetric card
+   margins only (anything one-sided would skew that), and the "Winners
+   meet in" caption sits over the gap between the pair's cards rather
+   than taking room below them. */
+@media (min-width: 720px) {
+  .brk-track { display: flex; align-items: stretch; white-space: normal; }
+  .brk-col { display: flex; flex-direction: column; flex: 0 0 320px; }
+  .brk-col-list { flex: 1; gap: 0; justify-content: space-around; }
+  .brk-pair { position: relative; flex: 1; gap: 0; }
+  .brk-pair-cards { flex: 1; gap: 0; justify-content: space-around; }
+  .brk-col-list > .brk-card, .brk-pair-cards > .brk-card { margin: 14px 0; }
+  .brk-pair-next {
+    position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%);
+    pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+}
+
 /* Below the desktop breakpoint a column is the full viewport width
    (see .brk-col above), so any side padding here would leave the next
    card's edge visibly bleeding in, cut off mid-text. */
