@@ -602,6 +602,24 @@ export async function cancelTournament(id: string, reason: string): Promise<Tour
   return data as Tournament;
 }
 
+// Permanent. Super admin only, and only for cancelled or draft tournaments
+// (enforced again in the database function).
+export async function deleteTournament(id: string): Promise<void | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { error } = await sb.rpc("delete_tournament", { p_id: id });
+  if (error) {
+    if (error.message.includes("ONLY_CANCELLED_OR_DRAFT")) return actionError("Only cancelled or draft tournaments can be deleted.");
+    if (error.message.includes("FK_BLOCKED")) return actionError("This tournament still has linked records, so it can't be deleted.");
+    if (error.message.includes("FORBIDDEN")) return actionError("Only a super admin can delete a tournament.");
+    return actionError(friendlyTournamentError(error.message));
+  }
+  revalidatePath("/platform/tournaments");
+  revalidatePath("/admin/tournaments");
+  revalidatePath("/organize");
+  revalidatePath("/tournaments");
+}
+
 // ── Player registration ─────────────────────────────────────────────
 
 export type TeamDetails = {
