@@ -7,6 +7,8 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // App-local plugins have to be registered before the bridge starts.
+        registerPlugin(AppLinksPlugin.class);
         super.onCreate(savedInstanceState);
         // Draw behind the system bars on every Android version, not just
         // 15+ where it's forced — Play Console asks for this. Capacitor's
