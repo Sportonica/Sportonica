@@ -4,7 +4,7 @@ import { useMemo, useState, Suspense } from "react";
 import Link from "next/link";
 import { Lock, AtSign, User, MessageSquare } from "lucide-react";
 import GoogleButton from "@/components/GoogleButton";
-import AppleButton from "@/components/AppleButton";
+import AppleButton, { APPLE_SIGNIN_ENABLED } from "@/components/AppleButton";
 import BackButton from "@/components/nav/BackButton";
 import AuthCard from "@/components/auth/AuthCard";
 import AuthInput from "@/components/auth/AuthInput";
@@ -271,12 +271,16 @@ function SignupInner() {
             label="Sign up with Google"
             guard={oauthGuard}
           />
-          <div style={{ height: 10 }} />
-          <AppleButton
-            next={safeRedirect(redirect)}
-            label="Sign up with Apple"
-            guard={oauthGuard}
-          />
+          {APPLE_SIGNIN_ENABLED && (
+            <>
+              <div style={{ height: 10 }} />
+              <AppleButton
+                next={safeRedirect(redirect)}
+                label="Sign up with Apple"
+                guard={oauthGuard}
+              />
+            </>
+          )}
 
           <div className="auth-alt">
             Already have an account?{" "}
