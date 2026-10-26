@@ -16,6 +16,12 @@ function AppleMark({ size = 17 }: { size?: number }) {
   );
 }
 
+// Off until the Apple provider is enabled in Supabase (Auth → Providers,
+// which needs an Apple Developer account): until then every tap fails with
+// "provider is not enabled". Set NEXT_PUBLIC_APPLE_SIGNIN=on in Vercel to
+// bring the buttons back on /login and /signup.
+export const APPLE_SIGNIN_ENABLED = process.env.NEXT_PUBLIC_APPLE_SIGNIN === "on";
+
 export default function AppleButton({
   next = "/discover",
   label = "Continue with Apple",
