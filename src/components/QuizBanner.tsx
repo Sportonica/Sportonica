@@ -1,7 +1,7 @@
 import Link from "next/link";
 import "./quiz-banner.css";
 
-// The sports quiz on the home page, for the event. To take it down,
+// The Sportonica Quiz on the home page. To take it down,
 // remove <QuizBanner /> from src/app/HomeClient.tsx, this file and quiz-banner.css.
 
 /** Four flat jigsaw pieces locked together: each knob is its piece's colour reaching into the next. */
@@ -30,7 +30,7 @@ export default function QuizBanner() {
         <Pieces />
         <div className="qb-text">
           <span className="qb-tag">Sports quiz</span>
-          <span className="qb-title">Sportonica Sports Quiz</span>
+          <span className="qb-title">Sportonica Quiz</span>
           <span className="qb-sub">4 questions. Get all 4 right to pick a lucky draw prize.</span>
         </div>
         <div className="qb-actions">

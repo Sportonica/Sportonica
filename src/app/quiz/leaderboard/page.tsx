@@ -66,7 +66,7 @@ export default async function LeaderboardPage({ searchParams }: { searchParams: 
     <main className="qz qz-lb">
       <AutoRefresh seconds={30} />
       <nav className="qz-tabs" aria-label="Leaderboards">
-        <Link href="/quiz/leaderboard" className={!game ? "on" : ""} aria-current={!game ? "page" : undefined}>Sports quiz</Link>
+        <Link href="/quiz/leaderboard" className={!game ? "on" : ""} aria-current={!game ? "page" : undefined}>Sportonica Quiz</Link>
         {STALL_GAMES.map((g) => (
           <Link key={g.key} href={`/quiz/leaderboard?board=${g.key}`} className={game?.key === g.key ? "on" : ""} aria-current={game?.key === g.key ? "page" : undefined}>{g.title}</Link>
         ))}

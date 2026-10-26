@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 import { clientIp, underRateLimit } from "@/lib/security/abuse";
 import { isValidLocalPhone, normalizePhone, PHONE_ERROR } from "@/lib/validation/identity";
-import { MAX_SCORE, NO_ANSWER, QUIZ, type HostQuestion, type PlayerQuestion } from "./quiz";
+import { MAX_SCORE, NO_ANSWER, QUIZ, isQuizRound, type HostQuestion, type PlayerQuestion } from "./quiz";
 import { hostDetails, isCorrect, pickQuestions } from "./bank";
 import { todayStartsAt } from "./leaderboard";
 
@@ -147,13 +147,15 @@ async function isSuperAdmin(): Promise<boolean> {
   return data === true;
 }
 
-export async function listQuizEntries(): Promise<QuizEntry[] | { message: string }> {
+/** Entries for one round: the current one unless an admin picks a past one. */
+export async function listQuizEntries(quizId: string = QUIZ.id): Promise<QuizEntry[] | { message: string }> {
   if (!(await isSuperAdmin())) return { message: "Only platform admins can see quiz entries." };
+  if (!isQuizRound(quizId)) return { message: "No such quiz round." };
   const all: QuizEntry[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await createServiceClient().from("quiz_entries")
       .select("id, full_name, phone, score, max_score, duration_ms, winner_code, prize_given_at, prize_note, created_at, finished_at")
-      .eq("quiz_id", QUIZ.id).order("created_at", { ascending: false }).range(from, from + 999);
+      .eq("quiz_id", quizId).order("created_at", { ascending: false }).range(from, from + 999);
     if (error) return { message: error.message.includes("quiz_entries") ? "The quiz table is not set up yet (run the quiz SQL in Supabase)." : "Could not load entries." };
     all.push(...((data ?? []) as QuizEntry[]));
     if (!data || data.length < 1000) break;
