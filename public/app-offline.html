@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Offline · Sportonica</title>
+  <!-- The Android app's server.errorPath (capacitor.config.ts): shown from
+       inside the app bundle when www.sportonica.com can't be reached, in
+       place of the WebView's own "Webpage not available" page. Everything
+       is inline: there is no network to fetch anything else from. -->
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: #F2EDE6; color: #14261C;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      display: grid; place-items: center; text-align: center;
+      padding: 24px; box-sizing: border-box;
+    }
+    .box { max-width: 340px; }
+    svg { width: 64px; height: 64px; margin-bottom: 20px; }
+    h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin: 0 0 10px; }
+    p { font-size: 15px; line-height: 1.55; color: #3d4a42; margin: 0 0 26px; }
+    button {
+      font: inherit; font-size: 15px; font-weight: 700; color: #fff;
+      background: #006241; border: 0; border-radius: 13px;
+      padding: 14px 30px; cursor: pointer;
+    }
+    button:disabled { opacity: .6; }
+    .hint { font-size: 13px; color: #6b766f; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="32" cy="32" r="30" fill="#006241" opacity=".12"/>
+      <path d="M14 26a26 26 0 0 1 36 0M20 33a17 17 0 0 1 24 0M26 40a8 8 0 0 1 12 0" fill="none" stroke="#006241" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="32" cy="47" r="3.5" fill="#006241"/>
+      <path d="M16 16l32 32" stroke="#14261C" stroke-width="4" stroke-linecap="round"/>
+    </svg>
+    <h1>You're offline</h1>
+    <p>Sportonica needs a connection to show live games, scores and court availability. Check your Wi-Fi or mobile data.</p>
+    <button id="retry" type="button">Try again</button>
+    <div class="hint">We'll reconnect by ourselves when you're back online.</div>
+  </div>
+  <script>
+    var retry = document.getElementById("retry");
+    function go() {
+      retry.disabled = true; retry.textContent = "Connecting…";
+      location.replace("https://www.sportonica.com/");
+    }
+    retry.addEventListener("click", go);
+    window.addEventListener("online", go);
+  </script>
+</body>
+</html>

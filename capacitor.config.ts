@@ -9,17 +9,26 @@ const config: CapacitorConfig = {
   appId: 'com.sportonica.app',
   appName: 'Sportonica',
   webDir: 'public',
+  // The WebView's own background while the remote page loads after the
+  // splash lifts: paper, same as styles.xml and layout.tsx's themeColor.
+  backgroundColor: '#F2EDE6',
   server: {
     url: 'https://www.sportonica.com',
     androidScheme: 'https',
+    // Bundled (webDir) page shown when the site can't load — no network,
+    // DNS, server down — instead of the WebView's "Webpage not available".
+    errorPath: 'app-offline.html',
   },
   plugins: {
     SplashScreen: {
-      // Held manually — CapacitorBridge.tsx calls SplashScreen.hide()
-      // once the remote page has actually mounted, instead of a fixed
-      // timer that could either flash away too early on a slow
-      // connection or hang around too long on a fast one.
-      launchAutoHide: false,
+      // CapacitorBridge.tsx calls SplashScreen.hide() as soon as the
+      // remote page has mounted; launchShowDuration is only the ceiling.
+      // Never hold it indefinitely (launchAutoHide: false): on Android 12+
+      // the splash blocks the activity's first draw, so on a slow
+      // connection (or none) a tap lands on "no focused window" and
+      // Android raises an ANR after 5 s — Play vitals showed exactly that.
+      launchAutoHide: true,
+      launchShowDuration: 3000,
       backgroundColor: '#0B0D11',
       androidScaleType: 'CENTER_INSIDE',
     },
