@@ -4,7 +4,7 @@
 export const QUIZ = {
   // one entry per phone is per quiz id: a new quiz gets a new id
   id: "sports-2026-10",
-  title: "Sportonica Sports Quiz",
+  title: "Sportonica Quiz",
   pointsPerQuestion: 10,
   // every player gets this mix, picked at random within each level
   mix: { easy: 2, medium: 1, hard: 1 },
