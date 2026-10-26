@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Capacitor } from "@capacitor/core";
+import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
+import { appLinksBlocked, openAppLinkSettings } from "@/lib/capacitor/appLinks";
 import { createClient } from "@/lib/supabase/client";
 import { safeRedirect } from "@/lib/validation/redirect";
 
@@ -26,6 +29,27 @@ export default function GoogleButton({
 }: { next?: string; label?: string; guard?: () => boolean }) {
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Google URL held back while we ask the user to let the app open
+  // sportonica.com links (see appLinks.ts) — without that, sign-in ends
+  // in the browser instead of back here.
+  const [heldUrl, setHeldUrl] = useState<string | null>(null);
+
+  // Back from Settings: carry on with sign-in once links are allowed.
+  useEffect(() => {
+    if (!heldUrl) return;
+    const sub = App.addListener("appStateChange", async ({ isActive }) => {
+      if (!isActive || (await appLinksBlocked())) return;
+      setHeldUrl(null);
+      await Browser.open({ url: heldUrl });
+    });
+    return () => { sub.then((s) => s.remove()); };
+  }, [heldUrl]);
+
+  async function continueAnyway() {
+    const url = heldUrl;
+    setHeldUrl(null);
+    if (url) await Browser.open({ url });
+  }
 
   async function signIn() {
     if (guard && !guard()) return;
@@ -45,6 +69,10 @@ export default function GoogleButton({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`,
+        // Left to itself, supabase-js navigates this page to Google straight
+        // away — in the app that leaves the WebView and opens full Chrome
+        // before the code below gets a say. We open it ourselves instead.
+        skipBrowserRedirect: true,
       },
     });
     if (error) { setErr(error.message); setPending(false); return; }
@@ -56,6 +84,7 @@ export default function GoogleButton({
     // listens for the app being reopened via the Universal/App Link once
     // Google → /auth/callback finishes and brings the user back in.
     if (Capacitor.isNativePlatform()) {
+      if (await appLinksBlocked()) { setHeldUrl(data.url); setPending(false); return; }
       await Browser.open({ url: data.url });
     } else {
       window.location.href = data.url;
@@ -70,6 +99,23 @@ export default function GoogleButton({
       </button>
       {err && <p className="g-err">{err}</p>}
 
+      {/* Portalled: AuthCard's styling traps position:fixed inside the card. */}
+      {heldUrl && createPortal(
+        <div className="g-sheet-bg" role="dialog" aria-modal="true" aria-labelledby="g-sheet-title">
+          <div className="g-sheet">
+            <h2 id="g-sheet-title">One quick setting</h2>
+            <p>
+              To bring you back here after Google sign-in, Sportonica needs to open
+              sportonica.com links. On the next screen, choose <b>In the app</b> (or turn
+              on <b>Open supported links</b>), then come back.
+            </p>
+            <button type="button" className="g-sheet-go" onClick={() => openAppLinkSettings()}>Open settings</button>
+            <button type="button" className="g-sheet-skip" onClick={continueAnyway}>Continue anyway</button>
+          </div>
+        </div>,
+        document.body,
+      )}
+
       <style>{`
         .g-btn {
           width: 100%; display: inline-flex; align-items: center; justify-content: center;
@@ -82,6 +128,23 @@ export default function GoogleButton({
         .g-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 12px 30px -10px rgba(0,0,0,.55); }
         .g-btn:disabled { opacity: .65; cursor: default; }
         .g-err { color: #ef4444; font-size: 12.5px; margin: 8px 0 0; }
+        .g-sheet-bg {
+          position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-end;
+          justify-content: center; background: rgba(11,13,17,.45);
+        }
+        .g-sheet {
+          width: 100%; max-width: 480px; background: #F2EDE6; color: #14261C;
+          border-radius: 20px 20px 0 0; padding: 24px 20px calc(20px + env(safe-area-inset-bottom));
+          text-align: left;
+        }
+        .g-sheet h2 { margin: 0 0 8px; font-size: 19px; font-weight: 800; }
+        .g-sheet p { margin: 0 0 18px; font-size: 14.5px; line-height: 1.5; color: #3d4a42; }
+        .g-sheet-go, .g-sheet-skip {
+          width: 100%; padding: 13px 18px; border-radius: 13px; font: inherit;
+          font-size: 14.5px; font-weight: 700; cursor: pointer;
+        }
+        .g-sheet-go { background: #006241; color: #fff; border: 0; }
+        .g-sheet-skip { margin-top: 8px; background: transparent; color: #3d4a42; border: 0; font-weight: 600; }
       `}</style>
     </>
   );
