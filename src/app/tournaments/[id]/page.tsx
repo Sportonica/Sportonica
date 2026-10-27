@@ -1,15 +1,17 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
+import { cache } from "react";
 import { ChevronLeft, Trophy } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, runAsSignedOutVisitor } from "@/lib/supabase/server";
 import {
   getTournament, getDisplayVenueName, getMyTeamForTournament, getTournamentMatches, listTournamentTeams,
   getTournamentStandings, getTournamentPlayerStats, getTournamentAwards, getTournamentCricketStats, getTournamentMatchScorers,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import { FORMAT_LABELS, tournamentPath } from "@/lib/tournaments/types";
-import type { TournamentStanding } from "@/lib/tournaments/types";
+import type { Tournament, TournamentStanding } from "@/lib/tournaments/types";
 import { telHref } from "@/lib/playTogether/types";
 import { getSportKind, sportColor } from "@/lib/sports";
 import TournamentShareBar from "@/components/tournaments/TournamentShareBar";
@@ -29,9 +31,18 @@ import "./tournament-hero.css";
 
 export const dynamic = "force-dynamic";
 
+// who is looking, for "your team" and the Live scoring button only:
+// checked locally from the session token (no auth server round trip);
+// every action re-checks the user itself
+const getViewerId = cache(async (): Promise<string | null> => {
+  const sb = await createClient();
+  const { data: claims } = await sb.auth.getClaims();
+  return claims?.claims?.sub ?? null;
+});
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const tournament = await getTournament(id);
+  const tournament = (await getViewerId()) ? await getTournament(id) : (await getSignedOutView(id))?.tournament;
   if (isActionError(tournament) || !tournament) return { title: "Tournament — Sportonica" };
   return {
     title: `${tournament.name} — Sportonica`,
@@ -44,34 +55,10 @@ const when = (iso: string | null) => iso ? new Date(iso).toLocaleString("en-GB",
   weekday: "short", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kathmandu",
 }) : "Date TBD";
 
-export default async function TournamentDetailPage({
-  params, searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string }>;
-}) {
-  const { id: segment } = await params;
-  const { tab: initialTab } = await searchParams;
-  const tournament = await getTournament(segment);
-  if (isActionError(tournament) || !tournament) notFound();
-  // Old /tournaments/<uuid> links land on the name-based URL.
-  if (tournament.slug && segment !== tournament.slug) {
-    redirect(tournamentPath(tournament) + (initialTab ? `?tab=${encodeURIComponent(initialTab)}` : ""));
-  }
+// Everything the page reads from the database for one tournament. The
+// viewer only matters for "your team" and the Live scoring button.
+async function loadTournamentView(tournament: Tournament, user: { id: string } | null) {
   const id = tournament.id;
-  const hasBanner = !!tournament.banner_url && /^https?:\/\//i.test(tournament.banner_url);
-  // Draft/pending_approval tournaments are only visible to their vendor
-  // or a super_admin (RLS) — getTournament() already enforces that, so
-  // reaching this point with a non-published status means the viewer is
-  // the owner previewing it before publish.
-
-  // who is looking, for "your team" and the Live scoring button only:
-  // checked locally from the session token (no auth server round trip);
-  // every action re-checks the user itself
-  const sb = await createClient();
-  const { data: claims } = await sb.auth.getClaims();
-  const user = claims?.claims?.sub ? { id: claims.claims.sub } : null;
-
   const isLiveOrDone = tournament.status === "live" || tournament.status === "completed";
   const scored = !!sportKeyFor(tournament.sport);
   const cricketSport = isCricket(tournament.sport) && isLiveOrDone;
@@ -80,8 +67,7 @@ export default async function TournamentDetailPage({
   // Every query the page needs, in one round: each one is a trip to the
   // database, and run one after another they added up to most of the
   // page's load time.
-  const [venueName, myTeam, matchesRes, teamsRes, playerStatsRes, awardsRes, canScore,
-    contestsRes, leadersRes, cricketRes, highlightsRes, factsRes, recordsRes, scorersRes] = await Promise.all([
+  const results = await Promise.all([
     getDisplayVenueName(tournament),
     user ? getMyTeamForTournament(id) : Promise.resolve(null),
     isLiveOrDone ? getTournamentMatches(id) : Promise.resolve([]),
@@ -105,6 +91,9 @@ export default async function TournamentDetailPage({
     // goals sports: who scored in each match, opened under a result
     goalsSport ? getTournamentMatchScorers(id) : Promise.resolve(null),
   ]);
+  const [venueName, myTeam, matchesRes, teamsRes, playerStatsRes, awardsRes, canScore,
+    contestsRes, leadersRes, cricketRes, highlightsRes, factsRes, recordsRes, scorersRes] = results;
+  let failed = results.some(isActionError);
   const matches = isActionError(matchesRes) ? [] : matchesRes;
   const intel: Record<string, MatchIntel> = {};
   for (const c of isActionError(contestsRes) ? [] : contestsRes) {
@@ -140,10 +129,63 @@ export default async function TournamentDetailPage({
   } else if (hasStandings && matches.length > 0) {
     const entries = await Promise.all(groups.map(async (g) => {
       const res = await getTournamentStandings(id, g || undefined);
+      if (isActionError(res)) failed = true;
       return [g, isActionError(res) ? [] : res] as const;
     }));
     for (const [g, rows] of entries) standingsByGroup[g] = rows;
   }
+  return {
+    failed, venueName, myTeam: isActionError(myTeam) ? null : myTeam, canScore, matches, intel, teams, playerStats,
+    leaders, cricketStats, highlights, scorers, awards, cricketData, standingsByGroup,
+  };
+}
+
+// Signed-out visitors all see the same page, so build it once and share
+// it for 15 s instead of running a dozen queries per visit — a link shared
+// on WhatsApp during a match is what brings a crowd. Signed-in viewers
+// (organisers, scorers, team members) still read live on every visit.
+// A failed read throws, so a half-empty page is never what gets cached.
+const getSignedOutView = unstable_cache(
+  (segment: string) => runAsSignedOutVisitor(async () => {
+    const tournament = await getTournament(segment);
+    if (isActionError(tournament)) throw new Error(tournament.message);
+    if (!tournament) return null;
+    const view = await loadTournamentView(tournament, null);
+    if (view.failed) throw new Error("tournament page: a read failed");
+    return { tournament, view };
+  }),
+  ["tournament-page-signed-out"],
+  { revalidate: 15 },
+);
+
+export default async function TournamentDetailPage({
+  params, searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
+}) {
+  const { id: segment } = await params;
+  const { tab: initialTab } = await searchParams;
+  const viewerId = await getViewerId();
+  const user = viewerId ? { id: viewerId } : null;
+  // signed out: the shared copy, or a live read if building it failed
+  const shared = user ? undefined : await getSignedOutView(segment).catch(() => undefined);
+  const tournament = shared !== undefined ? shared?.tournament : await getTournament(segment);
+  if (isActionError(tournament) || !tournament) notFound();
+  // Old /tournaments/<uuid> links land on the name-based URL.
+  if (tournament.slug && segment !== tournament.slug) {
+    redirect(tournamentPath(tournament) + (initialTab ? `?tab=${encodeURIComponent(initialTab)}` : ""));
+  }
+  const hasBanner = !!tournament.banner_url && /^https?:\/\//i.test(tournament.banner_url);
+  // Draft/pending_approval tournaments are only visible to their vendor
+  // or a super_admin (RLS) — getTournament() already enforces that, so
+  // reaching this point with a non-published status means the viewer is
+  // the owner previewing it before publish.
+
+  const {
+    venueName, myTeam, canScore, matches, intel, teams, playerStats, leaders, cricketStats,
+    highlights, scorers, awards, cricketData, standingsByGroup,
+  } = shared?.view ?? await loadTournamentView(tournament, user);
 
   const phoneHref = tournament.contact_phone ? telHref(tournament.contact_phone) : null;
   // The "Other" prize field is one freeform text input — organizers commonly
