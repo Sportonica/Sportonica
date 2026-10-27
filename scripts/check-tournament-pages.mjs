@@ -4,12 +4,16 @@
 // baseUrl defaults to http://localhost:3000. Only reads: it lists public
 // tournaments with the anon key and opens their pages like a visitor.
 //
-// --save writes each page's visible text to a file; --compare checks the
-// pages still show exactly that text (run --save before a change and
-// --compare after it).
+// Also opens every public match centre and loads its timeline and stats
+// the way the browser does (the same server actions, by name from the
+// build), so run it against a `next build && next start`.
+//
+// --save writes each page's visible text (and each load's data) to a
+// file; --compare checks they are exactly the same (run --save before a
+// change and --compare after it).
 
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const env = {};
 for (const line of readFileSync(".env.local", "utf8").split("\n")) {
@@ -71,6 +75,60 @@ for (const t of tournaments) {
     });
   }
 }
+
+// ── match centres: /tournaments/<name>/live/<contest> ──
+const contestsRes = await fetch(
+  `${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/si_contests?select=id,label,tournament_id,tournaments(slug)&order=created_at`,
+  { headers: { apikey: env.NEXT_PUBLIC_SUPABASE_ANON_KEY } },
+);
+const contests = (await contestsRes.json()).filter((c) => c.tournaments?.slug);
+const manifestPath = ".next/server/server-reference-manifest.json";
+const actionId = (name) => existsSync(manifestPath)
+  ? Object.entries(JSON.parse(readFileSync(manifestPath, "utf8")).node)
+    .find(([, v]) => v.filename === "lib/intelligence/actions.ts" && v.exportedName === name)?.[0]
+  : undefined;
+const eventsAction = actionId("getContestEvents");
+const statsAction = actionId("getContestIntelligence");
+// a server action as the browser calls it; the result is the response's "1:" line
+async function callAction(path, id, args) {
+  const r = await fetch(base + path, {
+    method: "POST", body: JSON.stringify(args),
+    headers: { "Next-Action": id, Origin: base, Accept: "text/x-component", "Content-Type": "text/plain;charset=UTF-8" },
+  });
+  const body = await r.text();
+  return { status: r.status, data: body.split("\n").find((l) => l.startsWith("1:"))?.slice(2) ?? "" };
+}
+
+console.log(`Match centres (${contests.length})`);
+check("timeline and stats actions found in the build", () => assert.ok(eventsAction && statsAction, "run next build first"));
+for (const c of contests) {
+  const path = `/tournaments/${c.tournaments.slug}/live/${c.id}`;
+  await fetch(base + path);
+  const started = performance.now();
+  const page = await fetch(base + path);
+  timings.push({ path, ms: Math.round(performance.now() - started) });
+  texts[path] = visibleText(await page.text());
+  check(`${path} opens (200)`, () => assert.equal(page.status, 200));
+  if (!eventsAction || !statsAction) continue;
+  for (const [label, id, args] of [
+    ["timeline", eventsAction, [c.id, { limit: 40 }]],
+    ["timeline, older page", eventsAction, [c.id, { limit: 150, before: 60 }]],
+    ["stats", statsAction, [c.id]],
+  ]) {
+    await callAction(path, id, args);
+    const t0 = performance.now();
+    const res = await callAction(path, id, args);
+    timings.push({ path: `${path} (${label})`, ms: Math.round(performance.now() - t0) });
+    texts[`${path} ${label}`] = res.data;
+    check(`  ${label} loads`, () => {
+      assert.equal(res.status, 200);
+      assert.ok(res.data.startsWith("{") && !res.data.includes("__sportonicaActionError"), res.data.slice(0, 120));
+    });
+  }
+}
+console.log("Unknown match");
+const noMatch = await fetch(`${base}/tournaments/${contests[0]?.tournaments.slug}/live/00000000-0000-4000-8000-000000000000`);
+check("unknown match shows not found (404)", () => assert.equal(noMatch.status, 404));
 
 console.log("Unknown tournament");
 const missing = await fetch(`${base}/tournaments/no-such-tournament-${Date.now()}`);
