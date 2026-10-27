@@ -2,9 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
-import { cache } from "react";
 import { ChevronLeft, Trophy } from "lucide-react";
-import { createClient, runAsSignedOutVisitor } from "@/lib/supabase/server";
+import { getViewerId, runAsSignedOutVisitor } from "@/lib/supabase/server";
 import {
   getTournament, getDisplayVenueName, getMyTeamForTournament, getTournamentMatches, listTournamentTeams,
   getTournamentStandings, getTournamentPlayerStats, getTournamentAwards, getTournamentCricketStats, getTournamentMatchScorers,
@@ -30,15 +29,6 @@ import "@/app/platform/events/events.css";
 import "./tournament-hero.css";
 
 export const dynamic = "force-dynamic";
-
-// who is looking, for "your team" and the Live scoring button only:
-// checked locally from the session token (no auth server round trip);
-// every action re-checks the user itself
-const getViewerId = cache(async (): Promise<string | null> => {
-  const sb = await createClient();
-  const { data: claims } = await sb.auth.getClaims();
-  return claims?.claims?.sub ?? null;
-});
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -166,6 +156,7 @@ export default async function TournamentDetailPage({
 }) {
   const { id: segment } = await params;
   const { tab: initialTab } = await searchParams;
+  // who is looking, for "your team" and the Live scoring button only
   const viewerId = await getViewerId();
   const user = viewerId ? { id: viewerId } : null;
   // signed out: the shared copy, or a live read if building it failed

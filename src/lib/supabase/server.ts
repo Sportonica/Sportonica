@@ -47,6 +47,16 @@ export async function createClient() {
   )
 }
 
+// The signed-in user's id, or null for a signed-out visitor — checked
+// locally from the session token (no auth server round trip), once per
+// request. Only for choosing between a live read and a copy shared by
+// signed-out visitors; anything that acts as the user re-checks it.
+export const getViewerId = cache(async (): Promise<string | null> => {
+  const sb = await createClient()
+  const { data } = await sb.auth.getClaims()
+  return data?.claims?.sub ?? null
+})
+
 // Server-side pages often fetch several things that each independently
 // need "who's logged in" (e.g. LeaguePage's browseSquads() + myMemberships()
 // both called auth.getUser() on their own client, two redundant network
