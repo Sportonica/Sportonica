@@ -139,9 +139,28 @@ if (saveTo) {
   console.log(`\nsaved page text to ${saveTo}`);
 }
 if (compareTo) {
+  // A server action's answer is React's wire format, which writes a value
+  // used twice once and points back to it ("$1:charts:0:labels"). Resolve
+  // those so the check compares the data the browser ends up with.
+  const resolved = (raw) => {
+    if (!raw?.startsWith("{")) return raw;
+    const root = JSON.parse(raw);
+    const walk = (v) => {
+      if (typeof v === "string") {
+        if (v.startsWith("$1:")) return walk(v.slice(3).split(":").reduce((o, k) => o[k], root));
+        return v.startsWith("$$") ? v.slice(1) : v;
+      }
+      if (Array.isArray(v)) return v.map(walk);
+      if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+      return v;
+    };
+    return JSON.stringify(walk(root));
+  };
   console.log("Same content as before");
   const before = JSON.parse(readFileSync(compareTo, "utf8"));
-  for (const [path, text] of Object.entries(before)) {
+  for (const [path, raw] of Object.entries(before)) {
+    const text = resolved(raw);
+    texts[path] = resolved(texts[path]);
     check(`${path} shows the same text`, () => {
       if (text === texts[path]) return;
       const a = text.split(" "), b = (texts[path] ?? "").split(" ");
