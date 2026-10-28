@@ -13,8 +13,8 @@
 // ================================================================
 
 import { randomUUID } from "node:crypto";
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { revalidatePath, unstable_cache } from "next/cache";
+import { createClient, getViewerId, runAsSignedOutVisitor } from "@/lib/supabase/server";
 import { actionError, isActionError, safeActionError, type ActionError } from "@/lib/actionError";
 import { friendlyTournamentError, type TournamentMatch } from "@/lib/tournaments/types";
 import {
@@ -157,8 +157,31 @@ export async function canScoreTournament(tournamentId: string): Promise<boolean>
   return !error && data === true;
 }
 
+// Signed-out spectators all get the same timeline and statistics, so
+// share one copy for 15 s instead of building it for each of them (a
+// cricket timeline replays every ball of the match). Scorers and other
+// signed-in viewers read live. A failed read throws, so it's never cached.
+function sharedWhileSignedOut<A extends unknown[], R>(name: string, read: (...args: A) => Promise<R | ActionError>) {
+  const shared = unstable_cache(
+    (...args: A) => runAsSignedOutVisitor(async () => {
+      const res = await read(...args);
+      if (isActionError(res)) throw new Error(res.message);
+      return res;
+    }),
+    [`${name}-signed-out`],
+    { revalidate: 15 },
+  );
+  return async (...args: A): Promise<R | ActionError> =>
+    (await getViewerId()) ? read(...args) : shared(...args).catch(() => read(...args));
+}
+
 /** GET /matches/:id/statistics and /analytics, computed from the cached state. */
 export async function getContestIntelligence(contestId: string): Promise<ContestIntelligence | ActionError> {
+  return sharedContestIntelligence(contestId);
+}
+const sharedContestIntelligence = sharedWhileSignedOut("contest-intelligence", readContestIntelligence);
+
+async function readContestIntelligence(contestId: string): Promise<ContestIntelligence | ActionError> {
   const sb = await createClient();
   const row = await loadContest(sb, contestId);
   if (isActionError(row)) return row;
@@ -219,11 +242,21 @@ export async function askContest(contestId: string, question: string): Promise<M
 export async function getContestEvents(
   contestId: string, opts: { before?: number; limit?: number } = {},
 ): Promise<{ entries: TimelineEntry[]; hasMore: boolean } | ActionError> {
+  // only the parts that change the answer go into the shared copy's key
+  const limit = Math.min(Math.max(Number(opts.limit ?? 50) || 50, 1), 200);
+  const before = opts.before === undefined || opts.before === null ? null : Number(opts.before);
+  return sharedContestEvents(contestId, before, limit);
+}
+const sharedContestEvents = sharedWhileSignedOut("contest-events", readContestEvents);
+
+async function readContestEvents(
+  contestId: string, before: number | null, limit: number,
+): Promise<{ entries: TimelineEntry[]; hasMore: boolean } | ActionError> {
+  const opts = { before: before ?? undefined };
   const sb = await createClient();
   const row = await loadContest(sb, contestId);
   if (isActionError(row)) return row;
   const engine = getEngine(row.sport as SportKey);
-  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
 
   let rules: unknown;
   try { rules = engine.resolveRules(row.rules); } catch (e) { return safeActionError(e, "This match has invalid rules."); }

@@ -1,10 +1,25 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { cache } from 'react'
 import { SUPABASE_COOKIE_OPTIONS } from '@/lib/supabase/cookieOptions'
 
+// Set while building data that's cached once and shown to every
+// signed-out visitor (see runAsSignedOutVisitor). Inside it createClient()
+// reads as anonymous and never touches cookies, so whoever happened to
+// fill the cache can't leak their own view into it — and unstable_cache
+// doesn't allow cookies() anyway.
+const signedOutScope = new AsyncLocalStorage<true>()
+
+export function runAsSignedOutVisitor<T>(fn: () => Promise<T>): Promise<T> {
+  return signedOutScope.run(true, fn)
+}
+
 export async function createClient() {
-  const cookieStore = await cookies()
+  // an empty cookie jar: same client, signed out
+  const cookieStore = signedOutScope.getStore()
+    ? { getAll: () => [], set: () => {} }
+    : await cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -31,6 +46,16 @@ export async function createClient() {
     }
   )
 }
+
+// The signed-in user's id, or null for a signed-out visitor — checked
+// locally from the session token (no auth server round trip), once per
+// request. Only for choosing between a live read and a copy shared by
+// signed-out visitors; anything that acts as the user re-checks it.
+export const getViewerId = cache(async (): Promise<string | null> => {
+  const sb = await createClient()
+  const { data } = await sb.auth.getClaims()
+  return data?.claims?.sub ?? null
+})
 
 // Server-side pages often fetch several things that each independently
 // need "who's logged in" (e.g. LeaguePage's browseSquads() + myMemberships()
