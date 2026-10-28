@@ -130,6 +130,12 @@ console.log("Unknown match");
 const noMatch = await fetch(`${base}/tournaments/${contests[0]?.tournaments.slug}/live/00000000-0000-4000-8000-000000000000`);
 check("unknown match shows not found (404)", () => assert.equal(noMatch.status, 404));
 
+// Nothing uses next/image, so its optimizer endpoint should not exist: it
+// fetched remote images for anyone (security audit, Next.js advisories).
+console.log("Image optimizer");
+const optimizer = await fetch(`${base}/_next/image?url=${encodeURIComponent("https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png")}&w=64&q=75`);
+check("/_next/image is switched off (404)", () => assert.equal(optimizer.status, 404, `status ${optimizer.status}`));
+
 console.log("Unknown tournament");
 const missing = await fetch(`${base}/tournaments/no-such-tournament-${Date.now()}`);
 check("unknown name shows not found (404)", () => assert.equal(missing.status, 404));

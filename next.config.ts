@@ -43,12 +43,13 @@ const nextConfig: NextConfig = {
     // multipart/base64 encoding overhead on top of the raw file bytes.
     serverActions: { bodySizeLimit: "6mb" },
   },
+  // Nothing uses next/image (map tiles and markers load straight from
+  // their hosts in the browser), so turn the optimizer off: /_next/image
+  // was fetching remote images for anyone, including from unpkg.com where
+  // anyone can publish a file — the path Next.js's image optimizer
+  // advisories (remote code execution via SVG, SSRF) need (security audit).
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "unpkg.com" },
-      { protocol: "https", hostname: "tile.openstreetmap.org" },
-      { protocol: "https", hostname: "*.basemaps.cartocdn.com" },
-    ],
+    unoptimized: true,
   },
   // sportonica.com -> www, except /.well-known/: Android App Links (and
   // Apple's association file) must be fetched from the exact host with
