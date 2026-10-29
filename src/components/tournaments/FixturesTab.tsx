@@ -1170,29 +1170,36 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
     return null;
   }
 
+  // Only a change of winner unwinds later rounds (same rule as
+  // record_match_result): re-saving with the same winner never does,
+  // even if the next match's slot was edited by hand.
   function cascadeConflict(winnerId: string | null): TournamentMatch | null {
-    if (!winnerId || !match.next_match_id) return null;
+    if (!winnerId || !match.next_match_id || winnerId === match.winner_team_id) return null;
     const next = matches.find((m) => m.id === match.next_match_id);
     if (!next) return null;
     const currentSlotTeam = match.next_match_slot === "a" ? next.team_a_id : next.team_b_id;
     return currentSlotTeam && currentSlotTeam !== winnerId ? next : null;
   }
 
-  function confirmCascadeIfNeeded(winnerId: string | null): boolean {
+  // null: the organiser backed out. Otherwise whether they agreed to
+  // reset later rounds, passed on as confirmCascade so the server never
+  // resets anything nobody was asked about.
+  function confirmCascadeIfNeeded(winnerId: string | null): boolean | null {
     const conflict = cascadeConflict(winnerId);
-    if (!conflict) return true;
+    if (!conflict) return false;
     const conflictTeam = match.next_match_slot === "a" ? conflict.team_a_id : conflict.team_b_id;
     return window.confirm(
       `${teamName(conflictTeam)} already advanced to ${conflict.round_label} based on the previous result. Changing this will reset that match (and anything it already fed into). Continue?`
-    );
+    ) || null;
   }
 
   function save() {
     const et = scoreAEt !== "" && scoreBEt !== "" ? { scoreA: Number(scoreAEt), scoreB: Number(scoreBEt) } : undefined;
     const pens = scoreAPens !== "" && scoreBPens !== "" ? { scoreA: Number(scoreAPens), scoreB: Number(scoreBPens) } : undefined;
     const winner = computeWinner();
-    if (!confirmCascadeIfNeeded(winner)) return;
-    onResult(Number(scoreA), Number(scoreB), undefined, et, pens, true);
+    const confirmCascade = confirmCascadeIfNeeded(winner);
+    if (confirmCascade === null) return;
+    onResult(Number(scoreA), Number(scoreB), undefined, et, pens, confirmCascade);
   }
 
   return (
@@ -1401,8 +1408,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                   <button key={id} className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
                     onClick={() => {
                       if (!window.confirm(`Record a walkover win for ${teamName(id)}? No score is recorded and this can't be undone.`)) return;
-                      if (!confirmCascadeIfNeeded(id)) return;
-                      onResult(null, null, id, undefined, undefined, true);
+                      const confirmCascade = confirmCascadeIfNeeded(id);
+                      if (confirmCascade === null) return;
+                      onResult(null, null, id, undefined, undefined, confirmCascade);
                     }}>
                     {teamName(id)} wins
                   </button>
@@ -1432,8 +1440,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                   className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
                   onClick={() => {
                     if (!window.confirm(`Record a walkover win for ${teamName(match.team_a_id)}? No score is recorded and this can't be undone.`)) return;
-                    if (!confirmCascadeIfNeeded(match.team_a_id)) return;
-                    onResult(null, null, match.team_a_id!, undefined, undefined, true);
+                    const confirmCascade = confirmCascadeIfNeeded(match.team_a_id);
+                    if (confirmCascade === null) return;
+                    onResult(null, null, match.team_a_id!, undefined, undefined, confirmCascade);
                   }}
                 >
                   {teamName(match.team_a_id)} wins
@@ -1442,8 +1451,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                   className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
                   onClick={() => {
                     if (!window.confirm(`Record a walkover win for ${teamName(match.team_b_id)}? No score is recorded and this can't be undone.`)) return;
-                    if (!confirmCascadeIfNeeded(match.team_b_id)) return;
-                    onResult(null, null, match.team_b_id!, undefined, undefined, true);
+                    const confirmCascade = confirmCascadeIfNeeded(match.team_b_id);
+                    if (confirmCascade === null) return;
+                    onResult(null, null, match.team_b_id!, undefined, undefined, confirmCascade);
                   }}
                 >
                   {teamName(match.team_b_id)} wins
@@ -1539,8 +1549,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                   className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
                   onClick={() => {
                     if (!window.confirm(`Record a walkover win for ${teamName(match.team_a_id)}? No score is recorded and this can't be undone.`)) return;
-                    if (!confirmCascadeIfNeeded(match.team_a_id)) return;
-                    onResult(null, null, match.team_a_id!, undefined, undefined, true);
+                    const confirmCascade = confirmCascadeIfNeeded(match.team_a_id);
+                    if (confirmCascade === null) return;
+                    onResult(null, null, match.team_a_id!, undefined, undefined, confirmCascade);
                   }}
                 >
                   {teamName(match.team_a_id)} wins
@@ -1549,8 +1560,9 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
                   className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
                   onClick={() => {
                     if (!window.confirm(`Record a walkover win for ${teamName(match.team_b_id)}? No score is recorded and this can't be undone.`)) return;
-                    if (!confirmCascadeIfNeeded(match.team_b_id)) return;
-                    onResult(null, null, match.team_b_id!, undefined, undefined, true);
+                    const confirmCascade = confirmCascadeIfNeeded(match.team_b_id);
+                    if (confirmCascade === null) return;
+                    onResult(null, null, match.team_b_id!, undefined, undefined, confirmCascade);
                   }}
                 >
                   {teamName(match.team_b_id)} wins
@@ -1578,7 +1590,7 @@ function CricketScoreEntry({ match, teamName, pending, onSave, confirmCascadeIfN
     winnerId?: string, toss?: { winnerTeamId: string; decision: "bat" | "bowl" }, targetRuns?: number,
     confirmCascade?: boolean
   ) => void;
-  confirmCascadeIfNeeded: (winnerId: string | null) => boolean;
+  confirmCascadeIfNeeded: (winnerId: string | null) => boolean | null;
 }) {
   const [runsA, setRunsA] = useState(match.score_a?.toString() ?? "");
   const [wicketsA, setWicketsA] = useState(match.wickets_a?.toString() ?? "");
@@ -1618,7 +1630,8 @@ function CricketScoreEntry({ match, teamName, pending, onSave, confirmCascadeIfN
 
   function save() {
     const winner = result === "a" || result === "so_a" ? match.team_a_id : result === "b" || result === "so_b" ? match.team_b_id : null;
-    if (!confirmCascadeIfNeeded(winner)) return;
+    const confirmCascade = confirmCascadeIfNeeded(winner);
+    if (confirmCascade === null) return;
     // no result with nothing entered: saved as no balls bowled
     const nr = result === "nr";
     const ra = runsA === "" && nr ? 0 : Number(runsA), rb = runsB === "" && nr ? 0 : Number(runsB);
@@ -1629,7 +1642,7 @@ function CricketScoreEntry({ match, teamName, pending, onSave, confirmCascadeIfN
       winner ?? undefined,
       tossWinner ? { winnerTeamId: tossWinner, decision: tossDecision } : undefined,
       target,
-      true,
+      confirmCascade,
     );
   }
 
