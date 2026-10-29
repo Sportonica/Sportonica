@@ -557,6 +557,7 @@ export const TOURNAMENT_ERROR_MESSAGES: Record<string, string> = {
   INVALID_STAGE: "That's not a valid stage.",
   SAME_TEAM: "Pick two different teams.",
   CASCADE_CONFIRMATION_REQUIRED: "This would change a team that's already advanced further in the bracket. Confirm to continue.",
+  TOURNAMENT_COMPLETED: "This tournament is finished, so later rounds can't be reset. Ask Sportonica support if a result really needs changing.",
   INVALID_SLOT: "Pick which side (A or B) this feeds into.",
   SAME_MATCH: "A match can't advance into itself.",
   NOT_SAME_ROUND: "Only two matches in the same knockout round can swap places.",
