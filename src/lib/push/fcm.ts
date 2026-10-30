@@ -52,7 +52,7 @@ async function accessToken(sa: ServiceAccount): Promise<string> {
   return json.access_token;
 }
 
-export type PushMessage = { title: string; body?: string | null; url: string };
+export type PushMessage = { title: string; body?: string | null; url: string; channel?: string };
 
 // "dead" = FCM says this token will never work again (app uninstalled,
 // token rotated) — the caller deletes it. Anything else is transient.
@@ -70,7 +70,7 @@ export async function sendPush(token: string, msg: PushMessage): Promise<PushRes
         data: { url: msg.url },
         android: {
           priority: "high",
-          notification: { channel_id: "default", color: "#006241", icon: "ic_stat_notification" },
+          notification: { channel_id: msg.channel ?? "default", color: "#006241", icon: "ic_stat_notification" },
         },
         apns: { payload: { aps: { sound: "default" } } },
       },
