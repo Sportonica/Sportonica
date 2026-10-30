@@ -1,7 +1,7 @@
 "use client";
 
-// A thin bar at the top that starts the moment a link is tapped and
-// finishes when the new page arrives. Pages are rendered on the server
+// A small spinning circle near the top that appears the moment a link
+// is tapped and goes away when the new page arrives. Pages are rendered on the server
 // for every visit, so without it a tap looked like nothing happened for
 // half a second or more. (Not a loading.tsx: that would commit a 200
 // before a page's notFound()/redirect(), see RouteLoadingSpinner.)
@@ -46,12 +46,16 @@ export default function NavProgress() {
 
   return (
     <div aria-hidden="true" className={`navp navp-${state}`}>
+      <span />
       <style>{`
-        .navp { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 2147483000; pointer-events: none; padding-top: env(safe-area-inset-top); }
-        .navp::before { content: ""; display: block; height: 3px; width: 0; background: #006241; box-shadow: 0 0 6px rgba(0,98,65,.5); opacity: 0; }
-        .navp-busy::before { opacity: 1; width: 85%; transition: width 6s cubic-bezier(.1,.7,.2,1), opacity .1s; }
-        .navp-done::before { opacity: 0; width: 100%; transition: width .2s ease-out, opacity .3s ease .15s; }
-        @media (prefers-reduced-motion: reduce) { .navp-busy::before { transition: opacity .1s; } }
+        .navp { position: fixed; left: 0; right: 0; top: calc(env(safe-area-inset-top) + 72px); z-index: 2147483000; pointer-events: none;
+          width: 40px; height: 40px; margin: 0 auto; border-radius: 50%; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18);
+          display: grid; place-items: center; opacity: 0; transform: scale(.6); transition: opacity .15s, transform .15s; }
+        .navp > span { width: 22px; height: 22px; border-radius: 50%; border: 3px solid rgba(0,98,65,.18); border-top-color: #006241; animation: navp-spin .7s linear infinite; }
+        .navp-busy { opacity: 1; transform: scale(1); }
+        .navp-idle > span { animation: none; }
+        @keyframes navp-spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .navp { transition: opacity .15s; transform: none; } .navp > span { animation-duration: 1.4s; } }
       `}</style>
     </div>
   );
