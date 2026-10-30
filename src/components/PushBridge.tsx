@@ -52,6 +52,11 @@ export default function PushBridge() {
         id: "default", name: "Sportonica", description: "Games, bookings, payments and tournaments",
         importance: 4, visibility: 1,
       }).catch(() => {});
+      // the daily message: its own channel, so it can be muted on its own
+      PushNotifications.createChannel({
+        id: "updates", name: "News and offers", description: "New features and offers, once a day",
+        importance: 3, visibility: 1,
+      }).catch(() => {});
     }
 
     registerIfSignedIn().catch(() => {});

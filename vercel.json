@@ -1,6 +1,7 @@
 {
   "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in changes|ios|android|db/*) exit 0 ;; *) exit 1 ;; esac",
   "regions": ["syd1"],
+  "crons": [{ "path": "/api/cron/daily-push", "schedule": "15 12 * * *" }],
   "headers": [
     {
       "source": "/(.*)",
