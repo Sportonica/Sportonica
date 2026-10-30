@@ -10,11 +10,14 @@
 // layout.
 
 import { useEffect, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 
 export default function NavProgress() {
   const [state, setState] = useState<"idle" | "busy" | "done">("idle");
 
   useEffect(() => {
+    // website only: the Android/iOS app shows no loading circle
+    if (Capacitor.isNativePlatform()) return;
     let tick: ReturnType<typeof setInterval> | undefined, giveUp: ReturnType<typeof setTimeout> | undefined, fade: ReturnType<typeof setTimeout> | undefined;
     const stop = () => { clearInterval(tick); clearTimeout(giveUp); clearTimeout(fade); };
     const onClick = (e: MouseEvent) => {
