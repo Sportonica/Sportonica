@@ -1115,12 +1115,12 @@ function VolleyballGroups({ teams, pending, onSave }: { teams: TournamentTeam[];
         {teams.map((t) => (
           <label key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13.5 }}>
             {t.name}
-            <input value={groups[t.id] ?? ""} placeholder="A" aria-label={`${t.name} group`} style={{ ...inputStyle, width: 70 }}
+            <input value={groups[t.id] ?? ""} placeholder="A" aria-label={`${t.name} group`} style={{ ...inputStyle, width: 70, minHeight: 44, fontSize: 16 }}
               onChange={(e) => setGroups((g) => ({ ...g, [t.id]: e.target.value.toUpperCase() }))} />
           </label>
         ))}
       </div>
-      <button className="tc-btn primary" disabled={pending || !ready} style={{ marginTop: 12, padding: "9px 14px" }}
+      <button className="tc-btn primary" disabled={pending || !ready} style={{ marginTop: 12, padding: "9px 14px", minHeight: 44 }}
         onClick={() => onSave(Object.fromEntries(Object.entries(groups).map(([id, g]) => [id, g.trim()])))}>
         Save groups
       </button>

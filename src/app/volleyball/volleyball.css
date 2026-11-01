@@ -29,3 +29,9 @@
 .vbp-row-v { flex: none; font-weight: 800; font-variant-numeric: tabular-nums; }
 .vbp-book { margin-top: 34px; text-align: center; font-size: 14px; }
 .vbp-book a { color: #006241; font-weight: 700; }
+
+.vbp .tourn-filters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px 2px; }
+.vbp .tourn-filters::-webkit-scrollbar { display: none; }
+.vbp .tourn-chip { flex: none; min-height: 44px; padding: 0 16px; border: 1px solid rgba(20,23,30,0.14); border-radius: 999px; background: #fff; color: #14171e; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.vbp .tourn-chip.on { border-color: #006241; background: #006241; color: #fff; }
+.vbp-book a { display: inline-block; padding: 12px 8px; }
