@@ -8,6 +8,7 @@ import { isActionError } from "@/lib/actionError";
 import { isVolleyball } from "@/lib/tournaments/standings";
 import { tournamentPath } from "@/lib/tournaments/types";
 import "@/app/p/profile.css";
+import "./team.css";
 
 export const dynamic = "force-dynamic";
 
@@ -40,11 +41,11 @@ function MatchLine({ m }: { m: VolleyballMatchRow }) {
     <div className="pf-game">
       <span className="pf-game-date">{day(m.startsAt)}</span>
       <div>
-        <div className="pf-game-t">v {m.opponentHref ? <Link href={m.opponentHref} style={{ color: "inherit" }}>{m.opponent}</Link> : m.opponent}</div>
+        <div className="pf-game-t">v {m.opponentHref ? <Link href={m.opponentHref} className="vbt-link">{m.opponent}</Link> : m.opponent}</div>
         <div className="pf-game-v">{[m.round, m.sets, m.status === "live" && "Live"].filter(Boolean).join(" · ")}</div>
       </div>
       <span className="pf-game-t" style={{ whiteSpace: "nowrap" }}>
-        {m.href ? <Link href={m.href} style={{ color: "inherit" }}>{result ?? "Match page"}</Link> : result}
+        {m.href ? <Link href={m.href} className="vbt-link">{result ?? "Match page"}</Link> : result}
       </span>
     </div>
   );
@@ -95,7 +96,7 @@ export default async function VolleyballTeamPage({ params }: { params: Params })
         <section className="pf-sec">
           <div className="pf-sec-head"><span className="pf-sec-num">{num()}</span><h2 className="pf-sec-t">Squad</h2>{roster ? <span className="pf-sec-count">{roster.length}</span> : null}</div>
           {!roster ? (
-            <div className="pf-empty"><Link href={`/login?redirect=${encodeURIComponent(`${base}/teams/${teamId}`)}`} style={{ color: "inherit", fontWeight: 700 }}>Sign in</Link> to see the squad.</div>
+            <div className="pf-empty"><Link href={`/login?redirect=${encodeURIComponent(`${base}/teams/${teamId}`)}`} className="vbt-link" style={{ fontWeight: 700 }}>Sign in</Link> to see the squad.</div>
           ) : !roster.length ? <div className="pf-empty">No roster on file yet.</div> : roster.map((p) => (
             <Link key={p.id} href={`${base}/players/${p.id}`} className="pf-game" style={{ color: "inherit", textDecoration: "none" }}>
               <span className="pf-game-date">{p.number !== null ? `#${p.number}` : "–"}</span>
@@ -122,7 +123,7 @@ export default async function VolleyballTeamPage({ params }: { params: Params })
 
         <div className="pf-trustline">
           <span>Sportonica · {tournament.name}</span>
-          <Link href={`${base}?tab=table`} style={{ color: "inherit" }}>Tournament table</Link>
+          <Link href={`${base}?tab=table`} className="vbt-link">Tournament table</Link>
         </div>
       </div>
     </div>

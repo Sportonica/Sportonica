@@ -106,7 +106,7 @@ export default function VolleyballClient({ data }: { data: VolleyballDiscovery }
 
       <label className="vbp-search">
         <Search size={16} aria-hidden="true" />
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tournaments, teams, players or venues" aria-label="Search volleyball" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search teams, players, venues" aria-label="Search volleyball" />
       </label>
       <div className="tourn-filters">
         {FILTERS.map((f) => <button key={f} type="button" className={`tourn-chip ${filter === f ? "on" : ""}`} onClick={() => setFilter(f)}>{f}</button>)}

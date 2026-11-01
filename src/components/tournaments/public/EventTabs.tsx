@@ -250,7 +250,7 @@ export default function EventTabs({
       {activeTab === "Knockout" && <KnockoutTab matches={matches} teams={teams} intel={intel} tournamentId={tournament.id} />}
       {activeTab === "Fixtures" && (
         <FixturesPublicTab tournamentId={tournament.id} matches={matches} teams={teams} intel={intel} highlights={highlights} scorers={scorers}
-          basePath={tournamentPath(tournament)} stacked={isCricketSport || isBasketballSport} filterable={isVolleyball(tournament.sport)} />
+          basePath={tournamentPath(tournament)} stacked={isCricketSport || isBasketballSport || isVolleyball(tournament.sport)} filterable={isVolleyball(tournament.sport)} />
       )}
       {activeTab === "Player Stats" && (
         authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
@@ -646,7 +646,7 @@ function FixturesPublicTab({ tournamentId, matches: allMatches, teams, intel, hi
   highlights?: Record<string, MatchHighlight>;
   scorers?: Record<string, MatchScorer[]>;
   basePath: string;
-  // cricket's and basketball's scores ("180/4 – 156/2", "114 – 113") are too wide to share a phone's line with two names: there the teams stack
+  // cricket's and basketball's scores ("180/4 – 156/2", "114 – 113") are too wide to share a phone's line with two names, and volleyball's set scores need the width: there the teams stack
   stacked?: boolean;
   // volleyball: filter by status, stage and round
   filterable?: boolean;

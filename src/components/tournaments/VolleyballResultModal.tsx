@@ -6,6 +6,7 @@
 // is typed here: nothing is worked out from the score.
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import "@/components/intelligence/volleyball/volleyball.css";
 import { getVolleyballResult, saveVolleyballResult, type VolleyballResultView } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
 import type { Side } from "@/lib/intelligence/core/types";
@@ -32,6 +33,8 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
   const [rows, setRows] = useState<Row[]>([]);
   const [detailed, setDetailed] = useState(false);
   const [side, setSide] = useState<Side>("a");
+  // phones: one player's figures open at a time, in place of the wide table
+  const [openPlayer, setOpenPlayer] = useState<string | null>(null);
   const [lines, setLines] = useState<Record<string, Partial<Record<VolleyballLineKey, string>>>>({});
   const [mvp, setMvp] = useState("");
   const [notes, setNotes] = useState("");
@@ -79,7 +82,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
   if (loadErr || !view || !check) {
     return (
       <div className="tc-scrim" onClick={onClose}>
-        <div className="tc-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+        <div className="tc-modal vb-form" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
           <div className="tc-empty">{loadErr ?? "Loading…"}</div>
           {loadErr ? <div style={{ textAlign: "right" }}><button className="tc-btn" onClick={onClose}>Close</button></div> : null}
         </div>
@@ -117,7 +120,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
     const w = check.winner, l = w === "a" ? "b" : "a";
     return (
       <div className="tc-scrim">
-        <div className="tc-modal" style={{ maxWidth: 480, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+        <div className="tc-modal vb-form" style={{ maxWidth: 480, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
           <div style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.6 }}>Check the result</div>
           <div style={{ fontSize: 21, fontWeight: 800, margin: "12px 0" }}>{view.sides[w].name} defeated {view.sides[l].name}</div>
           <div style={{ fontSize: 15 }}>Final score: <b>{check.setsWon[w]}–{check.setsWon[l]}</b></div>
@@ -136,7 +139,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
 
   return (
     <div className="tc-scrim" onClick={onClose}>
-      <div className="tc-modal" style={{ maxWidth: detailed ? 720 : 480 }} onClick={(e) => e.stopPropagation()}>
+      <div className="tc-modal vb-form" style={{ maxWidth: detailed ? 720 : 480 }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Enter match result</h3>
           <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", color: "inherit", opacity: 0.6, cursor: "pointer", width: 36, height: 36, fontSize: 18 }}>×</button>
@@ -195,14 +198,19 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
               {(["a", "b"] as Side[]).map((s) => <button key={s} className={`tc-btn ${side === s ? "primary" : ""}`} style={{ padding: "7px 12px", fontSize: 12.5 }} onClick={() => setSide(s)}>{view.sides[s].name}</button>)}
             </div>
             <div style={{ overflowX: "auto" }}>
-              <table className="tc-table" style={{ minWidth: 1180 }}>
+              <table className="tc-table vb-lines" style={{ minWidth: 1180 }}>
                 <thead><tr><th>Player</th>{VOLLEYBALL_LINE_KEYS.map((k) => <th key={k} style={{ fontSize: 10.5 }}>{LINE_LABEL[k]}</th>)}</tr></thead>
                 <tbody>
                   {view.sides[side].players.map((p) => (
-                    <tr key={p.id}>
-                      <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{p.number != null ? `#${p.number} ` : ""}{p.name}</td>
+                    <tr key={p.id} className={openPlayer === p.id ? "open" : ""}>
+                      <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
+                        <button type="button" className="vb-line-name" aria-expanded={openPlayer === p.id} onClick={() => setOpenPlayer(openPlayer === p.id ? null : p.id)}>
+                          <span>{p.number != null ? `#${p.number} ` : ""}{p.name}</span>
+                          {lines[p.id] && Object.values(lines[p.id]).some(Boolean) ? <small>{Object.values(lines[p.id]).filter(Boolean).length} entered</small> : null}
+                        </button>
+                      </td>
                       {VOLLEYBALL_LINE_KEYS.map((k) => (
-                        <td key={k}><input inputMode="numeric" aria-label={`${p.name} ${LINE_LABEL[k]}`} value={lines[p.id]?.[k] ?? ""} style={{ font: "inherit", width: 44, padding: "6px 3px", textAlign: "center", borderRadius: 6, border: "1px solid rgba(127,127,127,.35)", background: "transparent", color: "inherit" }}
+                        <td key={k} data-label={LINE_LABEL[k]}><input inputMode="numeric" aria-label={`${p.name} ${LINE_LABEL[k]}`} value={lines[p.id]?.[k] ?? ""} style={{ font: "inherit", width: 44, padding: "6px 3px", textAlign: "center", borderRadius: 6, border: "1px solid rgba(127,127,127,.35)", background: "transparent", color: "inherit" }}
                           onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 3); setLines((all) => ({ ...all, [p.id]: { ...all[p.id], [k]: v } })); }} /></td>
                       ))}
                     </tr>
