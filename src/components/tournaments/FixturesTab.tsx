@@ -20,6 +20,7 @@ import { basketballScoringModes, getBasketballBoxScore, openMatchContest, saveBa
 import type { Side } from "@/lib/intelligence/core/types";
 import type { BoxScoreLine } from "@/lib/intelligence/sports/basketball";
 import { standingsScheme } from "@/lib/tournaments/standings";
+import VolleyballResultModal from "./VolleyballResultModal";
 import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry } from "@/lib/tournaments/types";
 
 const inputStyle: React.CSSProperties = {
@@ -337,9 +338,11 @@ export default function FixturesTab({
   // basketball: each match is scored live in the scorer, entered as a box score, or neither yet.
   // Only one of those can hold its result, so the row offers what fits (see MatchRow).
   const basketball = sportKeyFor(tournament.sport) === "basketball";
+  const volleyball = sportKeyFor(tournament.sport) === "volleyball";
+  const [vbEntry, setVbEntry] = useState<TournamentMatch | null>(null);
   const [bbModes, setBbModes] = useState<Record<string, { contestId: string; mode: "box" | "live" }>>({});
   // cricket too: a match in the live scorer keeps its result there
-  const tracksScorer = basketball || sportKind === "cricket";
+  const tracksScorer = basketball || volleyball || sportKind === "cricket";
   const [boxScoring, setBoxScoring] = useState<{ match: TournamentMatch; prefill: { a: number | null; b: number | null } } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
@@ -349,7 +352,7 @@ export default function FixturesTab({
     return () => { stale = true; };
   }, [tracksScorer, tournament.id, matches]);
   const bbFor = (m: TournamentMatch) => {
-    if (!basketball) return null;
+    if (!basketball && !volleyball) return null;
     const c = bbModes[m.id];
     return {
       mode: c?.mode ?? ("none" as const),
@@ -770,7 +773,8 @@ export default function FixturesTab({
                       if (!isActionError(c)) router.push(`/tournaments/${tournament.id}/score/${c.id}`);
                       return c;
                     })}
-                    onBoxScore={(typed) => setBoxScoring({ match: m, prefill: typed ?? { a: m.score_a, b: m.score_b } })}
+                    volleyball={volleyball}
+                    onBoxScore={(typed) => (volleyball ? setVbEntry(m) : setBoxScoring({ match: m, prefill: typed ?? { a: m.score_a, b: m.score_b } }))}
                     drawless={drawless}
                     drawlessHint={drawlessHint}
                     selected={selected.has(m.id)}
@@ -799,6 +803,14 @@ export default function FixturesTab({
             </table>
           </div>
         ))
+      )}
+
+      {vbEntry && (
+        <VolleyballResultModal
+          match={vbEntry}
+          onClose={() => setVbEntry(null)}
+          onSaved={(warning) => { setVbEntry(null); setNotice(warning); router.refresh(); }}
+        />
       )}
 
       {boxScoring && (
@@ -1059,7 +1071,7 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, onMoveUp, onMoveDown, pending, selected, onToggleSelect }: {
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, volleyball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, onMoveUp, onMoveDown, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -1068,6 +1080,8 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   liveScoringHref: string | null;
   // basketball: how this match is being scored (null for other sports)
   basketball: { mode: "none" | "box" | "live"; scorerHref: string | null; centreHref: string | null } | null;
+  // volleyball shares those modes: scored live, or the final set scores entered afterwards
+  volleyball: boolean;
   // cricket: this match is in the live scorer, which holds its result
   scoredLive: { scorerHref: string; centreHref: string } | null;
   // basketball: open this match in the live scorer
@@ -1377,6 +1391,36 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           ) : null
         ) : !bothSet ? (
           <span className="tc-dim" style={{ fontSize: 12 }}>Waiting for teams</span>
+        ) : volleyball && basketball && (basketball.mode !== "none" || !done) ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button className="tc-btn primary" disabled={pending} style={{ padding: "8px 14px", fontSize: 12.5 }} onClick={() => onBoxScore()}>{done ? "Edit match result" : "Enter match result"}</button>
+              {basketball.mode === "live" ? (
+                <Link className="tc-btn" href={basketball.scorerHref!} style={{ padding: "8px 14px", fontSize: 12.5, textDecoration: "none" }}>{done ? "Open in scorer" : "Live scoring"}</Link>
+              ) : basketball.mode === "none" ? (
+                <button className="tc-btn" disabled={pending} style={{ padding: "8px 14px", fontSize: 12.5 }} onClick={onOpenScorer}>Live scoring</button>
+              ) : null}
+              {basketball.centreHref ? <Link className="tc-btn" href={basketball.centreHref} style={{ padding: "8px 14px", fontSize: 12.5, textDecoration: "none" }}>Match page</Link> : null}
+            </div>
+            {!done && basketball.mode === "none" ? <span className="tc-dim" style={{ fontSize: 11 }}>Enter match result: the final set scores after the match. Live scoring: every rally as it happens.</span> : null}
+            {!done && basketball.mode === "live" ? <span className="tc-dim" style={{ fontSize: 11 }}>Being scored live. Entering a result asks you to confirm first.</span> : null}
+            {!done && basketball.mode === "none" && match.team_a_id && match.team_b_id ? (
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <span className="tc-dim" style={{ fontSize: 11 }}>Or record a walkover:</span>
+                {[match.team_a_id, match.team_b_id].map((id) => (
+                  <button key={id} className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
+                    onClick={() => {
+                      if (!window.confirm(`Record a walkover win for ${teamName(id)}? No score is recorded and this can't be undone.`)) return;
+                      const confirmCascade = confirmCascadeIfNeeded(id);
+                      if (confirmCascade === null) return;
+                      onResult(null, null, id, undefined, undefined, confirmCascade);
+                    }}>
+                    {teamName(id)} wins
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         ) : basketball && basketball.mode !== "none" ? (
           // the result lives in the scorer or the box score: typing a score here would contradict it
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>

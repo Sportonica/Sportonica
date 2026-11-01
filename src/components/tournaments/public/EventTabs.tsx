@@ -18,7 +18,8 @@ import { CricketCrest, CricketStatus } from "./CricketArt";
 import { BasketballCrest, BasketballStatus } from "./BasketballArt";
 import { BracketIcon, ClipboardIcon, HoopIcon, PlayerAvatar, StumpsIcon } from "./SportIcons";
 import type { MatchHighlight } from "@/lib/intelligence/actions";
-import { diffText, standingsScheme } from "@/lib/tournaments/standings";
+import { diffText, isVolleyball, ratioText, standingsScheme, type VolleyballStanding } from "@/lib/tournaments/standings";
+import { VOLLEYBALL_LEADERBOARDS } from "@/lib/intelligence/sports/volleyballRules";
 import {
   FORMAT_LABELS, compareStageRound, sideScore, tournamentPath,
   type Tournament, type TournamentTeam, type TournamentMatch,
@@ -254,12 +255,13 @@ export default function EventTabs({
       {activeTab === "Player Stats" && (
         authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
           : isBasketballSport ? <BasketballLeadersTab leaders={leaders} />
+          : isVolleyball(tournament.sport) ? <VolleyballLeadersTab leaders={leaders} />
           : isCricketSport ? (cricket?.players.length ? <CricketLeaders data={cricket} /> : <div className="ev2-empty">Player stats appear here once match figures are entered.</div>)
           : <PlayerStatsTab rows={playerStats} teams={teams} basePath={tournamentPath(tournament)} />
       )}
       {activeTab === "Results" && <ResultsTab tournamentId={tournament.id} />}
       {activeTab === "Teams" && (
-        authLoading ? null : user ? <TeamsTab teams={confirmedTeams} playerStats={isBasketballSport || isCricketSport ? [] : playerStats} /> : <SignInGate what="the teams and squads" pathname={pathname} />
+        authLoading ? null : user ? <TeamsTab teams={confirmedTeams} playerStats={isBasketballSport || isCricketSport || isVolleyball(tournament.sport) ? [] : playerStats} /> : <SignInGate what="the teams and squads" pathname={pathname} />
       )}
 
       {/* Rules only matter while you're deciding whether to register or
@@ -394,6 +396,7 @@ function TableTab({
   }
   const teamLogo = (id: string) => teams.find((t) => t.id === id)?.logo_url ?? null;
   const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
+  const vb = isVolleyball(tournament.sport);
   // One compact row per team, like a league table: played, won, drawn (where the sport has
   // draws), lost, scored for and against, difference and points. The top 2
   // of each group are marked, the usual qualifying places.
@@ -416,7 +419,10 @@ function TableTab({
                   <th scope="col" title="Lost">L</th>
                   <th className="wide" scope="col" title={scheme.forName}>{scheme.forLabel}</th>
                   <th className="wide" scope="col" title={scheme.againstName}>{scheme.againstLabel}</th>
-                  <th scope="col" title={scheme.diffName}>{scheme.diffLabel}</th>
+                  {vb ? <th scope="col" title="Set ratio">SR</th> : <th scope="col" title={scheme.diffName}>{scheme.diffLabel}</th>}
+                  {vb ? <th className="wide" scope="col" title="Points for">PF</th> : null}
+                  {vb ? <th className="wide" scope="col" title="Points against">PA</th> : null}
+                  {vb ? <th className="wide" scope="col" title="Point ratio">PR</th> : null}
                   <th className="pts" scope="col" title="Points">Pts</th>
                 </tr>
               </thead>
@@ -443,7 +449,10 @@ function TableTab({
                       <td>{r.lost}</td>
                       <td className="wide">{r.goals_for}</td>
                       <td className="wide">{r.goals_against}</td>
-                      <td>{diffText(scheme, r.goal_diff)}</td>
+                      {vb ? <td>{ratioText((r as VolleyballStanding).set_ratio, r.goals_for)}</td> : <td>{diffText(scheme, r.goal_diff)}</td>}
+                      {vb ? <td className="wide">{(r as VolleyballStanding).points_for}</td> : null}
+                      {vb ? <td className="wide">{(r as VolleyballStanding).points_against}</td> : null}
+                      {vb ? <td className="wide">{ratioText((r as VolleyballStanding).point_ratio, (r as VolleyballStanding).points_for)}</td> : null}
                       <td className="pts">{r.points}</td>
                     </tr>
                   );
@@ -928,6 +937,42 @@ const BB_STATS = [
   { total: "blk", avg: "bpg", label: "Blocks" },
   { total: "tpm", avg: "tpmPg", label: "3-pointers" },
 ] as const;
+
+// Volleyball leaders: one award at a time, each with how it is worked out.
+function VolleyballLeadersTab({ leaders }: { leaders: TournamentLeaders | null }) {
+  const [board, setBoard] = useState(VOLLEYBALL_LEADERBOARDS[0]);
+  if (!leaders?.rows.length) return <div className="ev2-empty">Player stats appear here once matches have player figures. Results entered without them don&apos;t count towards these.</div>;
+  const raw = (r: (typeof leaders.rows)[number]) => r.values as Record<string, number | null>;
+  const sorted = leaders.rows
+    .filter((r) => { const v = board.value(raw(r)); return v !== null && (v > 0 || board.key === "attacker") && (!board.minKey || (raw(r)[board.minKey] ?? 0) >= (board.min ?? 0)); })
+    .sort((x, y) => (board.value(raw(y))! - board.value(raw(x))!) || ((board.then?.(raw(y)) ?? 0) - (board.then?.(raw(x)) ?? 0)));
+  const shown = (r: (typeof leaders.rows)[number]) => {
+    const v = board.value(raw(r))!;
+    return board.format === "pct" ? `${v.toFixed(1)}%` : board.format === "dec1" ? v.toFixed(1) : v;
+  };
+  return (
+    <div>
+      <div className="ev2-subtabs">
+        {VOLLEYBALL_LEADERBOARDS.map((b) => <button key={b.key} className={`ev2-subtab ${board.key === b.key ? "on" : ""}`} onClick={() => setBoard(b)}>{b.title}</button>)}
+      </div>
+      <p className="ev2-prow-team" style={{ margin: "0 0 10px" }}>{board.how}</p>
+      {sorted.length === 0 ? <div className="ev2-empty">Nothing recorded for this yet.</div> : (
+        <div className="ev2-standings">
+          {sorted.map((r, i) => (
+            <div key={r.subjectKey} className={`ev2-srow${i < 2 ? " top3" : ""}`}>
+              <span className="ev2-srow-rank">{i + 1}</span>
+              <div className="ev2-prow-id">
+                <span className="ev2-srow-name">{r.name}</span>
+                <span className="ev2-prow-team">{r.teamName} · {r.contests} match{r.contests === 1 ? "" : "es"}</span>
+              </div>
+              <span className="ev2-srow-stat">{shown(r)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function BasketballLeadersTab({ leaders }: { leaders: TournamentLeaders | null }) {
   const [stat, setStat] = useState<(typeof BB_STATS)[number]>(BB_STATS[0]);

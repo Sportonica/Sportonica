@@ -14,13 +14,14 @@ import type { MatchAnswer } from "@/lib/intelligence/core/types";
 import { SPORTS_WITH_QUESTIONS } from "@/lib/intelligence/capabilities";
 import type { SwimPerformance } from "@/lib/intelligence/sports/swimming";
 import { useLiveContest } from "./useLiveContest";
+import VolleyballMatchPanel, { type VolleyballMatchInfo } from "./volleyball/VolleyballMatchPanel";
 import { ChartView, Insights, RulesGuide, ScoreCard, StatCards, StatTableView, Timeline } from "./views";
 import "./intelligence.css";
 
 const TABS = ["Live", "Timeline", "Statistics", "Players", "Analytics", "History"] as const;
 type Tab = (typeof TABS)[number];
 
-export default function MatchCentre({ initial, tournamentName, canScore }: { initial: ContestView; tournamentName: string; canScore: boolean }) {
+export default function MatchCentre({ initial, tournamentName, canScore, matchInfo = null }: { initial: ContestView; tournamentName: string; canScore: boolean; matchInfo?: VolleyballMatchInfo | null }) {
   const [contest] = useLiveContest(initial);
   const [tab, setTab] = useState<Tab>("Live");
   const [intel, setIntel] = useState<ContestIntelligence | null>(null);
@@ -83,6 +84,7 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
 
         {tab === "Live" ? (
           <>
+            {contest.sport === "volleyball" ? <VolleyballMatchPanel contest={contest} tournamentName={tournamentName} info={matchInfo} /> : null}
             <div className="si-card">
               <h2 className="si-h2">At a glance</h2>
               <div className="si-notes">{contest.summary.lines.map((l, i) => <span key={i}>{l}</span>)}</div>

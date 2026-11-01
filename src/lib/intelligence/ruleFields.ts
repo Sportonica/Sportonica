@@ -19,6 +19,7 @@ export interface RuleGroup { title: string; fields: RuleField[] }
 
 export const RULE_PRESETS: Partial<Record<SportKey, readonly (readonly [string, string])[]>> = {
   basketball: [["fiba", "FIBA: 4 × 10 min"], ["nba", "NBA: 4 × 12 min"], ["ncaa", "College: 2 × 20 min"], ["3x3", "3x3: 10 min or first to 21"], ["custom", "Custom"]],
+  volleyball: [["indoor", "Indoor: best of 5, 6 a side"], ["indoor3", "Indoor: best of 3, 6 a side"], ["beach", "Beach: best of 3, 2 a side"], ["custom", "Custom"]],
   cricket: [["t20", "T20: 20 overs"], ["odi", "One-day: 50 overs"], ["test", "Two innings, no over limit"], ["custom", "Custom overs (box cricket)"]],
 };
 
@@ -108,4 +109,30 @@ const CRICKET: RuleGroup[] = [
   ] },
 ];
 
-export const RULE_GROUPS: Partial<Record<SportKey, RuleGroup[]>> = { basketball: BASKETBALL, cricket: CRICKET };
+const VOLLEYBALL: RuleGroup[] = [
+  { title: "Match", fields: [
+    { key: "bestOf", label: "Best of (sets)", kind: "int", min: 1, max: 9, help: "An odd number: 3 or 5" },
+    { key: "setPoints", label: "Points to win a set", kind: "int", min: 1, max: 99 },
+    { key: "decidingSetPoints", label: "Points to win the deciding set", kind: "int", min: 1, max: 99 },
+    { key: "winBy", label: "Winning margin", kind: "int", min: 1, max: 9 },
+    { key: "pointCap", label: "Highest score in a set", kind: "limit", empty: "No limit" },
+    { key: "decidingSetToss", label: "New toss for the deciding set", kind: "bool" },
+  ] },
+  { title: "Teams on court", fields: [
+    { key: "playersOnCourt", label: "Players on court", kind: "int", min: 1, max: 12 },
+    { key: "timeoutsPerSet", label: "Timeouts per set", kind: "int", min: 0 },
+    { key: "substitutionsPerSet", label: "Substitutions per set", kind: "int", min: 0 },
+    { key: "substitutionPairs", label: "Players only swap with the same player", kind: "bool", help: "The official rule: there and back once a set" },
+    { key: "liberoAllowed", label: "Libero allowed", kind: "bool", help: "Six a side only" },
+    { key: "maxLiberos", label: "Liberos per team", kind: "int", min: 0, max: 2 },
+  ] },
+  { title: "League table", fields: [
+    { key: "tableWinPoints", label: "Points for a win", kind: "int", min: 0 },
+    { key: "tableDecidingWinPoints", label: "Win in the deciding set", kind: "int", min: 0 },
+    { key: "tableDecidingLossPoints", label: "Loss in the deciding set", kind: "int", min: 0 },
+    { key: "tableLossPoints", label: "Points for a loss", kind: "int", min: 0 },
+    { key: "tableForfeitLossPoints", label: "Points for a forfeit", kind: "int", min: 0 },
+  ] },
+];
+
+export const RULE_GROUPS: Partial<Record<SportKey, RuleGroup[]>> = { basketball: BASKETBALL, cricket: CRICKET, volleyball: VOLLEYBALL };

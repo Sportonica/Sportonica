@@ -20,10 +20,10 @@ import EventTabs from "@/components/tournaments/public/EventTabs";
 import { CricketBall, CricketHeroArt, ballFor } from "@/components/tournaments/public/CricketArt";
 import { BasketballBall, BasketballHeroArt } from "@/components/tournaments/public/BasketballArt";
 import LiveScoringStrip from "@/components/intelligence/LiveScoringStrip";
-import { canScoreTournament, getCricketMatchFacts, getCricketRecords, getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
+import { canScoreTournament, getVolleyballMatchFacts, getCricketMatchFacts, getCricketRecords, getMatchHighlights, getTournamentLeaders, listTournamentContests } from "@/lib/intelligence/actions";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import { toMatchIntel, type MatchIntel } from "@/lib/intelligence/matchIntel";
-import { computeBasketballStandings, computeCricketStandings, isBasketball, isCricket } from "@/lib/tournaments/standings";
+import { computeBasketballStandings, computeCricketStandings, computeVolleyballStandings, isBasketball, isCricket, isVolleyball } from "@/lib/tournaments/standings";
 import "@/app/(play)/play.css";
 import "@/app/platform/events/events.css";
 import "./tournament-hero.css";
@@ -52,7 +52,7 @@ async function loadTournamentView(tournament: Tournament, user: { id: string } |
   const isLiveOrDone = tournament.status === "live" || tournament.status === "completed";
   const scored = !!sportKeyFor(tournament.sport);
   const cricketSport = isCricket(tournament.sport) && isLiveOrDone;
-  const goalsSport = isLiveOrDone && !isCricket(tournament.sport) && !isBasketball(tournament.sport)
+  const goalsSport = isLiveOrDone && !isCricket(tournament.sport) && !isBasketball(tournament.sport) && !isVolleyball(tournament.sport)
     && getSportKind(tournament.sport) !== "individual_race";
   // Every query the page needs, in one round: each one is a trip to the
   // database, and run one after another they added up to most of the
@@ -69,7 +69,7 @@ async function loadTournamentView(tournament: Tournament, user: { id: string } |
     // sport-aware scores for fixtures that are scored event by event
     scored ? listTournamentContests(id) : Promise.resolve([]),
     // basketball's player stats come from its scored games (points, rebounds…), not the goals table
-    isLiveOrDone && (isBasketball(tournament.sport) || isCricket(tournament.sport)) ? getTournamentLeaders(id) : Promise.resolve(null),
+    isLiveOrDone && (isBasketball(tournament.sport) || isCricket(tournament.sport) || isVolleyball(tournament.sport)) ? getTournamentLeaders(id) : Promise.resolve(null),
     // cricket: batting and bowling figures entered from the fixtures
     isLiveOrDone && isCricket(tournament.sport) ? getTournamentCricketStats(id) : Promise.resolve(null),
     // what each scored game recorded: period scores, result, top performers
@@ -113,6 +113,11 @@ async function loadTournamentView(tournament: Tournament, user: { id: string } |
   if (hasStandings && matches.length > 0 && isBasketball(tournament.sport)) {
     // basketball tables follow the competition's own rules, from the fixtures
     for (const g of groups) standingsByGroup[g] = computeBasketballStandings(matches, teams, tournament.scoring_rules, g || null);
+  } else if (hasStandings && matches.length > 0 && isVolleyball(tournament.sport)) {
+    // set ratio and point ratio need each match's set scores, which the fixture row doesn't hold
+    const vbFacts = await getVolleyballMatchFacts(id);
+    if (isActionError(vbFacts)) failed = true;
+    for (const g of groups) standingsByGroup[g] = computeVolleyballStandings(matches, teams, tournament.scoring_rules, g || null, isActionError(vbFacts) ? {} : vbFacts);
   } else if (hasStandings && matches.length > 0 && isCricket(tournament.sport)) {
     // cricket tables: points then net run rate, from the fixtures' runs and overs (and each scored match's own overs)
     for (const g of groups) standingsByGroup[g] = computeCricketStandings(matches, teams, tournament.scoring_rules, g || null, facts);

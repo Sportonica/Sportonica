@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { getTournamentCricketStats, getTournamentStandings } from "@/lib/tournaments/actions";
-import { getCricketMatchFacts, getCricketRecords } from "@/lib/intelligence/actions";
+import { getCricketMatchFacts, getCricketRecords, getVolleyballMatchFacts } from "@/lib/intelligence/actions";
 import { cricketPlayers, cricketTeams } from "@/lib/tournaments/cricketRecords";
 import { CricketOverview, CricketTablePublic, type CricketTournamentData } from "./public/CricketStats";
 import { isActionError } from "@/lib/actionError";
 import type { Tournament, TournamentMatch, TournamentTeam, TournamentStanding } from "@/lib/tournaments/types";
-import { basketballRulesOf, computeBasketballStandings, computeCricketStandings, cricketOutcome, cricketRulesOf, diffText, type CricketMatchFacts, type CricketStanding, isBasketball, isCricket, standingsScheme, type BasketballStanding } from "@/lib/tournaments/standings";
+import { basketballRulesOf, computeBasketballStandings, computeCricketStandings, computeVolleyballStandings, cricketOutcome, cricketRulesOf, diffText, type CricketMatchFacts, type CricketStanding, isBasketball, isCricket, isVolleyball, ratioText, standingsScheme, type BasketballStanding, type VolleyballMatchFacts, type VolleyballStanding } from "@/lib/tournaments/standings";
 
 const ALL = "__all__";
 
@@ -28,7 +28,9 @@ export default function StandingsTab({ tournament, teams, matches }: {
   const basketball = isBasketball(tournament.sport) && !!matches;
   const cricket = isCricket(tournament.sport) && !!matches;
   // computed here from the fixtures, with the sport's own rules (the rest come from tournament_standings())
-  const computed = basketball || cricket;
+  const volleyball = isVolleyball(tournament.sport) && !!matches;
+  const computed = basketball || cricket || volleyball;
+  const [vbFacts, setVbFacts] = useState<VolleyballMatchFacts>({});
   const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
   const [data, setData] = useState<Record<string, TournamentStanding[]>>({});
   const [loading, setLoading] = useState(!computed);
@@ -59,6 +61,14 @@ export default function StandingsTab({ tournament, teams, matches }: {
   }, [cricket, tournament.id, matchesKey, teamsKey, JSON.stringify(tournament.scoring_rules ?? null)]);
 
   useEffect(() => {
+    if (!volleyball) return;
+    let cancelled = false;
+    getVolleyballMatchFacts(tournament.id).then((f) => { if (!cancelled && !isActionError(f)) setVbFacts(f); }).catch(() => { /* the table still shows sets and wins */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [volleyball, tournament.id, matchesKey]);
+
+  useEffect(() => {
     if (computed) return;
     let cancelled = false;
     (async () => {
@@ -79,8 +89,9 @@ export default function StandingsTab({ tournament, teams, matches }: {
   }
   if (loading) return <div className="tc-empty">Loading standings…</div>;
 
-  const rowsFor = (g: string | null): (TournamentStanding & Partial<BasketballStanding>)[] =>
-    basketball ? computeBasketballStandings(matches!, teams, tournament.scoring_rules, g)
+  const rowsFor = (g: string | null): (TournamentStanding & Partial<BasketballStanding> & Partial<VolleyballStanding>)[] =>
+    volleyball ? computeVolleyballStandings(matches!, teams, tournament.scoring_rules, g, vbFacts)
+    : basketball ? computeBasketballStandings(matches!, teams, tournament.scoring_rules, g)
     : cricket ? computeCricketStandings(matches!, teams, tournament.scoring_rules, g, quotas)
     : data[g ?? ALL] ?? [];
   const anyPlayed = groups.some((g) => rowsFor(g).some((r) => r.played > 0));
@@ -119,6 +130,10 @@ export default function StandingsTab({ tournament, teams, matches }: {
         <div className="tc-dim" style={{ fontSize: 12, marginTop: 4 }}>
           Ranked by table points, then {standingsTiebreakText(tournament.scoring_rules)}. A forfeit counts as a loss with no points for or against.
         </div>
+      ) : volleyball ? (
+        <div className="tc-dim" style={{ fontSize: 12, marginTop: 4 }}>
+          Ranked by table points, then the competition&apos;s tiebreaks. MAX: no sets or points lost yet.
+        </div>
       ) : cricket ? (
         <div className="tc-dim" style={{ fontSize: 12, marginTop: 4 }}>
           2 points for a win, 1 for a tie or no result. Ranked by points, then net run rate (a side bowled out counts its full overs).
@@ -140,7 +155,10 @@ export default function StandingsTab({ tournament, teams, matches }: {
                       {basketball && <th className="tc-sm-hide" title="Win percentage">Win %</th>}
                       <th className="tc-sm-hide" title={scheme.forName}>{scheme.forLabel}</th>
                       <th className="tc-sm-hide" title={scheme.againstName}>{scheme.againstLabel}</th>
-                      <th title={scheme.diffName}>{scheme.diffLabel}</th>
+                      {volleyball ? <th title="Set ratio">SR</th> : <th title={scheme.diffName}>{scheme.diffLabel}</th>}
+                      {volleyball && <th className="tc-sm-hide" title="Points for">PF</th>}
+                      {volleyball && <th className="tc-sm-hide" title="Points against">PA</th>}
+                      {volleyball && <th className="tc-sm-hide" title="Point ratio">PR</th>}
                       {basketball && <th className="tc-sm-hide" title="Current streak">Strk</th>}
                       {basketball && <th className="tc-sm-hide" title="Last five games, most recent last">Last 5</th>}
                       <th>Pts</th>
@@ -157,7 +175,10 @@ export default function StandingsTab({ tournament, teams, matches }: {
                         {basketball && <td className="tc-num tc-sm-hide">{r.win_pct === null || r.win_pct === undefined ? "–" : r.win_pct.toFixed(1)}</td>}
                         <td className="tc-num tc-sm-hide">{r.goals_for}</td>
                         <td className="tc-num tc-sm-hide">{r.goals_against}</td>
-                        <td className="tc-num">{diffText(scheme, r.goal_diff)}</td>
+                        {volleyball ? <td className="tc-num">{ratioText(r.set_ratio ?? null, r.goals_for)}</td> : <td className="tc-num">{diffText(scheme, r.goal_diff)}</td>}
+                        {volleyball && <td className="tc-num tc-sm-hide">{r.points_for}</td>}
+                        {volleyball && <td className="tc-num tc-sm-hide">{r.points_against}</td>}
+                        {volleyball && <td className="tc-num tc-sm-hide">{ratioText(r.point_ratio ?? null, r.points_for ?? 0)}</td>}
                         {basketball && <td className="tc-num tc-sm-hide">{r.streak || "–"}</td>}
                         {basketball && <td className="tc-num tc-sm-hide" style={{ letterSpacing: 1 }}>{r.last5 || "–"}</td>}
                         <td className="tc-num" style={{ fontWeight: 700 }}>{r.points}</td>

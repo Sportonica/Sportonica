@@ -33,7 +33,11 @@ export const SPORTS: Sport[] = [
       { code: "PG", name: "Point Guard" }, { code: "SG", name: "Shooting Guard" }, { code: "SF", name: "Small Forward" },
       { code: "PF", name: "Power Forward" }, { code: "C", name: "Center" },
     ] },
-  { name: "Volleyball", color: "#3b82f6", squad: 6,  tagline: "Sand, net, sunset" },
+  { name: "Volleyball", color: "#3b82f6", squad: 6,  tagline: "Sand, net, sunset", team: { onCourt: 6, substitutes: 6 },
+    positions: [
+      { code: "S", name: "Setter" }, { code: "OH", name: "Outside Hitter" }, { code: "OPP", name: "Opposite" },
+      { code: "MB", name: "Middle Blocker" }, { code: "L", name: "Libero" }, { code: "DS", name: "Defensive Specialist" },
+    ] },
   { name: "Badminton",  color: "#a855f7", squad: 2,  tagline: "Dawn doubles, indoor courts" },
   { name: "Tennis",     color: "#ec4899", squad: 2,  tagline: "Baseline rallies" },
   { name: "Pickleball", color: "#84cc16", squad: 2,  tagline: "The fastest-growing game in town" },

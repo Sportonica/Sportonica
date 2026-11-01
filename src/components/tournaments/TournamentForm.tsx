@@ -7,6 +7,7 @@ import { SPORT_NAMES as SPORTS, normalizeSport, sportTeamSize } from "@/lib/spor
 import { saveScoringRules } from "@/lib/intelligence/actions";
 import { CRICKET_TIEBREAKERS, TIEBREAKER_LABEL, cricketTableOf, type CricketTiebreaker } from "@/lib/intelligence/sports/cricketTable";
 import { BASKETBALL_PRESETS, type BasketballPreset } from "@/lib/intelligence/sports/basketball/rules";
+import { VOLLEYBALL_PRESETS, VOLLEYBALL_TIEBREAKS, volleyballRulesOf, type VolleyballPreset, type VolleyballTiebreak } from "@/lib/intelligence/sports/volleyballRules";
 import { CRICKET_PRESETS, type CricketRules } from "@/lib/intelligence/sports/cricketRules";
 import RuleFields from "@/components/intelligence/RuleFields";
 import { createTournament, updateTournamentDraft, publishTournament, uploadTournamentBanner, uploadTournamentQr } from "@/lib/tournaments/actions";
@@ -170,11 +171,20 @@ export default function TournamentForm({
     const preset = (saved.preset && saved.preset in CRICKET_FORMATS ? saved.preset : "t20") as keyof typeof CRICKET_FORMATS;
     return { ...cricketPreset(preset), ...saved, table: cricketTableOf(saved.table) };
   });
+  // volleyball: the format and the table (saved as the tournament's scoring rules)
+  const isVolleyballSport = sport === "Volleyball";
+  const [vb, setVb] = useState(() => volleyballRulesOf(existing?.scoring_rules));
+  const setVbPreset = (preset: string) => {
+    if (!(preset in VOLLEYBALL_PRESETS)) return;
+    const next = VOLLEYBALL_PRESETS[preset as VolleyballPreset];
+    setVb({ ...next });
+    if (!existing) { setMinPlayers(next.playersOnCourt); setMaxPlayers(next.playersOnCourt); setSubLimit(next.substitutionsPerSet); }
+  };
   // scoring rules are saved next to the tournament, once it exists
   async function saveGameRules(id: string): Promise<string | null> {
-    if (!isBasketballSport && !isCricketSport) return null;
+    if (!isBasketballSport && !isCricketSport && !isVolleyballSport) return null;
     // every rule, not just the ones on show: the server fills any missing one from the preset
-    const res = await saveScoringRules(id, isBasketballSport ? bb : ck);
+    const res = await saveScoringRules(id, isBasketballSport ? bb : isVolleyballSport ? (vb as unknown as Record<string, unknown>) : ck);
     return isActionError(res) ? `The tournament was saved, but the ${sport.toLowerCase()} settings were not: ${res.message}` : null;
   }
 
@@ -737,6 +747,34 @@ export default function TournamentForm({
           <SectionTitle>Basketball game</SectionTitle>
           <RuleFields sport="basketball" look="console" rules={bb as unknown as Record<string, unknown>}
             onChange={(r) => setBb(r as unknown as typeof bb)} onPreset={setPreset} />
+          <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
+            Matches already being scored keep the rules they started with. Change one match&apos;s rules from its scorer.
+          </p>
+        </>
+      )}
+
+      {isVolleyballSport && (
+        <>
+          <SectionTitle>Volleyball format</SectionTitle>
+          <RuleFields sport="volleyball" look="console" rules={vb as unknown as Record<string, unknown>}
+            onChange={(r) => setVb(r as unknown as typeof vb)} onPreset={setVbPreset} />
+          {format !== "knockout" && (
+            <div className="ev-row">
+              {[0, 1, 2, 3].map((i) => (
+                <div className="ev-field" key={i}>
+                  <label>{i === 0 ? "Level on points: first" : "Then"}</label>
+                  <select value={vb.tiebreakers[i] ?? ""} onChange={(e) => {
+                    const tb = [...vb.tiebreakers];
+                    if (e.target.value) tb[i] = e.target.value as VolleyballTiebreak; else tb.splice(i);
+                    setVb({ ...vb, tiebreakers: [...new Set(tb.filter(Boolean))] });
+                  }}>
+                    {i > 0 ? <option value="">Nothing further</option> : null}
+                    {VOLLEYBALL_TIEBREAKS.map((t) => <option key={t} value={t}>{{ wins: "Most wins", set_ratio: "Set ratio", point_ratio: "Point ratio", head_to_head: "Matches between them" }[t]}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          )}
           <p className="tc-dim" style={{ fontSize: 12.5, margin: "-4px 0 12px" }}>
             Matches already being scored keep the rules they started with. Change one match&apos;s rules from its scorer.
           </p>
