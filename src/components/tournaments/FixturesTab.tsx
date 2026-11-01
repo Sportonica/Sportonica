@@ -16,12 +16,13 @@ import QualifierPicker from "./QualifierPicker";
 import { friendlyTournamentError } from "@/lib/tournaments/types";
 import { getSportKind, type SportKind } from "@/lib/sports";
 import { sportKeyFor } from "@/lib/intelligence/registry";
-import { basketballScoringModes, getBasketballBoxScore, openMatchContest, saveBasketballBoxScore, type BasketballBoxScoreView } from "@/lib/intelligence/actions";
+import { basketballScoringModes, getBasketballBoxScore, getVolleyballMatchFacts, openMatchContest, saveBasketballBoxScore, type BasketballBoxScoreView } from "@/lib/intelligence/actions";
+import { computeVolleyballStandings } from "@/lib/tournaments/standings";
 import type { Side } from "@/lib/intelligence/core/types";
 import type { BoxScoreLine } from "@/lib/intelligence/sports/basketball";
 import { standingsScheme } from "@/lib/tournaments/standings";
 import VolleyballResultModal from "./VolleyballResultModal";
-import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry } from "@/lib/tournaments/types";
+import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry, TournamentStanding } from "@/lib/tournaments/types";
 
 const inputStyle: React.CSSProperties = {
   padding: "5px 8px", borderRadius: 8, border: "1px solid rgba(242,237,230,0.15)",
@@ -436,6 +437,10 @@ export default function FixturesTab({
     && groupMatches.length > 0 && !matches.some((m) => m.stage === "knockout");
   const [advancePerGroup, setAdvancePerGroup] = useState("2");
   const [pickQualifiers, setPickQualifiers] = useState(false);
+  const volleyballTables = async (groups: string[]) => {
+    const facts = await getVolleyballMatchFacts(tournament.id);
+    return groups.map((g) => computeVolleyballStandings(matches, teams, tournament.scoring_rules, g, isActionError(facts) ? {} : facts) as TournamentStanding[]);
+  };
 
   if (!canAddMatches && matches.length === 0) {
     return (
@@ -600,6 +605,16 @@ export default function FixturesTab({
         </div>
       )}
 
+      {volleyball && tournament.format === "group_knockout" && tournament.status === "registration_closed" && teams.length > 0 && (
+        <VolleyballGroups teams={teams} pending={pending} onSave={(groups) => run(async () => {
+          for (const [i, t] of teams.entries()) {
+            const res = await setTeamSeed(t.id, t.seed ?? i + 1, groups[t.id] || undefined);
+            if (isActionError(res)) return res;
+          }
+          return null;
+        })} />
+      )}
+
       {canGenerateKnockout && (
         <div className="tc-card" style={{ marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Generate the knockout stage</div>
@@ -607,11 +622,16 @@ export default function FixturesTab({
             Builds the bracket from the group standings, all the way to the Final, and moves each winner on automatically.
             Group winners play a runner-up from another group, and two teams from the same group can only meet again in the Final.
           </div>
-          {pickQualifiers ? (
+          {volleyball && !teams.some((t) => t.group_name) ? (
+            <div className="tc-dim" style={{ fontSize: 13 }}>
+              These teams weren&apos;t put into groups before the first match, so the bracket can&apos;t be built from the groups. Add the knockout matches by hand below, then enter each next round&apos;s teams yourself.
+            </div>
+          ) : pickQualifiers ? (
             <QualifierPicker
               tournamentId={tournament.id} teams={teams} perGroup={Math.max(1, Number(advancePerGroup) || 2)} groupsLeft={groupsLeft} pending={pending}
               onGenerate={(picks) => run(() => generateKnockoutFromPicks(tournament.id, picks))}
               onCancel={() => setPickQualifiers(false)}
+              loadTables={volleyball ? volleyballTables : undefined}
             />
           ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -626,6 +646,17 @@ export default function FixturesTab({
               className="tc-btn primary" disabled={pending || groupsLeft > 0 || !(Number(advancePerGroup) >= 1)}
               onClick={() => {
                 if (!window.confirm(`Generate the knockout stage with the top ${advancePerGroup} of each group?`)) return;
+                if (volleyball) {
+                  // the volleyball table decides who goes through, not tournament_standings()
+                  run(async () => {
+                    const groups = [...new Set(teams.map((t) => t.group_name).filter((g): g is string => !!g))].sort();
+                    const tables = await volleyballTables(groups);
+                    const picks: Record<string, string[]> = {};
+                    groups.forEach((g, i) => { picks[g] = (tables[i] as TournamentStanding[]).slice(0, Number(advancePerGroup)).map((r) => r.team_id); });
+                    return generateKnockoutFromPicks(tournament.id, picks);
+                  });
+                  return;
+                }
                 run(() => generateKnockoutFromGroups(tournament.id, Number(advancePerGroup)));
               }}
             >
@@ -1070,6 +1101,32 @@ const STATUS_OPTIONS: SettableStatus[] = ["unscheduled", "scheduled", "live", "p
 const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
+
+// Which group each team is in. Only before play starts: set_team_seed() takes
+// no changes once the first match is added, and the bracket reads these.
+function VolleyballGroups({ teams, pending, onSave }: { teams: TournamentTeam[]; pending: boolean; onSave: (groups: Record<string, string>) => void }) {
+  const [groups, setGroups] = useState<Record<string, string>>(() => Object.fromEntries(teams.map((t) => [t.id, t.group_name ?? ""])));
+  const ready = teams.every((t) => groups[t.id]?.trim());
+  return (
+    <div className="tc-card" style={{ marginBottom: 16 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Put teams in groups</div>
+      <div className="tc-card-sub" style={{ marginBottom: 10 }}>Do this before adding the first match. The table and the knockout stage are built from these groups.</div>
+      <div style={{ display: "grid", gap: 8, maxWidth: 360 }}>
+        {teams.map((t) => (
+          <label key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13.5 }}>
+            {t.name}
+            <input value={groups[t.id] ?? ""} placeholder="A" aria-label={`${t.name} group`} style={{ ...inputStyle, width: 70 }}
+              onChange={(e) => setGroups((g) => ({ ...g, [t.id]: e.target.value.toUpperCase() }))} />
+          </label>
+        ))}
+      </div>
+      <button className="tc-btn primary" disabled={pending || !ready} style={{ marginTop: 12, padding: "9px 14px" }}
+        onClick={() => onSave(Object.fromEntries(Object.entries(groups).map(([id, g]) => [id, g.trim()])))}>
+        Save groups
+      </button>
+    </div>
+  );
+}
 
 function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, volleyball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, onMoveUp, onMoveDown, pending, selected, onToggleSelect }: {
   match: TournamentMatch;

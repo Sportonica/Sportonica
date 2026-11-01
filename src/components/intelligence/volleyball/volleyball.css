@@ -28,3 +28,9 @@
 .vb-facts dt { color: var(--si-text-3); }
 .vb-facts dd { margin: 0; font-weight: 600; text-align: right; }
 .vb-log { display: grid; gap: 4px; font-size: 13px; margin: 0; padding: 0; list-style: none; }
+
+.vb-crests { display: flex; justify-content: space-between; gap: 12px; }
+.vb-crest { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; font-size: 13.5px; }
+.vb-crest:last-child { flex-direction: row-reverse; text-align: right; }
+.vb-crest b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vb-crest img, .vb-crest span { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: rgba(59,130,246,0.14); color: #1d4ed8; font-weight: 800; }

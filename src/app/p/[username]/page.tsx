@@ -62,6 +62,8 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
     );
   }
 
+  const volleyballRes = await getPlayerHistory(profile.id, "volleyball");
+  const volleyball = !isActionError(volleyballRes) && volleyballRes.contests > 0 ? volleyballRes : null;
   const [stats, sports, recent, relationship, blocked, scorecardRes, sb, cricketRes] = await Promise.all([
     getPlayerStats(profile.id),
     getPlayerSports(profile.id),
@@ -191,6 +193,28 @@ export default async function PublicProfile({ params }: { params: Promise<{ user
               <div className="pf-stat"><div className="pf-stat-v">{cricket.sixes}</div><div className="pf-stat-l">6s</div></div>
               <div className="pf-stat"><div className="pf-stat-v">{cricket.wickets}</div><div className="pf-stat-l">Wickets</div></div>
               <div className="pf-stat"><div className="pf-stat-v">{cricket.bestBowling ?? "–"}</div><div className="pf-stat-l">Best bowling{cricket.economy !== null ? ` · econ ${cricket.economy.toFixed(2)}` : ""}</div></div>
+            </div>
+          </section>
+        ) : null}
+
+        {/* ── Volleyball ── */}
+        {volleyball ? (
+          <section className="pf-sec">
+            <div className="pf-sec-head">
+              <span className="pf-sec-num">{num()}</span>
+              <h2 className="pf-sec-t">Volleyball</h2>
+              <span className="pf-sec-count">{volleyball.contests} match{volleyball.contests !== 1 ? "es" : ""}</span>
+            </div>
+            <div className="pf-stats">
+              <div className="pf-stat"><div className="pf-stat-v">{volleyball.values.pointsScored ?? 0}</div><div className="pf-stat-l">Points</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{volleyball.values.kills ?? 0}</div><div className="pf-stat-l">Kills</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{volleyball.values.aces ?? 0}</div><div className="pf-stat-l">Aces</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{volleyball.values.blocks ?? 0}</div><div className="pf-stat-l">Blocks</div></div>
+            </div>
+            <div className="pf-stats" style={{ marginTop: 0 }}>
+              <div className="pf-stat"><div className="pf-stat-v">{volleyball.values.digs ?? 0}</div><div className="pf-stat-l">Digs</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{volleyball.values.assists ?? 0}</div><div className="pf-stat-l">Assists</div></div>
+              <div className="pf-stat"><div className="pf-stat-v">{new Set(volleyball.rows.map((r) => r.tournamentId)).size}</div><div className="pf-stat-l">Tournaments</div></div>
             </div>
           </section>
         ) : null}

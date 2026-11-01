@@ -33,3 +33,12 @@ Everything is an event in `si_events`; the engine rebuilds the match from them.
 ## Leaderboards
 
 Formulas are in `VOLLEYBALL_LEADERBOARDS`, and each is shown next to its table. Tournament MVP is points won, plus half of assists, digs and positive receptions, minus half of errors.
+
+## Public pages
+
+- `/volleyball`: tournaments, live, upcoming and recent matches, leading teams and top players, with filters and search.
+- `/tournaments/<slug>/teams/<id>`: a team's record, results and upcoming matches. The squad needs a sign-in, as the Teams tab does.
+- `/tournaments/<slug>/players/<id>`: a roster player's recorded figures, match by match. Needs a sign-in.
+- `/p/<username>`: a Volleyball section once a linked account has recorded figures.
+
+`/sports/*` is excluded from the proxy for the sport photos, so a page there gets no CSP nonce and never hydrates. Don't put routes under it.

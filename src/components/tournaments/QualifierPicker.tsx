@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getTournamentStandings } from "@/lib/tournaments/actions";
-import { isActionError } from "@/lib/actionError";
+import { isActionError, type ActionError } from "@/lib/actionError";
 import type { TournamentStanding, TournamentTeam } from "@/lib/tournaments/types";
 
 const ordinal = (n: number) => `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
@@ -18,8 +18,10 @@ const firstRound = (n: number) => {
   return size <= 2 ? "Final" : size === 4 ? "Semifinals" : size === 8 ? "Quarterfinals" : `Round of ${size}`;
 };
 
-export default function QualifierPicker({ tournamentId, teams, perGroup, groupsLeft, pending, onGenerate, onCancel }: {
+export default function QualifierPicker({ tournamentId, teams, perGroup, groupsLeft, pending, onGenerate, onCancel, loadTables }: {
   tournamentId: string;
+  // a sport whose table isn't tournament_standings(): the groups' tables in order
+  loadTables?: (groups: string[]) => Promise<(TournamentStanding[] | ActionError)[]>;
   teams: TournamentTeam[];
   perGroup: number;
   groupsLeft: number;
@@ -39,7 +41,7 @@ export default function QualifierPicker({ tournamentId, teams, perGroup, groupsL
   useEffect(() => {
     let off = false;
     (async () => {
-      const res = await Promise.all(groups.map((g) => getTournamentStandings(tournamentId, g)));
+      const res = loadTables ? await loadTables(groups) : await Promise.all(groups.map((g) => getTournamentStandings(tournamentId, g)));
       if (off) return;
       const failed = res.find(isActionError);
       if (failed) { setErr(failed.message); return; }
@@ -52,6 +54,8 @@ export default function QualifierPicker({ tournamentId, teams, perGroup, groupsL
       setTables(t); setPlace(p);
     })();
     return () => { off = true; };
+    // loadTables reads the same fixtures: a new function each render isn't a change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groups, tournamentId, perGroup]);
 
   if (err) return <div className="tc-err">{err}</div>;

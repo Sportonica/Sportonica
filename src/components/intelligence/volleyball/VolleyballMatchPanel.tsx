@@ -9,7 +9,7 @@ import type { Side } from "@/lib/intelligence/core/types";
 import type { VolleyballState } from "@/lib/intelligence/sports/volleyball";
 import { Court, MatchClock, SetScorecard, playerOf, shortName } from "./parts";
 
-export interface VolleyballMatchInfo { venue: string | null; court: string | null; startsAt: string | null; round: string | null }
+export interface VolleyballMatchInfo { venue: string | null; court: string | null; startsAt: string | null; round: string | null; logos?: Record<Side, string | null> }
 
 const CARD: Record<string, string> = { yellow: "Yellow card", red: "Red card", expulsion: "Expulsion", disqualification: "Disqualification" };
 

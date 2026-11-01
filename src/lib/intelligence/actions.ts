@@ -1277,6 +1277,19 @@ async function moveVolleyballWinner(sb: Sb, m: TournamentMatch, sets: SetScore[]
 
 const finalSetsOf = (stored: StoredEvent[]) => [...effectiveEvents(stored).list].reverse().find((e) => e.type === "FINAL_SETS") ?? null;
 
+/**
+ * The match's teams with anyone added to a roster since it was opened, so
+ * their figures can still be entered afterwards. Nobody is dropped: earlier
+ * events may name a player who has since left the team.
+ */
+async function sidesWithNewPlayers(sb: Sb, sides: Record<Side, SideContext>): Promise<Record<Side, SideContext> | ActionError> {
+  const [a, b] = await Promise.all([sideContext(sb, sides.a.teamId), sideContext(sb, sides.b.teamId)]);
+  if (isActionError(a)) return a;
+  if (isActionError(b)) return b;
+  const merged = (old: SideContext, now: SideContext): SideContext => ({ ...old, players: [...old.players, ...now.players.filter((p) => !old.players.some((o) => o.id === p.id))] });
+  return { a: merged(sides.a, a), b: merged(sides.b, b) };
+}
+
 export async function getVolleyballResult(matchId: string): Promise<VolleyballResultView | ActionError> {
   const { sb, user } = await requireUser();
   if (!user) return actionError("UNAUTHORIZED");
@@ -1297,6 +1310,8 @@ export async function getVolleyballResult(matchId: string): Promise<VolleyballRe
   const stored = loaded.map(toStored);
   const current = finalSetsOf(stored);
   const st = row.state.sport as VolleyballState;
+  const sides = await sidesWithNewPlayers(sb, row.context.sides!);
+  if (isActionError(sides)) return sides;
 
   // each replacement, oldest first: what it was, what it became, who and why
   const replaced = loaded.filter((e) => e.type === "FINAL_SETS" && e.replaces_event_id);
@@ -1309,7 +1324,7 @@ export async function getVolleyballResult(matchId: string): Promise<VolleyballRe
   }));
 
   return {
-    contestId: row.id, status: row.status, sides: row.context.sides!, rules: getEngine("volleyball").resolveRules(row.rules) as VolleyballRules,
+    contestId: row.id, status: row.status, sides, rules: getEngine("volleyball").resolveRules(row.rules) as VolleyballRules,
     entry: current ? { sets: current.payload.sets as SetScore[], lines: current.payload.lines as Record<string, unknown>[] | undefined, mvp: (current.payload.mvp as string | null | undefined) ?? null, notes: (current.payload.notes as string | null | undefined) ?? null } : null,
     livePoints: st.rallies.length,
     liveSets: st.manual ? [] : st.sets.filter((g) => g.a + g.b > 0).map((g) => ({ a: g.a, b: g.b })),
@@ -1340,6 +1355,12 @@ export async function saveVolleyballResult(
 
   const row = await loadContest(sb, contestId);
   if (isActionError(row)) return row;
+  const sides = await sidesWithNewPlayers(sb, row.context.sides!);
+  if (isActionError(sides)) return sides;
+  if (sides.a.players.length !== row.context.sides!.a.players.length || sides.b.players.length !== row.context.sides!.b.players.length) {
+    const { error } = await sb.rpc("si_refresh_roster", { p_contest_id: contestId, p_context: { ...row.context, sides } });
+    if (error) return fail(error.message);
+  }
   const rules = getEngine("volleyball").resolveRules(row.rules) as VolleyballRules;
   const sets = (input.sets ?? []).map((g) => ({ a: g.a, b: g.b }));
   const check = checkSetScores(sets, rules);
@@ -1412,6 +1433,16 @@ export async function getMatchInfo(matchId: string): Promise<{ courtId: string |
   if (!data) return null;
   const { data: court } = data.court_id ? await sb.from("courts").select("name").eq("id", data.court_id).maybeSingle() : { data: null };
   return { courtId: data.court_id, court: court?.name ?? null, startsAt: data.starts_at, round: data.round_label };
+}
+
+/** The two teams' logos for the match page's header. */
+export async function getMatchLogos(tournamentId: string, contest: Pick<ContestView, "context">): Promise<Record<Side, string | null>> {
+  const sides = contest.context.sides;
+  if (!sides) return { a: null, b: null };
+  const sb = await createClient();
+  const { data } = await sb.from("tournament_teams").select("id, logo_url").eq("tournament_id", tournamentId).in("id", [sides.a.teamId, sides.b.teamId]);
+  const logo = (id: string) => ((data ?? []) as { id: string; logo_url: string | null }[]).find((t) => t.id === id)?.logo_url ?? null;
+  return { a: logo(sides.a.teamId), b: logo(sides.b.teamId) };
 }
 
 /** Each scored volleyball fixture's set scores, for points for and against on the table. */
