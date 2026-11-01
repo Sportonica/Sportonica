@@ -441,4 +441,8 @@ section("volleyball league table: set and point ratios, deciding-set points, tie
   const three = computeVolleyballStandings(hh, teams, { tiebreakers: ["head_to_head"] }, null, {});
   assert.equal(new Set(three.map((r) => r.points)).size, 1, "all level on 3");
   assert.deepEqual(three.map((r) => r.team_id), ["x", "y", "z"], "each won one against the others, so by name");
+  // fixtures added by hand name the group on the match; the teams have none
+  const grouped = [{ ...fx("g1", "x", "y", 3, 0), stage: "group", group_name: "A" }];
+  const groupA = computeVolleyballStandings(grouped, teams, {}, "A", {});
+  assert.deepEqual(groupA.map((r) => [r.team_id, r.played, r.points]), [["x", 1, 3], ["y", 1, 0]], "only the teams playing in the group");
 });

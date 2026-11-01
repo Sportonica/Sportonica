@@ -21,15 +21,15 @@ export default function StandingsTab({ tournament, teams, matches }: {
   teams: Pick<TournamentTeam, "id" | "name" | "status" | "group_name">[];
   matches?: TournamentMatch[];
 }) {
-  const groups = tournament.format === "group_knockout"
-    ? [...new Set(teams.map((t) => t.group_name).filter((g): g is string => !!g))].sort()
-    : [null];
-
   const basketball = isBasketball(tournament.sport) && !!matches;
   const cricket = isCricket(tournament.sport) && !!matches;
   // computed here from the fixtures, with the sport's own rules (the rest come from tournament_standings())
   const volleyball = isVolleyball(tournament.sport) && !!matches;
   const computed = basketball || cricket || volleyball;
+  // volleyball also takes its groups from fixtures added by hand, which name the group on the match
+  const groups = tournament.format === "group_knockout"
+    ? [...new Set([...teams.map((t) => t.group_name), ...(volleyball ? matches!.map((m) => m.group_name) : [])].filter((g): g is string => !!g))].sort()
+    : [null];
   const [vbFacts, setVbFacts] = useState<VolleyballMatchFacts>({});
   const scheme = standingsScheme(tournament.sport, tournament.scoring_rules);
   const [data, setData] = useState<Record<string, TournamentStanding[]>>({});

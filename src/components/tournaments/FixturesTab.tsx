@@ -1391,13 +1391,13 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           ) : null
         ) : !bothSet ? (
           <span className="tc-dim" style={{ fontSize: 12 }}>Waiting for teams</span>
-        ) : volleyball && basketball && (basketball.mode !== "none" || !done) ? (
+        ) : volleyball && basketball && (basketball.mode !== "none" || match.status !== "walkover") ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <button className="tc-btn primary" disabled={pending} style={{ padding: "8px 14px", fontSize: 12.5 }} onClick={() => onBoxScore()}>{done ? "Edit match result" : "Enter match result"}</button>
               {basketball.mode === "live" ? (
                 <Link className="tc-btn" href={basketball.scorerHref!} style={{ padding: "8px 14px", fontSize: 12.5, textDecoration: "none" }}>{done ? "Open in scorer" : "Live scoring"}</Link>
-              ) : basketball.mode === "none" ? (
+              ) : basketball.mode === "none" && !done ? (
                 <button className="tc-btn" disabled={pending} style={{ padding: "8px 14px", fontSize: 12.5 }} onClick={onOpenScorer}>Live scoring</button>
               ) : null}
               {basketball.centreHref ? <Link className="tc-btn" href={basketball.centreHref} style={{ padding: "8px 14px", fontSize: 12.5, textDecoration: "none" }}>Match page</Link> : null}

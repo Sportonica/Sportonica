@@ -174,7 +174,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
         <div style={{ marginTop: 14, minHeight: 44 }}>
           {!typed ? null : check.winner ? (
             <div style={{ padding: 12, borderRadius: 10, background: "rgba(0,168,107,.12)", textAlign: "center" }}>
-              <div style={{ fontSize: 13.5 }}>{nameA} {check.setsWon.a} sets · {nameB} {check.setsWon.b} sets</div>
+              <div style={{ fontSize: 13.5 }}>{nameA} {check.setsWon.a} {check.setsWon.a === 1 ? "set" : "sets"} · {nameB} {check.setsWon.b} {check.setsWon.b === 1 ? "set" : "sets"}</div>
               <div style={{ fontWeight: 800, marginTop: 2 }}>Winner: {view.sides[check.winner].name}</div>
             </div>
           ) : (

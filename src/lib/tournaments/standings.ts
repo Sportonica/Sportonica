@@ -227,7 +227,9 @@ export function computeVolleyballStandings(
 ): VolleyballStanding[] {
   const rules = volleyballRulesOf(scoringRules);
   const need = Math.ceil(rules.bestOf / 2);
-  const pool = teams.filter((t) => t.status === "confirmed" && (group === null || t.group_name === group));
+  // fixtures added by hand name the group on the match, not on the team
+  const inGroupMatch = (id: string) => matches.some((m) => m.group_name === group && (m.team_a_id === id || m.team_b_id === id));
+  const pool = teams.filter((t) => t.status === "confirmed" && (group === null || t.group_name === group || inGroupMatch(t.id)));
   const blank = () => ({ played: 0, won: 0, lost: 0, forfeits: 0, sw: 0, sl: 0, pf: 0, pa: 0, points: 0 });
   type T = ReturnType<typeof blank>;
 

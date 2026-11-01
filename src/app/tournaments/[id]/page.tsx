@@ -117,7 +117,9 @@ async function loadTournamentView(tournament: Tournament, user: { id: string } |
     // set ratio and point ratio need each match's set scores, which the fixture row doesn't hold
     const vbFacts = await getVolleyballMatchFacts(id);
     if (isActionError(vbFacts)) failed = true;
-    for (const g of groups) standingsByGroup[g] = computeVolleyballStandings(matches, teams, tournament.scoring_rules, g || null, isActionError(vbFacts) ? {} : vbFacts);
+    // fixtures added by hand name the group on the match, not on the team
+    const matchGroups = tournament.format === "group_knockout" ? matches.map((m) => m.group_name).filter((g): g is string => !!g) : [];
+    for (const g of new Set([...groups, ...matchGroups])) standingsByGroup[g] = computeVolleyballStandings(matches, teams, tournament.scoring_rules, g || null, isActionError(vbFacts) ? {} : vbFacts);
   } else if (hasStandings && matches.length > 0 && isCricket(tournament.sport)) {
     // cricket tables: points then net run rate, from the fixtures' runs and overs (and each scored match's own overs)
     for (const g of groups) standingsByGroup[g] = computeCricketStandings(matches, teams, tournament.scoring_rules, g || null, facts);
