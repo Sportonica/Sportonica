@@ -1,17 +1,16 @@
 "use client";
 
+import { useState } from "react";
+import { Pencil } from "lucide-react";
 import DataTable, { type Column } from "@/components/DataTable";
+import { nepalParts } from "@/lib/platform/bookingEdit";
+import EditBookingModal, { type EditableBooking } from "./EditBookingModal";
 
-interface BookingRow extends Record<string, unknown> {
-  id: string;
-  venue: string;
-  starts_at: string;
-  price: number | null;
-  state: string | null;
-  payment_status: string | null;
+interface BookingRow extends EditableBooking, Record<string, unknown> {
+  court: string;
   source: string | null;
-  customer_name: string | null;
-  phone: string | null;
+  balance_due: number;
+  state_label: string;
   payment_method: string | null;
   transaction_id: string | null;
 }
@@ -19,36 +18,77 @@ interface BookingRow extends Record<string, unknown> {
 // 5% platform commission, shown per booking.
 const COMMISSION = 0.05;
 
+const money = (n: number) => `Rs ${Math.round(n).toLocaleString("en-IN")}`;
+const when = (r: BookingRow) => `${nepalParts(r.starts_at).time} to ${nepalParts(r.ends_at).time}`;
+
+const STATE_COLORS: Record<string, string> = {
+  reserved: "#F5A623", paid: "#2E7D5B", confirmed: "#2E7D5B", checked_in: "#2E7D5B",
+  played: "#3b82f6", dropped: "#8A95A3", no_show: "#ef4444", refunded: "#8A95A3", cancelled: "#ef4444",
+};
+
+const PAYMENT_NOTES: Record<string, string> = {
+  pending_verification: "Waiting for review",
+  rejected: "Payment rejected",
+  refunded: "Refunded",
+};
+
 const COLS: Column<BookingRow>[] = [
-  { key: "venue", label: "Venue" },
-  { key: "starts_at", label: "When", type: "date" },
   {
-    key: "customer_name", label: "Customer", type: "custom",
+    key: "venue", label: "Venue", type: "custom",
     render: (r) => (
       <>
-        {r.customer_name ?? "Player"}
+        {r.venue}
+        <div className="dt-dim" style={{ fontSize: 11 }}>{r.court}</div>
+      </>
+    ),
+  },
+  {
+    key: "starts_at", label: "When", type: "custom",
+    render: (r) => (
+      <>
+        {new Date(r.starts_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kathmandu" })}
+        <div className="dt-dim" style={{ fontSize: 11 }}>{when(r)}</div>
+      </>
+    ),
+  },
+  {
+    key: "customer", label: "Customer", type: "custom",
+    render: (r) => (
+      <>
+        {r.customer}
         {r.phone && <div className="dt-dim" style={{ fontSize: 11 }}>{r.phone}</div>}
       </>
     ),
   },
-  { key: "price", label: "Amount", type: "money" },
+  {
+    key: "state_label", label: "Played?", type: "custom",
+    render: (r) => {
+      const color = STATE_COLORS[r.state ?? ""] ?? "#8A95A3";
+      return <span className="dt-badge" style={{ color, borderColor: `${color}55`, background: `${color}14` }}>{r.state_label}</span>;
+    },
+  },
+  { key: "price", label: "Price", type: "money" },
+  {
+    key: "amount_paid", label: "Paid", type: "custom",
+    render: (r) => {
+      const note = PAYMENT_NOTES[r.payment_status ?? ""];
+      return (
+        <>
+          <span className="dt-mono">{money(r.amount_paid)}</span>
+          {note && <div className="dt-dim" style={{ fontSize: 11 }}>{note}</div>}
+        </>
+      );
+    },
+  },
+  {
+    key: "balance_due", label: "Still to pay", type: "custom",
+    render: (r) => r.balance_due > 0
+      ? <span className="dt-mono" style={{ color: "#d97706", fontWeight: 700 }}>{money(r.balance_due)}</span>
+      : <span className="dt-dim">—</span>,
+  },
   {
     key: "commission", label: "Our cut", type: "custom",
-    render: (r) => <span className="dt-mono" style={{ color: "#006241" }}>Rs {Math.round((Number(r.price) || 0) * COMMISSION).toLocaleString("en-IN")}</span>,
-  },
-  {
-    key: "state", label: "Status", type: "badge",
-    badgeColors: {
-      reserved: "#F5A623", paid: "#2E7D5B", confirmed: "#2E7D5B", checked_in: "#2E7D5B",
-      played: "#3b82f6", dropped: "#8A95A3", no_show: "#ef4444", refunded: "#8A95A3", cancelled: "#ef4444",
-    },
-  },
-  {
-    key: "payment_status", label: "Payment", type: "badge",
-    badgeColors: {
-      unpaid: "#8A95A3", pending_verification: "#F5A623", paid: "#2E7D5B",
-      rejected: "#ef4444", partial: "#F5A623", refunded: "#8A95A3",
-    },
+    render: (r) => <span className="dt-mono" style={{ color: "#006241" }}>{money((Number(r.price) || 0) * COMMISSION)}</span>,
   },
   {
     key: "transaction_id", label: "Approved via", type: "custom",
@@ -63,22 +103,38 @@ const COLS: Column<BookingRow>[] = [
 ];
 
 export default function BookingsGrid({ bookings }: { bookings: BookingRow[] }) {
+  const [editing, setEditing] = useState<BookingRow | null>(null);
   const total = bookings.reduce((s, b) => s + (Number(b.price) || 0), 0);
+  const collected = bookings.reduce((s, b) => s + b.amount_paid, 0);
+  const owed = bookings.reduce((s, b) => s + b.balance_due, 0);
+  const played = bookings.filter((b) => b.state === "played").length;
   const cut = Math.round(total * COMMISSION);
 
   return (
     <>
-      <div className="plt-stats" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+      <div className="plt-stats" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))" }}>
         <div className="plt-stat">
           <div className="plt-stat-v">{bookings.length}</div>
           <div className="plt-stat-l">Bookings shown</div>
         </div>
         <div className="plt-stat">
-          <div className="plt-stat-v dt-mono">Rs {total.toLocaleString("en-IN")}</div>
+          <div className="plt-stat-v">{played}</div>
+          <div className="plt-stat-l">Played</div>
+        </div>
+        <div className="plt-stat">
+          <div className="plt-stat-v dt-mono">{money(total)}</div>
           <div className="plt-stat-l">Gross value</div>
         </div>
         <div className="plt-stat">
-          <div className="plt-stat-v warn dt-mono">Rs {cut.toLocaleString("en-IN")}</div>
+          <div className="plt-stat-v dt-mono">{money(collected)}</div>
+          <div className="plt-stat-l">Paid so far</div>
+        </div>
+        <div className="plt-stat">
+          <div className="plt-stat-v warn dt-mono">{money(owed)}</div>
+          <div className="plt-stat-l">Still to pay</div>
+        </div>
+        <div className="plt-stat">
+          <div className="plt-stat-v warn dt-mono">{money(cut)}</div>
           <div className="plt-stat-l">Our commission (5%)</div>
         </div>
       </div>
@@ -89,7 +145,12 @@ export default function BookingsGrid({ bookings }: { bookings: BookingRow[] }) {
         pageSize={15}
         exportName="sportonica-bookings"
         empty="No bookings yet."
+        actions={(r) => (
+          <button type="button" className="dt-btn" onClick={() => setEditing(r)}><Pencil size={13} /> Edit</button>
+        )}
       />
+
+      {editing && <EditBookingModal key={editing.id} booking={editing} onClose={() => setEditing(null)} />}
     </>
   );
 }

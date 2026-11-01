@@ -17,7 +17,7 @@ export default async function PlatformBookingsPage() {
   return (
     <>
       <h1 className="plt-h1">Bookings</h1>
-      <p className="plt-sub2">Every court booking across the platform.</p>
+      <p className="plt-sub2">Every court booking across the platform. Use Edit to change the amount paid, whether they played, the time or anything else.</p>
       <BookingsGrid bookings={bookings} />
     </>
   );
