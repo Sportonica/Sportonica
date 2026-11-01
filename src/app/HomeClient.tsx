@@ -378,9 +378,9 @@ export default function HomeClient({ rails }: { rails?: HomeRails }) {
                   {SPORTS_PANELS.map((sp) => (
                     <Link
                       key={sp.sport}
-                      href={`/create?sport=${encodeURIComponent(sp.sport)}`}
+                      href={sp.sport === "Volleyball" ? "/volleyball" : `/create?sport=${encodeURIComponent(sp.sport)}`}
                       className="p-sportchip"
-                      aria-label={`Book ${sp.sport} grounds`}
+                      aria-label={sp.sport === "Volleyball" ? "Volleyball tournaments, scores and courts" : `Book ${sp.sport} grounds`}
                     >
                       <img className="p-sportchip-img" src={SPORT_IMG[sp.sport]} alt={`${sp.sport} players`} loading="lazy" />
                       <span className="p-sportchip-tint" style={{ background:`${sp.color}22` }} />

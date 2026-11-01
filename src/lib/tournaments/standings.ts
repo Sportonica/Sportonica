@@ -19,6 +19,7 @@
 import type { TournamentMatch, TournamentStanding, TournamentTeam } from "./types";
 import { resolveBasketballRules, type BasketballRules } from "../intelligence/sports/basketball/rules";
 import { cricketTableOf, type CricketTable, type CricketTiebreaker } from "../intelligence/sports/cricketTable";
+import { volleyballRulesOf, type SetScore, type VolleyballTiebreak } from "../intelligence/sports/volleyballRules";
 
 export interface StandingsScheme {
   draws: boolean;
@@ -72,6 +73,7 @@ const GAMES: StandingsScheme = {
 const key = (sport: string | null | undefined) => (sport ?? "").trim().toLowerCase();
 export const isBasketball = (sport: string | null | undefined): boolean => key(sport) === "basketball";
 export const isCricket = (sport: string | null | undefined): boolean => key(sport) === "cricket";
+export const isVolleyball = (sport: string | null | undefined): boolean => key(sport) === "volleyball";
 
 export function standingsScheme(sport: string | null | undefined, scoringRules?: unknown): StandingsScheme {
   if (isBasketball(sport)) return { ...BASKETBALL, draws: basketballRulesOf(scoringRules).allowTie };
@@ -191,6 +193,99 @@ export function computeBasketballStandings(
       forfeits: r.forfeits,
       streak: last ? `${last}${run}` : "",
       last5: r.results.slice(-5).join(""),
+    };
+  });
+}
+
+// ── volleyball ──────────────────────────────────────────────────────
+
+/** Per scored fixture: its set scores, for the points for and against that the fixture row doesn't hold. */
+export type VolleyballMatchFacts = Record<string, { sets: SetScore[] }>;
+
+export interface VolleyballStanding extends TournamentStanding {
+  /** sets won / sets lost; null when none were lost yet ("MAX" on a table) */
+  set_ratio: number | null;
+  points_for: number;
+  points_against: number;
+  point_ratio: number | null;
+  forfeits: number;
+}
+
+/** A ratio with no losses is better than any number, unless nothing was won either. */
+const ratioValue = (won: number, lost: number): number => (lost ? won / lost : won ? Infinity : 0);
+const ratioShown = (won: number, lost: number): number | null => (lost ? Math.round((1000 * won) / lost) / 1000 : null);
+
+export const ratioText = (ratio: number | null, won: number): string => (ratio === null ? (won ? "MAX" : "–") : ratio.toFixed(3));
+
+/**
+ * Table points depend on how the match went: by default a win that needed
+ * the deciding set is worth less, and its loser gets a point. Ranked on
+ * table points, then the competition's tiebreaks in order.
+ */
+export function computeVolleyballStandings(
+  matches: TournamentMatch[], teams: TeamRef[], scoringRules: unknown, group: string | null = null, facts: VolleyballMatchFacts = {},
+): VolleyballStanding[] {
+  const rules = volleyballRulesOf(scoringRules);
+  const need = Math.ceil(rules.bestOf / 2);
+  // fixtures added by hand name the group on the match, not on the team
+  const inGroupMatch = (id: string) => matches.some((m) => m.group_name === group && (m.team_a_id === id || m.team_b_id === id));
+  const pool = teams.filter((t) => t.status === "confirmed" && (group === null || t.group_name === group || inGroupMatch(t.id)));
+  const blank = () => ({ played: 0, won: 0, lost: 0, forfeits: 0, sw: 0, sl: 0, pf: 0, pa: 0, points: 0 });
+  type T = ReturnType<typeof blank>;
+
+  const played = matches.filter((m) => (m.stage === "league" || m.stage === "group") && (group === null || m.group_name === group)
+    && (m.status === "completed" || m.status === "walkover") && m.team_a_id && m.team_b_id);
+
+  const tableOf = (ids: Set<string>, list: TournamentMatch[]) => {
+    const t = new Map<string, T>([...ids].map((id) => [id, blank()]));
+    for (const m of list) {
+      const a = t.get(m.team_a_id!), b = t.get(m.team_b_id!);
+      if (!a || !b) continue;
+      a.played += 1; b.played += 1;
+      const winner = m.winner_team_id === m.team_a_id ? a : m.winner_team_id === m.team_b_id ? b : null;
+      const loser = winner === a ? b : winner === b ? a : null;
+      if (!winner || !loser) continue;
+      winner.won += 1; loser.lost += 1;
+      // a walkover, or a result with no sets: a win and a forfeit, with nothing for or against
+      if (m.status === "walkover" || m.score_a === null || m.score_b === null) {
+        winner.points += rules.tableWinPoints; loser.points += rules.tableForfeitLossPoints; loser.forfeits += 1;
+        continue;
+      }
+      a.sw += m.score_a; a.sl += m.score_b; b.sw += m.score_b; b.sl += m.score_a;
+      for (const g of facts[m.id]?.sets ?? []) { a.pf += g.a; a.pa += g.b; b.pf += g.b; b.pa += g.a; }
+      const deciding = need > 1 && Math.min(m.score_a, m.score_b) === need - 1;
+      winner.points += deciding ? rules.tableDecidingWinPoints : rules.tableWinPoints;
+      loser.points += deciding ? rules.tableDecidingLossPoints : rules.tableLossPoints;
+    }
+    return t;
+  };
+
+  const all = tableOf(new Set(pool.map((x) => x.id)), played);
+  const name = (id: string) => pool.find((x) => x.id === id)?.name ?? "";
+  const level = new Map<number, Set<string>>();
+  for (const [id, r] of all) level.set(r.points, (level.get(r.points) ?? new Set()).add(id));
+  const head = new Map([...level.values()].map((ids) => [ids, tableOf(ids, played.filter((m) => ids.has(m.team_a_id!) && ids.has(m.team_b_id!)))]));
+  const headOf = (id: string, points: number) => head.get(level.get(points)!)!.get(id)!;
+  const compare = (x: string, y: string, tb: VolleyballTiebreak): number => {
+    const p = all.get(x)!, q = all.get(y)!;
+    if (tb === "wins") return q.won - p.won;
+    if (tb === "set_ratio") return Math.sign(ratioValue(q.sw, q.sl) - ratioValue(p.sw, p.sl)) || 0;
+    if (tb === "point_ratio") return Math.sign(ratioValue(q.pf, q.pa) - ratioValue(p.pf, p.pa)) || 0;
+    const hp = headOf(x, p.points), hq = headOf(y, q.points);
+    return hq.points - hp.points || Math.sign(ratioValue(hq.sw, hq.sl) - ratioValue(hp.sw, hp.sl)) || 0;
+  };
+  const order = [...all.keys()].sort((x, y) => {
+    const d = all.get(y)!.points - all.get(x)!.points;
+    if (d) return d;
+    for (const tb of rules.tiebreakers) { const c = compare(x, y, tb); if (c) return c; }
+    return name(x).localeCompare(name(y));
+  });
+  return order.map((id) => {
+    const r = all.get(id)!;
+    return {
+      team_id: id, team_name: name(id), played: r.played, won: r.won, drawn: 0, lost: r.lost,
+      goals_for: r.sw, goals_against: r.sl, goal_diff: r.sw - r.sl, points: r.points,
+      set_ratio: ratioShown(r.sw, r.sl), points_for: r.pf, points_against: r.pa, point_ratio: ratioShown(r.pf, r.pa), forfeits: r.forfeits,
     };
   });
 }

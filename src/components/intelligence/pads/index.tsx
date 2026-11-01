@@ -9,6 +9,7 @@ import BasketballPad from "./BasketballPad";
 import CricketPad from "./CricketPad";
 import SwimmingPad from "./SwimmingPad";
 import TennisPad from "./TennisPad";
+import VolleyballPad from "./VolleyballPad";
 import RallyPad, { type RallyPadConfig } from "./RallyPad";
 import type { PadProps } from "./shared";
 
@@ -29,15 +30,6 @@ const PICKLEBALL: RallyPadConfig = {
   ],
 };
 
-const VOLLEYBALL: RallyPadConfig = {
-  pointWord: () => "Point",
-  hows: [
-    { key: "ace", label: "Ace" }, { key: "kill", label: "Kill" }, { key: "block", label: "Block" },
-    { key: "service_error", label: "Service error" }, { key: "attack_error", label: "Attack error" }, { key: "opponent_error", label: "Opponent error" },
-  ],
-  court: { sizeRule: "playersOnCourt" },
-};
-
 const rally = (config: RallyPadConfig) => function Pad(props: PadProps) { return <RallyPad {...props} config={config} />; };
 
 export const PADS: Record<SportKey, ComponentType<PadProps>> = {
@@ -47,5 +39,5 @@ export const PADS: Record<SportKey, ComponentType<PadProps>> = {
   tennis: TennisPad,
   badminton: rally(BADMINTON),
   pickleball: rally(PICKLEBALL),
-  volleyball: rally(VOLLEYBALL),
+  volleyball: VolleyballPad,
 };

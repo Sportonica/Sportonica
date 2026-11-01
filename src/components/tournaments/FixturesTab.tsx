@@ -16,11 +16,13 @@ import QualifierPicker from "./QualifierPicker";
 import { friendlyTournamentError } from "@/lib/tournaments/types";
 import { getSportKind, type SportKind } from "@/lib/sports";
 import { sportKeyFor } from "@/lib/intelligence/registry";
-import { basketballScoringModes, getBasketballBoxScore, openMatchContest, saveBasketballBoxScore, type BasketballBoxScoreView } from "@/lib/intelligence/actions";
+import { basketballScoringModes, getBasketballBoxScore, getVolleyballMatchFacts, openMatchContest, saveBasketballBoxScore, type BasketballBoxScoreView } from "@/lib/intelligence/actions";
+import { computeVolleyballStandings } from "@/lib/tournaments/standings";
 import type { Side } from "@/lib/intelligence/core/types";
 import type { BoxScoreLine } from "@/lib/intelligence/sports/basketball";
 import { standingsScheme } from "@/lib/tournaments/standings";
-import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry } from "@/lib/tournaments/types";
+import VolleyballResultModal from "./VolleyballResultModal";
+import type { Tournament, TournamentTeam, TournamentMatch, TournamentMatchPlayerStat, TournamentCricketPlayerStat, MatchAuditEntry, TournamentStanding } from "@/lib/tournaments/types";
 
 const inputStyle: React.CSSProperties = {
   padding: "5px 8px", borderRadius: 8, border: "1px solid rgba(242,237,230,0.15)",
@@ -337,9 +339,11 @@ export default function FixturesTab({
   // basketball: each match is scored live in the scorer, entered as a box score, or neither yet.
   // Only one of those can hold its result, so the row offers what fits (see MatchRow).
   const basketball = sportKeyFor(tournament.sport) === "basketball";
+  const volleyball = sportKeyFor(tournament.sport) === "volleyball";
+  const [vbEntry, setVbEntry] = useState<TournamentMatch | null>(null);
   const [bbModes, setBbModes] = useState<Record<string, { contestId: string; mode: "box" | "live" }>>({});
   // cricket too: a match in the live scorer keeps its result there
-  const tracksScorer = basketball || sportKind === "cricket";
+  const tracksScorer = basketball || volleyball || sportKind === "cricket";
   const [boxScoring, setBoxScoring] = useState<{ match: TournamentMatch; prefill: { a: number | null; b: number | null } } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
@@ -349,7 +353,7 @@ export default function FixturesTab({
     return () => { stale = true; };
   }, [tracksScorer, tournament.id, matches]);
   const bbFor = (m: TournamentMatch) => {
-    if (!basketball) return null;
+    if (!basketball && !volleyball) return null;
     const c = bbModes[m.id];
     return {
       mode: c?.mode ?? ("none" as const),
@@ -433,6 +437,10 @@ export default function FixturesTab({
     && groupMatches.length > 0 && !matches.some((m) => m.stage === "knockout");
   const [advancePerGroup, setAdvancePerGroup] = useState("2");
   const [pickQualifiers, setPickQualifiers] = useState(false);
+  const volleyballTables = async (groups: string[]) => {
+    const facts = await getVolleyballMatchFacts(tournament.id);
+    return groups.map((g) => computeVolleyballStandings(matches, teams, tournament.scoring_rules, g, isActionError(facts) ? {} : facts) as TournamentStanding[]);
+  };
 
   if (!canAddMatches && matches.length === 0) {
     return (
@@ -597,6 +605,16 @@ export default function FixturesTab({
         </div>
       )}
 
+      {volleyball && tournament.format === "group_knockout" && tournament.status === "registration_closed" && teams.length > 0 && (
+        <VolleyballGroups teams={teams} pending={pending} onSave={(groups) => run(async () => {
+          for (const [i, t] of teams.entries()) {
+            const res = await setTeamSeed(t.id, t.seed ?? i + 1, groups[t.id] || undefined);
+            if (isActionError(res)) return res;
+          }
+          return null;
+        })} />
+      )}
+
       {canGenerateKnockout && (
         <div className="tc-card" style={{ marginBottom: 16 }}>
           <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Generate the knockout stage</div>
@@ -604,11 +622,16 @@ export default function FixturesTab({
             Builds the bracket from the group standings, all the way to the Final, and moves each winner on automatically.
             Group winners play a runner-up from another group, and two teams from the same group can only meet again in the Final.
           </div>
-          {pickQualifiers ? (
+          {volleyball && !teams.some((t) => t.group_name) ? (
+            <div className="tc-dim" style={{ fontSize: 13 }}>
+              These teams weren&apos;t put into groups before the first match, so the bracket can&apos;t be built from the groups. Add the knockout matches by hand below, then enter each next round&apos;s teams yourself.
+            </div>
+          ) : pickQualifiers ? (
             <QualifierPicker
               tournamentId={tournament.id} teams={teams} perGroup={Math.max(1, Number(advancePerGroup) || 2)} groupsLeft={groupsLeft} pending={pending}
               onGenerate={(picks) => run(() => generateKnockoutFromPicks(tournament.id, picks))}
               onCancel={() => setPickQualifiers(false)}
+              loadTables={volleyball ? volleyballTables : undefined}
             />
           ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -623,6 +646,17 @@ export default function FixturesTab({
               className="tc-btn primary" disabled={pending || groupsLeft > 0 || !(Number(advancePerGroup) >= 1)}
               onClick={() => {
                 if (!window.confirm(`Generate the knockout stage with the top ${advancePerGroup} of each group?`)) return;
+                if (volleyball) {
+                  // the volleyball table decides who goes through, not tournament_standings()
+                  run(async () => {
+                    const groups = [...new Set(teams.map((t) => t.group_name).filter((g): g is string => !!g))].sort();
+                    const tables = await volleyballTables(groups);
+                    const picks: Record<string, string[]> = {};
+                    groups.forEach((g, i) => { picks[g] = (tables[i] as TournamentStanding[]).slice(0, Number(advancePerGroup)).map((r) => r.team_id); });
+                    return generateKnockoutFromPicks(tournament.id, picks);
+                  });
+                  return;
+                }
                 run(() => generateKnockoutFromGroups(tournament.id, Number(advancePerGroup)));
               }}
             >
@@ -770,7 +804,8 @@ export default function FixturesTab({
                       if (!isActionError(c)) router.push(`/tournaments/${tournament.id}/score/${c.id}`);
                       return c;
                     })}
-                    onBoxScore={(typed) => setBoxScoring({ match: m, prefill: typed ?? { a: m.score_a, b: m.score_b } })}
+                    volleyball={volleyball}
+                    onBoxScore={(typed) => (volleyball ? setVbEntry(m) : setBoxScoring({ match: m, prefill: typed ?? { a: m.score_a, b: m.score_b } }))}
                     drawless={drawless}
                     drawlessHint={drawlessHint}
                     selected={selected.has(m.id)}
@@ -799,6 +834,14 @@ export default function FixturesTab({
             </table>
           </div>
         ))
+      )}
+
+      {vbEntry && (
+        <VolleyballResultModal
+          match={vbEntry}
+          onClose={() => setVbEntry(null)}
+          onSaved={(warning) => { setVbEntry(null); setNotice(warning); router.refresh(); }}
+        />
       )}
 
       {boxScoring && (
@@ -1059,7 +1102,33 @@ const STATUS_LABEL: Record<SettableStatus, string> = {
   unscheduled: "Unscheduled", scheduled: "Scheduled", live: "Live", postponed: "Postponed", cancelled: "Cancelled",
 };
 
-function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, onMoveUp, onMoveDown, pending, selected, onToggleSelect }: {
+// Which group each team is in. Only before play starts: set_team_seed() takes
+// no changes once the first match is added, and the bracket reads these.
+function VolleyballGroups({ teams, pending, onSave }: { teams: TournamentTeam[]; pending: boolean; onSave: (groups: Record<string, string>) => void }) {
+  const [groups, setGroups] = useState<Record<string, string>>(() => Object.fromEntries(teams.map((t) => [t.id, t.group_name ?? ""])));
+  const ready = teams.every((t) => groups[t.id]?.trim());
+  return (
+    <div className="tc-card" style={{ marginBottom: 16 }}>
+      <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>Put teams in groups</div>
+      <div className="tc-card-sub" style={{ marginBottom: 10 }}>Do this before adding the first match. The table and the knockout stage are built from these groups.</div>
+      <div style={{ display: "grid", gap: 8, maxWidth: 360 }}>
+        {teams.map((t) => (
+          <label key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13.5 }}>
+            {t.name}
+            <input value={groups[t.id] ?? ""} placeholder="A" aria-label={`${t.name} group`} style={{ ...inputStyle, width: 70 }}
+              onChange={(e) => setGroups((g) => ({ ...g, [t.id]: e.target.value.toUpperCase() }))} />
+          </label>
+        ))}
+      </div>
+      <button className="tc-btn primary" disabled={pending || !ready} style={{ marginTop: 12, padding: "9px 14px" }}
+        onClick={() => onSave(Object.fromEntries(Object.entries(groups).map(([id, g]) => [id, g.trim()])))}>
+        Save groups
+      </button>
+    </div>
+  );
+}
+
+function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref, basketball, volleyball, scoredLive, onOpenScorer, onBoxScore, drawless, drawlessHint, onResult, onLiveScore, onCricketResult, onRecordStats, onSetTime, onSetStatus, onUpdateTeams, onDelete, onMoveUp, onMoveDown, pending, selected, onToggleSelect }: {
   match: TournamentMatch;
   teams: TournamentTeam[];
   matches: TournamentMatch[];
@@ -1068,6 +1137,8 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
   liveScoringHref: string | null;
   // basketball: how this match is being scored (null for other sports)
   basketball: { mode: "none" | "box" | "live"; scorerHref: string | null; centreHref: string | null } | null;
+  // volleyball shares those modes: scored live, or the final set scores entered afterwards
+  volleyball: boolean;
   // cricket: this match is in the live scorer, which holds its result
   scoredLive: { scorerHref: string; centreHref: string } | null;
   // basketball: open this match in the live scorer
@@ -1377,6 +1448,36 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
           ) : null
         ) : !bothSet ? (
           <span className="tc-dim" style={{ fontSize: 12 }}>Waiting for teams</span>
+        ) : volleyball && basketball && (basketball.mode !== "none" || match.status !== "walkover") ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-start" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button className="tc-btn primary" disabled={pending} style={{ padding: "8px 14px", fontSize: 12.5 }} onClick={() => onBoxScore()}>{done ? "Edit match result" : "Enter match result"}</button>
+              {basketball.mode === "live" ? (
+                <Link className="tc-btn" href={basketball.scorerHref!} style={{ padding: "8px 14px", fontSize: 12.5, textDecoration: "none" }}>{done ? "Open in scorer" : "Live scoring"}</Link>
+              ) : basketball.mode === "none" && !done ? (
+                <button className="tc-btn" disabled={pending} style={{ padding: "8px 14px", fontSize: 12.5 }} onClick={onOpenScorer}>Live scoring</button>
+              ) : null}
+              {basketball.centreHref ? <Link className="tc-btn" href={basketball.centreHref} style={{ padding: "8px 14px", fontSize: 12.5, textDecoration: "none" }}>Match page</Link> : null}
+            </div>
+            {!done && basketball.mode === "none" ? <span className="tc-dim" style={{ fontSize: 11 }}>Enter match result: the final set scores after the match. Live scoring: every rally as it happens.</span> : null}
+            {!done && basketball.mode === "live" ? <span className="tc-dim" style={{ fontSize: 11 }}>Being scored live. Entering a result asks you to confirm first.</span> : null}
+            {!done && basketball.mode === "none" && match.team_a_id && match.team_b_id ? (
+              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <span className="tc-dim" style={{ fontSize: 11 }}>Or record a walkover:</span>
+                {[match.team_a_id, match.team_b_id].map((id) => (
+                  <button key={id} className="tc-btn" disabled={pending} style={{ padding: "6px 8px", fontSize: 11.5 }}
+                    onClick={() => {
+                      if (!window.confirm(`Record a walkover win for ${teamName(id)}? No score is recorded and this can't be undone.`)) return;
+                      const confirmCascade = confirmCascadeIfNeeded(id);
+                      if (confirmCascade === null) return;
+                      onResult(null, null, id, undefined, undefined, confirmCascade);
+                    }}>
+                    {teamName(id)} wins
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
         ) : basketball && basketball.mode !== "none" ? (
           // the result lives in the scorer or the box score: typing a score here would contradict it
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>

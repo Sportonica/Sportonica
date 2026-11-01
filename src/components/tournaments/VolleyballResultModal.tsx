@@ -1,0 +1,252 @@
+"use client";
+
+// Enter a volleyball match's final set scores after it was played.
+// Quick result is the set scores and nothing else; the detailed result
+// adds what the score sheet recorded. Player figures are only ever what
+// is typed here: nothing is worked out from the score.
+
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { getVolleyballResult, saveVolleyballResult, type VolleyballResultView } from "@/lib/intelligence/actions";
+import { isActionError } from "@/lib/actionError";
+import type { Side } from "@/lib/intelligence/core/types";
+import { VOLLEYBALL_LINE_KEYS, checkSetScores, type VolleyballLineKey } from "@/lib/intelligence/sports/volleyballRules";
+import type { TournamentMatch } from "@/lib/tournaments/types";
+
+const LINE_LABEL: Record<VolleyballLineKey, string> = {
+  attacks: "Attacks", kills: "Kills", attackErrors: "Attack errors", serves: "Serves", aces: "Aces", serviceErrors: "Service errors",
+  blocks: "Block points", blockErrors: "Block errors", digs: "Digs", receptions: "Receptions", receptionPositive: "Good receptions", receptionErrors: "Reception errors",
+  assists: "Assists", settingErrors: "Setting errors", substitutions: "Substitutions", yellowCards: "Yellow cards", redCards: "Red cards",
+};
+
+type Row = { a: string; b: string };
+const score: React.CSSProperties = { font: "inherit", fontSize: 24, fontWeight: 800, textAlign: "center", width: "100%", minHeight: 52, borderRadius: 10, border: "1px solid rgba(127,127,127,.35)", background: "transparent", color: "inherit", padding: "6px 4px" };
+const field: React.CSSProperties = { font: "inherit", fontSize: 15, width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(127,127,127,.35)", background: "transparent", color: "inherit" };
+
+export default function VolleyballResultModal({ match, onClose, onSaved }: {
+  match: TournamentMatch;
+  onClose: () => void;
+  onSaved: (warning: string | null) => void;
+}) {
+  const [view, setView] = useState<VolleyballResultView | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [detailed, setDetailed] = useState(false);
+  const [side, setSide] = useState<Side>("a");
+  const [lines, setLines] = useState<Record<string, Partial<Record<VolleyballLineKey, string>>>>({});
+  const [mvp, setMvp] = useState("");
+  const [notes, setNotes] = useState("");
+  const [reason, setReason] = useState("");
+  const [confirmLive, setConfirmLive] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  // one id per entry: a second tap or a retry is stored once
+  const [clientId] = useState(() => crypto.randomUUID());
+
+  useEffect(() => {
+    let cancelled = false;
+    getVolleyballResult(match.id).then((v) => {
+      if (cancelled) return;
+      if (isActionError(v)) { setLoadErr(v.message); return; }
+      setView(v);
+      const known = v.entry?.sets ?? [];
+      setRows(Array.from({ length: v.rules.bestOf }, (_, i) => ({ a: known[i] ? String(known[i].a) : "", b: known[i] ? String(known[i].b) : "" })));
+      setMvp(v.entry?.mvp ?? "");
+      setNotes(v.entry?.notes ?? "");
+      const saved = v.entry?.lines ?? [];
+      if (saved.length) {
+        setDetailed(true);
+        setLines(Object.fromEntries(saved.map((l) => [String(l.player), Object.fromEntries(Object.entries(l).filter(([k]) => k !== "player").map(([k, x]) => [k, String(x)]))])));
+      }
+    }).catch(() => setLoadErr("No connection. Close this and try again."));
+    return () => { cancelled = true; };
+  }, [match.id]);
+
+  // the rows filled in so far; a row half filled still counts, so it is reported
+  const lastFilled = rows.reduce((last, r, i) => (r.a !== "" || r.b !== "" ? i : last), -1);
+  const sets = useMemo(() => rows.slice(0, lastFilled + 1).map((r) => ({ a: r.a === "" ? NaN : Number(r.a), b: r.b === "" ? NaN : Number(r.b) })), [rows, lastFilled]);
+  const check = view ? checkSetScores(sets, view.rules) : null;
+  const decidedAt = check ? (() => {
+    const tally = { a: 0, b: 0 };
+    for (let i = 0; i < check.winners.length; i++) {
+      const w = check.winners[i];
+      if (w) tally[w] += 1;
+      if (view && (tally.a >= Math.ceil(view.rules.bestOf / 2) || tally.b >= Math.ceil(view.rules.bestOf / 2))) return i;
+    }
+    return null;
+  })() : null;
+
+  if (loadErr || !view || !check) {
+    return (
+      <div className="tc-scrim" onClick={onClose}>
+        <div className="tc-modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+          <div className="tc-empty">{loadErr ?? "Loading…"}</div>
+          {loadErr ? <div style={{ textAlign: "right" }}><button className="tc-btn" onClick={onClose}>Close</button></div> : null}
+        </div>
+      </div>
+    );
+  }
+
+  const nameA = view.sides.a.name, nameB = view.sides.b.name;
+  const editing = !!view.entry || view.status === "completed";
+  const live = view.livePoints > 0 && !view.entry;
+  const typed = lastFilled >= 0;
+  const needReason = editing && !reason.trim();
+  const needLive = live && !confirmLive;
+
+  const toLines = () => Object.entries(lines).flatMap(([player, l]) => {
+    const out: Record<string, unknown> = { player };
+    for (const k of VOLLEYBALL_LINE_KEYS) { const v = Number(l[k]); if (l[k] && Number.isFinite(v) && v > 0) out[k] = Math.floor(v); }
+    return Object.keys(out).length > 1 ? [out] : [];
+  });
+
+  function save() {
+    setErr(null);
+    startTransition(async () => {
+      try {
+        const res = await saveVolleyballResult(match.id, {
+          sets, ...(detailed ? { lines: toLines(), mvp: mvp || null, notes } : {}),
+        }, { clientId, ...(reason.trim() ? { reason } : {}), confirmLive });
+        if (isActionError(res)) { setErr(res.message); setConfirming(false); return; }
+        onSaved(res.warning);
+      } catch { setErr("No connection. Nothing was saved. Try again."); setConfirming(false); }
+    });
+  }
+
+  if (confirming && check.winner) {
+    const w = check.winner, l = w === "a" ? "b" : "a";
+    return (
+      <div className="tc-scrim">
+        <div className="tc-modal" style={{ maxWidth: 480, textAlign: "center" }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", opacity: 0.6 }}>Check the result</div>
+          <div style={{ fontSize: 21, fontWeight: 800, margin: "12px 0" }}>{view.sides[w].name} defeated {view.sides[l].name}</div>
+          <div style={{ fontSize: 15 }}>Final score: <b>{check.setsWon[w]}–{check.setsWon[l]}</b></div>
+          <div style={{ fontSize: 15, margin: "8px 0 16px", fontVariantNumeric: "tabular-nums" }}>{sets.map((g) => `${g.a}–${g.b}`).join(" | ")}</div>
+          {editing ? <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 12 }}>Reason on the record: {reason}</div> : null}
+          <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 16 }}>Saving marks the match completed and updates the table and bracket.</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            <button className="tc-btn primary" style={{ padding: 14, fontSize: 15 }} disabled={pending} onClick={save}>{pending ? "Saving…" : "Save result"}</button>
+            <button className="tc-btn" style={{ padding: 12 }} disabled={pending} onClick={() => setConfirming(false)}>Edit scores</button>
+            <button className="tc-btn" style={{ padding: 12 }} disabled={pending} onClick={onClose}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tc-scrim" onClick={onClose}>
+      <div className="tc-modal" style={{ maxWidth: detailed ? 720 : 480 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Enter match result</h3>
+          <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", color: "inherit", opacity: 0.6, cursor: "pointer", width: 36, height: 36, fontSize: 18 }}>×</button>
+        </div>
+        <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 12 }}>
+          Best of {view.rules.bestOf}. Sets to {view.rules.setPoints}{view.rules.bestOf > 1 ? `, deciding set to ${view.rules.decidingSetPoints}` : ""}, win by {view.rules.winBy}.
+        </div>
+
+        {live ? (
+          <label style={{ display: "flex", gap: 10, padding: 12, borderRadius: 10, border: "1px solid #d97706", marginBottom: 12, fontSize: 13, lineHeight: 1.45 }}>
+            <input type="checkbox" checked={confirmLive} onChange={(e) => setConfirmLive(e.target.checked)} style={{ width: 18, height: 18, flex: "none", marginTop: 2 }} />
+            <span>This match was being scored live ({view.liveSets.map((g) => `${g.a}–${g.b}`).join(", ") || "0–0"}, {view.livePoints} points). The result you enter replaces that score. The live history stays on the record.</span>
+          </label>
+        ) : null}
+
+        <div style={{ display: "grid", gridTemplateColumns: "58px 1fr 1fr", gap: 8, alignItems: "center" }}>
+          <div />
+          <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13.5, overflowWrap: "anywhere" }}>{nameA}</div>
+          <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13.5, overflowWrap: "anywhere" }}>{nameB}</div>
+          {rows.map((r, i) => {
+            const off = decidedAt !== null && i > decidedAt && r.a === "" && r.b === "";
+            return (
+              <div key={i} style={{ display: "contents" }}>
+                <div className="tc-dim" style={{ fontSize: 13, fontWeight: 700, opacity: off ? 0.35 : undefined }}>Set {i + 1}</div>
+                {(["a", "b"] as Side[]).map((s) => (
+                  <input key={s} style={{ ...score, opacity: off ? 0.35 : 1, borderColor: check.winners[i] === s ? "#00a86b" : undefined }} inputMode="numeric" pattern="[0-9]*" disabled={off} value={r[s]}
+                    aria-label={`Set ${i + 1} ${s === "a" ? nameA : nameB}`}
+                    onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 3); setRows((all) => all.map((x, k) => (k === i ? { ...x, [s]: v } : x))); }} />
+                ))}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ marginTop: 14, minHeight: 44 }}>
+          {!typed ? null : check.winner ? (
+            <div style={{ padding: 12, borderRadius: 10, background: "rgba(0,168,107,.12)", textAlign: "center" }}>
+              <div style={{ fontSize: 13.5 }}>{nameA} {check.setsWon.a} {check.setsWon.a === 1 ? "set" : "sets"} · {nameB} {check.setsWon.b} {check.setsWon.b === 1 ? "set" : "sets"}</div>
+              <div style={{ fontWeight: 800, marginTop: 2 }}>Winner: {view.sides[check.winner].name}</div>
+            </div>
+          ) : (
+            <ul style={{ margin: 0, paddingLeft: 18, color: "#d97706", fontSize: 13, lineHeight: 1.5 }}>
+              {check.errors.map((e) => <li key={e}>{e}</li>)}
+            </ul>
+          )}
+        </div>
+
+        <button className="tc-btn" style={{ marginTop: 12, padding: "8px 12px", fontSize: 12.5 }} aria-expanded={detailed} onClick={() => setDetailed(!detailed)}>
+          {detailed ? "Hide detailed result" : "Add player statistics, MVP and notes (optional)"}
+        </button>
+
+        {detailed ? (
+          <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
+            <div className="tc-dim" style={{ fontSize: 12.5 }}>Only what you type is recorded. Leave anything you don&apos;t have empty.</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["a", "b"] as Side[]).map((s) => <button key={s} className={`tc-btn ${side === s ? "primary" : ""}`} style={{ padding: "7px 12px", fontSize: 12.5 }} onClick={() => setSide(s)}>{view.sides[s].name}</button>)}
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <table className="tc-table" style={{ minWidth: 1180 }}>
+                <thead><tr><th>Player</th>{VOLLEYBALL_LINE_KEYS.map((k) => <th key={k} style={{ fontSize: 10.5 }}>{LINE_LABEL[k]}</th>)}</tr></thead>
+                <tbody>
+                  {view.sides[side].players.map((p) => (
+                    <tr key={p.id}>
+                      <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{p.number != null ? `#${p.number} ` : ""}{p.name}</td>
+                      {VOLLEYBALL_LINE_KEYS.map((k) => (
+                        <td key={k}><input inputMode="numeric" aria-label={`${p.name} ${LINE_LABEL[k]}`} value={lines[p.id]?.[k] ?? ""} style={{ font: "inherit", width: 44, padding: "6px 3px", textAlign: "center", borderRadius: 6, border: "1px solid rgba(127,127,127,.35)", background: "transparent", color: "inherit" }}
+                          onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 3); setLines((all) => ({ ...all, [p.id]: { ...all[p.id], [k]: v } })); }} /></td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700 }}>Match MVP
+              <select style={field} value={mvp} onChange={(e) => setMvp(e.target.value)}>
+                <option value="">None</option>
+                {(["a", "b"] as Side[]).map((s) => <optgroup key={s} label={view.sides[s].name}>{view.sides[s].players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700 }}>Match notes
+              <textarea style={{ ...field, minHeight: 70 }} maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </label>
+          </div>
+        ) : null}
+
+        {editing ? (
+          <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700, marginTop: 12 }}>Why is the result changing? (kept on the record)
+            <input style={field} value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
+          </label>
+        ) : null}
+
+        {view.revisions.length ? (
+          <details style={{ marginTop: 12, fontSize: 13 }}>
+            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Earlier changes ({view.revisions.length})</summary>
+            <ul style={{ margin: "8px 0 0", paddingLeft: 18, display: "grid", gap: 6 }}>
+              {view.revisions.map((r, i) => (
+                <li key={i}>
+                  {r.from.map((g) => `${g.a}–${g.b}`).join(", ")} changed to {r.to.map((g) => `${g.a}–${g.b}`).join(", ")}. &ldquo;{r.reason}&rdquo;
+                  <span className="tc-dim"> {r.by ?? "An organiser"}, {new Date(r.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kathmandu" })}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+
+        {err ? <div role="alert" style={{ color: "#ef4444", fontSize: 13, marginTop: 10 }}>{err}</div> : null}
+        <button className="tc-btn primary" style={{ width: "100%", padding: 14, fontSize: 15, marginTop: 14, justifyContent: "center", textAlign: "center" }} disabled={!check.winner || needReason || needLive} onClick={() => { setErr(null); setConfirming(true); }}>
+          Review result
+        </button>
+      </div>
+    </div>
+  );
+}

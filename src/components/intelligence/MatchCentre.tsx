@@ -14,13 +14,15 @@ import type { MatchAnswer } from "@/lib/intelligence/core/types";
 import { SPORTS_WITH_QUESTIONS } from "@/lib/intelligence/capabilities";
 import type { SwimPerformance } from "@/lib/intelligence/sports/swimming";
 import { useLiveContest } from "./useLiveContest";
+import VolleyballMatchPanel, { type VolleyballMatchInfo } from "./volleyball/VolleyballMatchPanel";
+import type { VolleyballState } from "@/lib/intelligence/sports/volleyball";
 import { ChartView, Insights, RulesGuide, ScoreCard, StatCards, StatTableView, Timeline } from "./views";
 import "./intelligence.css";
 
 const TABS = ["Live", "Timeline", "Statistics", "Players", "Analytics", "History"] as const;
 type Tab = (typeof TABS)[number];
 
-export default function MatchCentre({ initial, tournamentName, canScore }: { initial: ContestView; tournamentName: string; canScore: boolean }) {
+export default function MatchCentre({ initial, tournamentName, canScore, matchInfo = null }: { initial: ContestView; tournamentName: string; canScore: boolean; matchInfo?: VolleyballMatchInfo | null }) {
   const [contest] = useLiveContest(initial);
   const [tab, setTab] = useState<Tab>("Live");
   const [intel, setIntel] = useState<ContestIntelligence | null>(null);
@@ -58,6 +60,10 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
   }
 
   const lanes = contest.summary.view.lanes ?? [];
+  // a result entered without player figures has nothing behind these: only the scorecard shows
+  const vb = contest.sport === "volleyball" ? (contest.state as VolleyballState | null) : null;
+  const noFigures = !!vb?.manual && !Object.keys(vb.players).length;
+  const tabs = noFigures ? TABS.filter((t) => t === "Live" || t === "Timeline") : TABS;
 
   return (
     <div className="si">
@@ -66,6 +72,20 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
           <Link href={`/tournaments/${contest.tournamentId}`} className="si-back"><ChevronLeft size={16} /> {tournamentName}</Link>
           <h1 className="si-h1">{contest.label ?? "Match centre"}</h1>
         </div>
+
+        {matchInfo?.logos && contest.context.sides ? (
+          <div className="vb-crests">
+            {(["a", "b"] as const).map((x) => {
+              const side = contest.context.sides![x];
+              const logo = matchInfo.logos![x];
+              const crest = logo
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={logo} alt="" />
+                : <span>{side.name.charAt(0).toUpperCase()}</span>;
+              return <Link key={x} href={`/tournaments/${contest.tournamentId}/teams/${side.teamId}`} className="vb-crest">{crest}<b>{side.name}</b></Link>;
+            })}
+          </div>
+        ) : null}
 
         <ScoreCard summary={contest.summary} context={contest.context} />
 
@@ -76,21 +96,22 @@ export default function MatchCentre({ initial, tournamentName, canScore }: { ini
         ) : null}
 
         <div className="si-tabs" role="tablist">
-          {TABS.map((t) => <button key={t} role="tab" aria-selected={tab === t} className={`si-tab${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>{t}</button>)}
+          {tabs.map((t) => <button key={t} role="tab" aria-selected={tab === t} className={`si-tab${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>{t}</button>)}
         </div>
 
         {error ? <div className="si-error">{error}</div> : null}
 
         {tab === "Live" ? (
           <>
+            {contest.sport === "volleyball" ? <VolleyballMatchPanel contest={contest} tournamentName={tournamentName} info={matchInfo} /> : null}
             <div className="si-card">
               <h2 className="si-h2">At a glance</h2>
               <div className="si-notes">{contest.summary.lines.map((l, i) => <span key={i}>{l}</span>)}</div>
             </div>
-            {SPORTS_WITH_QUESTIONS.includes(contest.sport) ? <AskCard contestId={contest.id} lastSeq={contest.lastSeq} /> : null}
-            {intel ? <Insights items={intel.analytics.insights?.slice(0, 5)} /> : null}
-            {intel ? <StatCards cards={intel.analytics.cards} sides={contest.context.sides ? [contest.context.sides.a.name, contest.context.sides.b.name] : undefined} /> : null}
-            {intel?.teams[0] ? <StatTableView table={intel.teams[0]} max={8} /> : null}
+            {SPORTS_WITH_QUESTIONS.includes(contest.sport) ? <AskCard contestId={contest.id} lastSeq={contest.lastSeq} suggested={contest.sport === "volleyball" ? SUGGESTED_VOLLEYBALL : SUGGESTED} /> : null}
+            {intel && !noFigures ? <Insights items={intel.analytics.insights?.slice(0, 5)} /> : null}
+            {intel && !noFigures ? <StatCards cards={intel.analytics.cards} sides={contest.context.sides ? [contest.context.sides.a.name, contest.context.sides.b.name] : undefined} /> : null}
+            {intel?.teams[0] && !noFigures ? <StatTableView table={intel.teams[0]} max={8} /> : null}
             {intel ? <RulesGuide sections={intel.guide} /> : null}
           </>
         ) : null}
@@ -205,9 +226,10 @@ function LeadersTable({ leaders }: { leaders: TournamentLeaders }) {
 }
 
 const SUGGESTED = ["Who is leading?", "Who has the most rebounds?", "What was the biggest run?", "What caused the lead?", "How many possessions?", "What is an and-one?"];
+const SUGGESTED_VOLLEYBALL = ["What is the score?", "Who has the most kills?", "How many points win a set?"];
 
 // Questions about this match, answered from its recorded events only.
-function AskCard({ contestId, lastSeq }: { contestId: string; lastSeq: number }) {
+function AskCard({ contestId, lastSeq, suggested }: { contestId: string; lastSeq: number; suggested: string[] }) {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [answers, setAnswers] = useState<{ q: string; a: MatchAnswer; seq: number }[]>([]);
@@ -229,7 +251,7 @@ function AskCard({ contestId, lastSeq }: { contestId: string; lastSeq: number })
         <button type="submit" className="si-btn primary" disabled={busy || !q.trim()}>Ask</button>
       </form>
       <div className="si-chips" style={{ marginTop: 8 }}>
-        {SUGGESTED.map((s) => <button type="button" key={s} className="si-chip" disabled={busy} onClick={() => void ask(s)}>{s}</button>)}
+        {suggested.map((s) => <button type="button" key={s} className="si-chip" disabled={busy} onClick={() => void ask(s)}>{s}</button>)}
       </div>
       {answers.length ? (
         <div className="si-answers" aria-live="polite">

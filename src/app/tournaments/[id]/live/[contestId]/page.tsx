@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
 import { getViewerId, runAsSignedOutVisitor } from "@/lib/supabase/server";
-import { getTournament } from "@/lib/tournaments/actions";
-import { canScoreTournament, getContest } from "@/lib/intelligence/actions";
+import { getDisplayVenueName, getTournament } from "@/lib/tournaments/actions";
+import { canScoreTournament, getContest, getMatchInfo, getMatchLogos } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
 import { tournamentPath } from "@/lib/tournaments/types";
 import MatchCentre from "@/components/intelligence/MatchCentre";
@@ -54,5 +54,10 @@ export default async function MatchCentrePage({ params }: { params: Params }) {
   if (!contest || contest.tournamentId !== tournament.id) notFound();
   // cricket has its own match centre: scorecard, commentary and the chase
   if (contest.sport === "cricket") return <CricketMatchCentre initial={contest} tournamentName={tournament.name} canScore={canScore} />;
+  if (contest.sport === "volleyball") {
+    const [info, venue, logos] = await Promise.all([contest.matchId ? getMatchInfo(contest.matchId) : null, getDisplayVenueName(tournament), getMatchLogos(tournament.id, contest)]);
+    return <MatchCentre initial={contest} tournamentName={tournament.name} canScore={canScore}
+      matchInfo={{ venue: venue ?? null, court: info?.court ?? null, startsAt: info?.startsAt ?? null, round: info?.round ?? null, logos }} />;
+  }
   return <MatchCentre initial={contest} tournamentName={tournament.name} canScore={canScore} />;
 }

@@ -29,12 +29,14 @@ import { getEngine, isSportKey, listIntelligenceSportsSync, sportKeyFor } from "
 import { planBasketballPlayerSwap } from "./sports/basketballEdits";
 import { oversOf, planBulkEdit, planWicketFollowOn, type CricketBulkEdit, type FollowOn, type OverRef } from "./sports/cricketEdits";
 import { aggregate } from "./aggregate";
-import type { CricketMatchFacts } from "@/lib/tournaments/standings";
+import type { CricketMatchFacts, VolleyballMatchFacts } from "@/lib/tournaments/standings";
 import type { CricketLine, PartnershipRecord } from "@/lib/tournaments/cricketRecords";
 import { toView, type ContestRow } from "./view";
 import { swimEventKey, swimEventName, swimPerformance, type SwimEntry, type SwimmingRules } from "./sports/swimming";
 import { isBoxScore, type BasketballState, type BoxScoreLine } from "./sports/basketball";
 import { checkBoxScoreSave } from "./boxScorePlan";
+import type { VolleyballState } from "./sports/volleyball";
+import { checkSetScores, pointsScored, type SetScore, type VolleyballRules } from "./sports/volleyballRules";
 import {
   friendlyIntelligenceError,
   type ContestIntelligence, type ContestView, type HistoryReport, type HistoryRow, type LeaderRow,
@@ -1210,6 +1212,252 @@ export async function saveBasketballBoxScore(
   return { contestId, warning: warnings[warnings.length - 1] ?? null };
 }
 
+// ── volleyball: the final set scores, entered after the match ───
+//
+// Everything goes through the same event log as live scoring: FINAL_SETS,
+// then MATCH_COMPLETE, so the fixture, bracket and table update the same
+// way. A later change replaces the event and keeps the old one, with a
+// required reason, who changed it and when.
+
+export interface VolleyballEntry { sets: SetScore[]; lines?: Record<string, unknown>[]; mvp?: string | null; notes?: string | null }
+
+export interface VolleyballRevision { at: string; by: string | null; reason: string; from: SetScore[]; to: SetScore[] }
+
+export interface VolleyballResultView {
+  contestId: string | null;
+  status: ContestRow["status"];
+  sides: Record<Side, SideContext>;
+  rules: VolleyballRules;
+  /** the entered result in force; null when none has been entered */
+  entry: VolleyballEntry | null;
+  /** live points already recorded: entering a result needs confirming */
+  livePoints: number;
+  liveSets: SetScore[];
+  revisions: VolleyballRevision[];
+}
+
+async function volleyballMatch(sb: Sb, matchId: string) {
+  const { data: match, error } = await sb.from("tournament_matches").select("*").eq("id", matchId).maybeSingle();
+  if (error) return fail(error.message);
+  if (!match) return fail("MATCH_NOT_FOUND");
+  const m = match as TournamentMatch;
+  if (!m.team_a_id || !m.team_b_id) return fail("TEAMS_NOT_SET");
+  const { data: t } = await sb.from("tournaments").select("sport, scoring_rules").eq("id", m.tournament_id).maybeSingle();
+  if (sportKeyFor(t?.sport) !== "volleyball") return actionError("Set scores are for volleyball matches.");
+  return Object.assign(m, { scoringRules: (t?.scoring_rules ?? {}) as Record<string, unknown> });
+}
+
+/**
+ * A changed winner has to reach the bracket before the result is stored, or
+ * the match and its fixture would disagree. The new winner moves on when
+ * nothing later has been played; a later round with a result or a scoring
+ * record is frozen to the old winner's roster, so the change is refused.
+ */
+async function moveVolleyballWinner(sb: Sb, m: TournamentMatch, sets: SetScore[], won: Side): Promise<ActionError | null> {
+  const winner = won === "a" ? m.team_a_id : m.team_b_id;
+  if (!DONE_MATCH.has(m.status) || !m.winner_team_id || m.winner_team_id === winner) return null;
+  const seen = new Set<string>();
+  for (let next = m.next_match_id; next && !seen.has(next);) {
+    seen.add(next);
+    const { data, error } = await sb.from("tournament_matches").select("id, status, round_label, next_match_id").eq("id", next).maybeSingle();
+    if (error) return fail(error.message);
+    if (!data) break;
+    const { data: scored } = await sb.from("si_contests").select("id").eq("match_id", next).maybeSingle();
+    if (scored || data.status === "completed" || data.status === "walkover" || data.status === "live") {
+      return actionError(`This changes who advances, but ${data.round_label ?? "a later round"} has already been scored. Nothing was changed. Contact Sportonica to correct that round first.`);
+    }
+    next = data.next_match_id;
+  }
+  const { error } = await sb.rpc("record_match_result", {
+    p_match_id: m.id, p_score_a: sets.filter((g) => g.a > g.b).length, p_score_b: sets.filter((g) => g.b > g.a).length, p_winner_team_id: null,
+    p_score_a_et: null, p_score_b_et: null, p_score_a_pens: null, p_score_b_pens: null, p_confirm_cascade: true,
+  });
+  return error ? fail(error.message) : null;
+}
+
+const finalSetsOf = (stored: StoredEvent[]) => [...effectiveEvents(stored).list].reverse().find((e) => e.type === "FINAL_SETS") ?? null;
+
+/**
+ * The match's teams with anyone added to a roster since it was opened, so
+ * their figures can still be entered afterwards. Nobody is dropped: earlier
+ * events may name a player who has since left the team.
+ */
+async function sidesWithNewPlayers(sb: Sb, sides: Record<Side, SideContext>): Promise<Record<Side, SideContext> | ActionError> {
+  const [a, b] = await Promise.all([sideContext(sb, sides.a.teamId), sideContext(sb, sides.b.teamId)]);
+  if (isActionError(a)) return a;
+  if (isActionError(b)) return b;
+  const merged = (old: SideContext, now: SideContext): SideContext => ({ ...old, players: [...old.players, ...now.players.filter((p) => !old.players.some((o) => o.id === p.id))] });
+  return { a: merged(sides.a, a), b: merged(sides.b, b) };
+}
+
+export async function getVolleyballResult(matchId: string): Promise<VolleyballResultView | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const m = await volleyballMatch(sb, matchId);
+  if (isActionError(m)) return m;
+  const { data: existing } = await sb.from("si_contests").select("*").eq("match_id", matchId).maybeSingle();
+  if (!existing) {
+    const [a, b] = await Promise.all([sideContext(sb, m.team_a_id!), sideContext(sb, m.team_b_id!)]);
+    if (isActionError(a)) return a;
+    if (isActionError(b)) return b;
+    let rules: VolleyballRules;
+    try { rules = getEngine("volleyball").resolveRules(m.scoringRules) as VolleyballRules; } catch { return actionError("The tournament's scoring rules are invalid."); }
+    return { contestId: null, status: "scheduled" as ContestRow["status"], sides: { a, b }, rules, entry: null, livePoints: 0, liveSets: [], revisions: [] };
+  }
+  const row = existing as ContestRow;
+  const loaded = await loadEvents(sb, row.id);
+  if (isActionError(loaded)) return loaded;
+  const stored = loaded.map(toStored);
+  const current = finalSetsOf(stored);
+  const st = row.state.sport as VolleyballState;
+  const sides = await sidesWithNewPlayers(sb, row.context.sides!);
+  if (isActionError(sides)) return sides;
+
+  // each replacement, oldest first: what it was, what it became, who and why
+  const replaced = loaded.filter((e) => e.type === "FINAL_SETS" && e.replaces_event_id);
+  const byIds = [...new Set(replaced.map((e) => e.recorded_by).filter((x): x is string => !!x))];
+  const { data: people } = byIds.length ? await sb.from("profiles").select("id, full_name, name").in("id", byIds) : { data: [] as { id: string; full_name: string | null; name: string | null }[] };
+  const who = new Map((people ?? []).map((p) => [p.id, p.full_name ?? p.name]));
+  const revisions: VolleyballRevision[] = replaced.map((e) => ({
+    at: e.recorded_at ?? e.occurred_at, by: (e.recorded_by && who.get(e.recorded_by)) || null, reason: e.reason ?? "",
+    from: (loaded.find((x) => x.id === e.replaces_event_id)?.payload.sets ?? []) as SetScore[], to: (e.payload.sets ?? []) as SetScore[],
+  }));
+
+  return {
+    contestId: row.id, status: row.status, sides, rules: getEngine("volleyball").resolveRules(row.rules) as VolleyballRules,
+    entry: current ? { sets: current.payload.sets as SetScore[], lines: current.payload.lines as Record<string, unknown>[] | undefined, mvp: (current.payload.mvp as string | null | undefined) ?? null, notes: (current.payload.notes as string | null | undefined) ?? null } : null,
+    livePoints: st.rallies.length,
+    liveSets: st.manual ? [] : st.sets.filter((g) => g.a + g.b > 0).map((g) => ({ a: g.a, b: g.b })),
+    revisions,
+  };
+}
+
+/**
+ * Save the final set scores and finish the match. `clientId` comes from the
+ * form, so a second tap or a retried request stores one result. Entering a
+ * result over live scoring needs `confirmLive`; the live history stays.
+ * Changing a saved result needs a `reason`.
+ */
+export async function saveVolleyballResult(
+  matchId: string, input: VolleyballEntry, opts: { clientId: string; reason?: string; confirmLive?: boolean },
+): Promise<{ contestId: string; warning: string | null } | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  if (!UUID.test(opts.clientId)) return actionError("Missing event id. Reload and try again.");
+  const m = await volleyballMatch(sb, matchId);
+  if (isActionError(m)) return m;
+  if (!(await canScoreTournament(m.tournament_id))) return fail("FORBIDDEN");
+
+  const { data: found } = await sb.from("si_contests").select("id").eq("match_id", matchId).maybeSingle();
+  const opened = found ? null : await openMatchContest(matchId);
+  if (opened && isActionError(opened)) return opened;
+  const contestId = found?.id ?? opened!.id;
+
+  const row = await loadContest(sb, contestId);
+  if (isActionError(row)) return row;
+  const sides = await sidesWithNewPlayers(sb, row.context.sides!);
+  if (isActionError(sides)) return sides;
+  if (sides.a.players.length !== row.context.sides!.a.players.length || sides.b.players.length !== row.context.sides!.b.players.length) {
+    const { error } = await sb.rpc("si_refresh_roster", { p_contest_id: contestId, p_context: { ...row.context, sides } });
+    if (error) return fail(error.message);
+  }
+  const rules = getEngine("volleyball").resolveRules(row.rules) as VolleyballRules;
+  const sets = (input.sets ?? []).map((g) => ({ a: g.a, b: g.b }));
+  const check = checkSetScores(sets, rules);
+  if (check.errors.length) return actionError(check.errors.join(" "));
+
+  const loaded = await loadEvents(sb, contestId);
+  if (isActionError(loaded)) return loaded;
+  const current = finalSetsOf(loaded.map(toStored));
+  const st = row.state.sport as VolleyballState;
+  const payload: Record<string, unknown> = {
+    sets,
+    ...(input.lines?.length ? { lines: input.lines } : {}),
+    ...(input.mvp ? { mvp: input.mvp } : {}),
+    ...(input.notes?.trim() ? { notes: input.notes.trim() } : {}),
+    ...(st.rallies.length ? { overrideLive: true } : {}),
+  };
+
+  // already saved: the same again is a second tap; anything else is a correction
+  if (current) {
+    // bookkeeping isn't part of the result: whether it replaced live scoring, and a correction's audit
+    const entered = (p: Record<string, unknown>) => Object.fromEntries(Object.entries(p).filter(([k]) => k !== "overrideLive" && k !== "audit"));
+    if (JSON.stringify(sortKeys(entered(current.payload))) === JSON.stringify(sortKeys(entered(payload)))) {
+      if (row.status !== "completed") {
+        const done = await recordContestEvent(contestId, { type: "MATCH_COMPLETE", payload: {}, clientId: randomUUID() });
+        if (isActionError(done)) return done;
+        return { contestId, warning: done.warning };
+      }
+      return { contestId, warning: null };
+    }
+    if (!opts.reason?.trim()) return actionError("Say why the result is changing.");
+    const moved = await moveVolleyballWinner(sb, m, sets, check.winner!);
+    if (moved) return moved;
+    const res = await correctContestEvent(contestId, current.id, opts.reason, opts.clientId, { type: "FINAL_SETS", payload });
+    if (isActionError(res)) return res;
+    return { contestId, warning: res.warning };
+  }
+
+  if (st.rallies.length && !opts.confirmLive) {
+    return actionError(`This match already has ${st.rallies.length} live points. Confirm that the entered result replaces the live score.`);
+  }
+  if (row.status === "cancelled" || row.status === "abandoned") return actionError("This match was called off. A result can't be entered.");
+
+  const warnings: string[] = [];
+  const record = async (type: string, p: Record<string, unknown>, clientId: string = randomUUID()) => {
+    const res = await recordContestEvent(contestId, { type, payload: p, clientId });
+    if (isActionError(res)) return res;
+    if (res.warning) warnings.push(res.warning);
+    return null;
+  };
+  if (row.status === "scheduled" || row.status === "postponed") { const err = await record("MATCH_START", {}); if (err) return err; }
+  if (row.status === "paused") { const err = await record("MATCH_RESUME", {}); if (err) return err; }
+  if (row.status === "completed") {
+    if (!opts.reason?.trim()) return actionError("Say why the result is changing.");
+    const moved = await moveVolleyballWinner(sb, m, sets, check.winner!);
+    if (moved) return moved;
+    const err = await record("MATCH_REOPEN", { reason: opts.reason.trim() });
+    if (err) return err;
+  }
+  const saved = await record("FINAL_SETS", payload, opts.clientId);
+  if (saved) return saved;
+  const done = await record("MATCH_COMPLETE", {});
+  if (done) return done;
+  return { contestId, warning: warnings[warnings.length - 1] ?? null };
+}
+
+/** Where and when a fixture is, for the public match page. */
+export async function getMatchInfo(matchId: string): Promise<{ courtId: string | null; court: string | null; startsAt: string | null; round: string | null } | null> {
+  const sb = await createClient();
+  const { data } = await sb.from("tournament_matches").select("court_id, starts_at, round_label").eq("id", matchId).maybeSingle();
+  if (!data) return null;
+  const { data: court } = data.court_id ? await sb.from("courts").select("name").eq("id", data.court_id).maybeSingle() : { data: null };
+  return { courtId: data.court_id, court: court?.name ?? null, startsAt: data.starts_at, round: data.round_label };
+}
+
+/** The two teams' logos for the match page's header. */
+export async function getMatchLogos(tournamentId: string, contest: Pick<ContestView, "context">): Promise<Record<Side, string | null>> {
+  const sides = contest.context.sides;
+  if (!sides) return { a: null, b: null };
+  const sb = await createClient();
+  const { data } = await sb.from("tournament_teams").select("id, logo_url").eq("tournament_id", tournamentId).in("id", [sides.a.teamId, sides.b.teamId]);
+  const logo = (id: string) => ((data ?? []) as { id: string; logo_url: string | null }[]).find((t) => t.id === id)?.logo_url ?? null;
+  return { a: logo(sides.a.teamId), b: logo(sides.b.teamId) };
+}
+
+/** Each scored volleyball fixture's set scores, for points for and against on the table. */
+export async function getVolleyballMatchFacts(tournamentId: string): Promise<VolleyballMatchFacts | ActionError> {
+  const sb = await createClient();
+  const { data, error } = await sb.from("si_contests").select("match_id, sets:state->sport->sets")
+    .eq("tournament_id", tournamentId).eq("sport", "volleyball").not("match_id", "is", null);
+  if (error) return fail(error.message);
+  const out: VolleyballMatchFacts = {};
+  for (const r of (data ?? []) as unknown as { match_id: string; sets: SetScore[] | null }[]) {
+    out[r.match_id] = { sets: (r.sets ?? []).map((g) => ({ a: g.a, b: g.b })) };
+  }
+  return out;
+}
+
 /** For each match with a scoring record: entered as a box score (basketball) or scored live. */
 export async function basketballScoringModes(tournamentId: string): Promise<Record<string, { contestId: string; mode: "box" | "live" }> | ActionError> {
   const contests = await listTournamentContests(tournamentId);
@@ -1218,7 +1466,8 @@ export async function basketballScoringModes(tournamentId: string): Promise<Reco
   for (const c of contests) {
     if (!c.matchId) continue;
     const st = c.state as BasketballState | null;
-    out[c.matchId] = { contestId: c.id, mode: st && isBoxScore(st) ? "box" : "live" };
+    const entered = c.sport === "volleyball" ? (c.state as VolleyballState | null)?.manual === true : !!st && isBoxScore(st);
+    out[c.matchId] = { contestId: c.id, mode: entered ? "box" : "live" };
   }
   return out;
 }
@@ -1277,6 +1526,8 @@ export async function getMatchHighlights(tournamentId: string): Promise<Record<s
         const reb = n(r, "oreb") + n(r, "dreb");
         return [`${n(r, "pts")} pts`, reb ? `${reb} reb` : null, n(r, "ast") ? `${n(r, "ast")} ast` : null].filter(Boolean).join(" · ");
       });
+    } else if (c.sport === "volleyball") {
+      best(pointsScored, (r) => [`${pointsScored(r)} pts`, n(r, "digs") ? `${n(r, "digs")} digs` : null, n(r, "assists") ? `${n(r, "assists")} ast` : null].filter(Boolean).join(" · "));
     } else if (c.sport === "cricket") {
       best((r) => n(r, "batRuns"), (r) => `${n(r, "batRuns")} (${n(r, "batBalls")})`);
       best((r) => n(r, "wickets") * 1000 - n(r, "bowlRuns"), (r) => `${n(r, "wickets")}/${n(r, "bowlRuns")}`);

@@ -1,0 +1,36 @@
+/* Volleyball: the court and the scorer's controls. */
+.vb-court-t { font-size: 13px; font-weight: 800; margin-bottom: 6px; }
+.vb-court-none { font-size: 13px; color: var(--si-text-3); padding: 10px 0; }
+.vb-court { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 8px; border-radius: 10px; border: 2px solid var(--si-line); background: var(--si-surface); }
+.vb-net { grid-column: 1 / -1; text-align: center; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--si-text-3); border-bottom: 3px double var(--si-text-3); padding-bottom: 3px; }
+.vb-spot { display: grid; justify-items: center; gap: 1px; padding: 7px 3px; border-radius: 8px; background: var(--si-surface-2); min-width: 0; }
+.vb-spot b { font-size: 18px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.vb-spot span { font-size: 11.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vb-spot small { font-size: 10px; color: var(--si-text-3); }
+.vb-spot.serve { outline: 2px solid var(--si-accent); }
+.vb-spot.serve small { color: var(--si-accent); font-weight: 800; }
+.vb-spot.libero { background: color-mix(in srgb, var(--si-warn) 22%, transparent); }
+.vb-pairs { display: grid; gap: 6px; }
+.vb-pair { display: flex; justify-content: space-between; gap: 8px; padding: 9px 11px; border-radius: 8px; background: var(--si-surface-2); font-size: 14px; }
+.vb-pair.serve { outline: 2px solid var(--si-accent); }
+.vb-pair b { color: var(--si-accent); font-size: 12px; }
+.vb-courts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px; }
+.vb-sets td.won { font-weight: 800; color: var(--si-accent); }
+.vb-sets tr.won td.text, .vb-sets td.total { font-weight: 800; }
+.vb-final { margin-top: 10px; font-weight: 800; font-size: 15px; }
+.vb-score { display: block; font-size: 38px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; margin: 4px 0; }
+.vb-point { min-height: 120px; }
+.vb-sheet { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--si-line); border-radius: 10px; }
+.vb-sheet-t { font-weight: 800; font-size: 14px; }
+.vb-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.vb-facts { display: grid; gap: 6px; font-size: 13.5px; }
+.vb-facts > div { display: flex; justify-content: space-between; gap: 12px; }
+.vb-facts dt { color: var(--si-text-3); }
+.vb-facts dd { margin: 0; font-weight: 600; text-align: right; }
+.vb-log { display: grid; gap: 4px; font-size: 13px; margin: 0; padding: 0; list-style: none; }
+
+.vb-crests { display: flex; justify-content: space-between; gap: 12px; }
+.vb-crest { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; font-size: 13.5px; }
+.vb-crest:last-child { flex-direction: row-reverse; text-align: right; }
+.vb-crest b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vb-crest img, .vb-crest span { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; object-fit: cover; background: rgba(59,130,246,0.14); color: #1d4ed8; font-weight: 800; }
