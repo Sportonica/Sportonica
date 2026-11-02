@@ -145,7 +145,7 @@ export function checkSetScores(
 
 /** Everything a player's line can hold when entered by hand after the match. */
 export const VOLLEYBALL_LINE_KEYS = [
-  "attacks", "kills", "attackErrors", "serves", "aces", "serviceErrors", "blocks", "blockErrors", "digs",
+  "manualPoints", "attacks", "kills", "attackErrors", "serves", "aces", "serviceErrors", "blocks", "blockErrors", "digs",
   "receptions", "receptionPositive", "receptionErrors", "assists", "settingErrors", "substitutions", "yellowCards", "redCards",
 ] as const;
 export type VolleyballLineKey = (typeof VOLLEYBALL_LINE_KEYS)[number];

@@ -468,7 +468,10 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
           const who = l.player as string, side = sideOfPlayer(ctx, who)!;
           for (const k of VOLLEYBALL_LINE_KEYS) {
             const v = l[k];
-            if (typeof v === "number" && v > 0) { add(s.team[side], k, v); add((s.players[who] ??= {}), k, v); }
+            if (typeof v !== "number" || v <= 0) continue;
+            // a player's own points stay off the team's figures
+            if (k !== "manualPoints") add(s.team[side], k, v);
+            add((s.players[who] ??= {}), k, v);
           }
           onCourtNow(s, 1, [who]);
         }
