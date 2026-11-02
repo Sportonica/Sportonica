@@ -524,3 +524,31 @@ section("volleyball: undoing and correcting player points", () => {
   assert.equal(fixed.issues.filter((i) => i.severity === "error").length, 0);
   assert.deepEqual(E.mirrorScore(fixed.envelope.sport), { scoreA: 2, scoreB: 0 }, "the result stands through corrections");
 });
+
+section("volleyball: points on an entered result, and updating them later", () => {
+  const sets = [{ a: 5, b: 1 }, { a: 5, b: 2 }];
+  const stored = (seq, type, payload, extra = {}) => ({ id: `e${seq}`, seq, type, payload, occurredAt: "2026-11-02T00:00:00.000Z", clientId: `c${seq}`, ...extra });
+  const base = [
+    stored(1, "MATCH_START", {}),
+    stored(2, "FINAL_SETS", { sets, lines: [{ player: "a1", manualPoints: 25 }] }),
+    stored(3, "MATCH_COMPLETE", {}),
+  ];
+  const rules = E.resolveRules(SHORT);
+  const first = reconstruct(E, ctx, rules, base);
+  assert.equal(first.envelope.sport.players.a1.manualPoints, 25, "points alone are enough");
+  assert.equal(pointsScored(first.envelope.sport.players.a1), 25);
+  assert.equal(first.envelope.sport.team.a.manualPoints, undefined, "they stay off the team's figures");
+  assert.equal(E.calculateTeamStatistics(first.envelope.sport, ctx, rules)[0].rows[0].values.pointsScored, 0);
+  assert.deepEqual(E.mirrorScore(first.envelope.sport), { scoreA: 2, scoreB: 0 });
+
+  const updated = reconstruct(E, ctx, rules, [...base, stored(4, "FINAL_SETS", { sets, lines: [{ player: "a1", manualPoints: 20 }, { player: "b1", manualPoints: 9, kills: 2 }] }, { replacesEventId: "e2", reason: "Player statistics updated" })]);
+  assert.equal(updated.envelope.status, "completed", "updating figures leaves the match finished");
+  assert.equal(updated.envelope.sport.players.a1.manualPoints, 20, "points can go down as well as up");
+  assert.equal(updated.envelope.sport.players.b1.manualPoints, 9);
+  assert.equal(updated.issues.filter((i) => i.severity === "error").length, 0);
+  assert.deepEqual(E.mirrorScore(updated.envelope.sport), { scoreA: 2, scoreB: 0 }, "the result stands");
+
+  const m = openMatch(E, ctx, SHORT);
+  m.push("MATCH_START");
+  m.refuses("FINAL_SETS", { sets, lines: [{ player: "a1", manualPoints: -1 }] }, /whole numbers/, "negative points on the form");
+});

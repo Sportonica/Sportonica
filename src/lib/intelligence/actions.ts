@@ -601,7 +601,11 @@ export async function correctContestEvent(
   if (error) return fail(error.message);
   const res = data as { duplicate: boolean; contest: ContestRow };
   // a corrected result has to reach the fixture too; a player's own record has nothing to send it
-  const recordOnly = !!target && !!engine.statisticalEvents?.includes(target.type) && (!replacement || replacement.type === target.type);
+  const recordOnly = !!target && (
+    (!!engine.statisticalEvents?.includes(target.type) && (!replacement || replacement.type === target.type))
+    // volleyball stats changed on an entered result: the sets and the winner stand
+    || (target.type === "FINAL_SETS" && replacement?.type === "FINAL_SETS" && row.status === "completed" && env.status === "completed" && row.summary?.result?.winner === env.result?.winner && JSON.stringify(engine.mirrorScore(row.state.sport, row.context, rules)) === JSON.stringify(snap.mirror))
+  );
   const warning = res.duplicate || recordOnly ? null : await syncFixture(sb, row, env, snap.mirror);
   reval(row.tournament_id, contestId);
   return { contest: toView(res.contest), duplicate: res.duplicate, warning };
@@ -1241,6 +1245,8 @@ export interface VolleyballResultView {
   rules: VolleyballRules;
   /** the entered result in force; null when none has been entered */
   entry: VolleyballEntry | null;
+  /** points from the Player points panel, on top of what this form holds */
+  addedPoints: Record<string, number>;
   /** live points already recorded: entering a result needs confirming */
   livePoints: number;
   liveSets: SetScore[];
@@ -1313,7 +1319,7 @@ export async function getVolleyballResult(matchId: string): Promise<VolleyballRe
     if (isActionError(b)) return b;
     let rules: VolleyballRules;
     try { rules = getEngine("volleyball").resolveRules(m.scoringRules) as VolleyballRules; } catch { return actionError("The tournament's scoring rules are invalid."); }
-    return { contestId: null, status: "scheduled" as ContestRow["status"], sides: { a, b }, rules, entry: null, livePoints: 0, liveSets: [], revisions: [] };
+    return { contestId: null, status: "scheduled" as ContestRow["status"], sides: { a, b }, rules, entry: null, addedPoints: {}, livePoints: 0, liveSets: [], revisions: [] };
   }
   const row = existing as ContestRow;
   const loaded = await loadEvents(sb, row.id);
@@ -1337,6 +1343,11 @@ export async function getVolleyballResult(matchId: string): Promise<VolleyballRe
   return {
     contestId: row.id, status: row.status, sides, rules: getEngine("volleyball").resolveRules(row.rules) as VolleyballRules,
     entry: current ? { sets: current.payload.sets as SetScore[], lines: current.payload.lines as Record<string, unknown>[] | undefined, mvp: (current.payload.mvp as string | null | undefined) ?? null, notes: (current.payload.notes as string | null | undefined) ?? null } : null,
+    addedPoints: effectiveEvents(stored).list.filter((e) => e.type === "PLAYER_POINTS").reduce<Record<string, number>>((all, e) => {
+      const id = String(e.payload.player);
+      all[id] = (all[id] ?? 0) + Number(e.payload.points);
+      return all;
+    }, {}),
     livePoints: st.rallies.length,
     liveSets: st.manual ? [] : st.sets.filter((g) => g.a + g.b > 0).map((g) => ({ a: g.a, b: g.b })),
     revisions,
@@ -1401,10 +1412,14 @@ export async function saveVolleyballResult(
       }
       return { contestId, warning: null };
     }
-    if (!opts.reason?.trim()) return actionError("Say why the result is changing.");
+    // only the set scores need a reason from the organiser: stats can simply be updated
+    const before = (current.payload.sets ?? []) as SetScore[];
+    const sameSets = before.length === sets.length && before.every((g, i) => g.a === sets[i].a && g.b === sets[i].b);
+    const reason = opts.reason?.trim() || (sameSets ? "Player statistics updated" : "");
+    if (!reason) return actionError("Say why the result is changing.");
     const moved = await moveVolleyballWinner(sb, m, sets, check.winner!);
     if (moved) return moved;
-    const res = await correctContestEvent(contestId, current.id, opts.reason, opts.clientId, { type: "FINAL_SETS", payload });
+    const res = await correctContestEvent(contestId, current.id, reason, opts.clientId, { type: "FINAL_SETS", payload });
     if (isActionError(res)) return res;
     return { contestId, warning: res.warning };
   }
@@ -1413,6 +1428,9 @@ export async function saveVolleyballResult(
     return actionError(`This match already has ${st.rallies.length} live points. Confirm that the entered result replaces the live score.`);
   }
   if (row.status === "cancelled" || row.status === "abandoned") return actionError("This match was called off. A result can't be entered.");
+  // refused figures must be refused before the match is marked started, or it is left live at 0-0
+  const refused = getEngine("volleyball").validateEvent(st, { id: opts.clientId, seq: row.last_seq + 1, type: "FINAL_SETS", payload, occurredAt: new Date().toISOString() }, { ...row.context, sides }, rules);
+  if (refused) return actionError(refused);
 
   const warnings: string[] = [];
   const record = async (type: string, p: Record<string, unknown>, clientId: string = randomUUID()) => {
