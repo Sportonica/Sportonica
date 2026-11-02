@@ -36,6 +36,7 @@ import { swimEventKey, swimEventName, swimPerformance, type SwimEntry, type Swim
 import { isBoxScore, type BasketballState, type BoxScoreLine } from "./sports/basketball";
 import { checkBoxScoreSave } from "./boxScorePlan";
 import type { VolleyballState } from "./sports/volleyball";
+import { IN_PLAY, LIVE_CONTEST_COLUMNS, livePlayerLines, type LiveContestRow } from "./volleyballLive";
 import { checkSetScores, pointsScored, type SetScore, type VolleyballRules } from "./sports/volleyballRules";
 import {
   friendlyIntelligenceError,
@@ -534,7 +535,9 @@ export async function recordContestEvent(contestId: string, input: RecordEventIn
     const statusChanged = env.status !== row.status;
     const warning = statusChanged ? await syncFixture(sb, row, env, snap.mirror) : null;
     // the cached pages only show the mirrored score, so only bust them when it moved
-    if (statusChanged || JSON.stringify(before) !== JSON.stringify(snap.mirror)) reval(row.tournament_id, contestId);
+    // points added to a finished match change its stat lines, which cached pages read
+    const finishedRecord = !!engine.statisticalEvents?.includes(input.type) && env.status === "completed";
+    if (statusChanged || finishedRecord || JSON.stringify(before) !== JSON.stringify(snap.mirror)) reval(row.tournament_id, contestId);
     return { contest: toView(res.contest), duplicate: false, warning };
   }
   return fail("SEQ_CONFLICT");
@@ -597,8 +600,9 @@ export async function correctContestEvent(
   });
   if (error) return fail(error.message);
   const res = data as { duplicate: boolean; contest: ContestRow };
-  // a corrected result has to reach the fixture too
-  const warning = res.duplicate ? null : await syncFixture(sb, row, env, snap.mirror);
+  // a corrected result has to reach the fixture too; a player's own record has nothing to send it
+  const recordOnly = !!target && !!engine.statisticalEvents?.includes(target.type) && (!replacement || replacement.type === target.type);
+  const warning = res.duplicate || recordOnly ? null : await syncFixture(sb, row, env, snap.mirror);
   reval(row.tournament_id, contestId);
   return { contest: toView(res.contest), duplicate: res.duplicate, warning };
 }
@@ -906,7 +910,14 @@ export async function getTournamentLeaders(tournamentId: string): Promise<Tourna
   const sb = await createClient();
   const { data, error } = await sb.from("si_stat_lines").select("*").eq("tournament_id", tournamentId).eq("subject", "player").limit(5000);
   if (error) return fail(error.message);
-  const lines = (data ?? []) as LineRow[];
+  const { data: inPlay } = await sb.from("si_contests").select(LIVE_CONTEST_COLUMNS).eq("tournament_id", tournamentId).eq("sport", "volleyball").in("status", IN_PLAY);
+  const lines: LineRow[] = [
+    ...((data ?? []) as LineRow[]),
+    ...livePlayerLines((inPlay ?? []) as unknown as LiveContestRow[]).map((l) => ({
+      contest_id: l.contest_id, tournament_id: l.tournament_id, subject_key: l.subject_key, team_id: l.team_id, team_player_id: l.team_player_id, user_id: l.user_id, raw: l.raw,
+      sport: "volleyball", subject: "player", event_key: null, played_at: "",
+    })),
+  ];
   if (!lines.length || !isSportKey(lines[0].sport)) return null;
   const sport = lines[0].sport;
   const engine = getEngine(sport);
@@ -1446,6 +1457,52 @@ export async function getMatchLogos(tournamentId: string, contest: Pick<ContestV
 }
 
 /** Each scored volleyball fixture's set scores, for points for and against on the table. */
+export interface PlayerPointsEntry {
+  id: string; player: string; points: number; at: string; by: string | null;
+  state: "active" | "undone" | "replaced";
+  reason: string | null;
+  /** the amount this entry corrected */
+  corrects: number | null;
+}
+export interface PlayerPointsView { entries: PlayerPointsEntry[]; photos: Record<string, string> }
+
+/** Every point adjustment in a match, newest first, with who made it, for the scorer's panel. */
+export async function getPlayerPoints(contestId: string): Promise<PlayerPointsView | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const row = await loadContest(sb, contestId);
+  if (isActionError(row)) return row;
+  if (!(await canScoreTournament(row.tournament_id))) return fail("FORBIDDEN");
+  const loaded = await loadEvents(sb, contestId);
+  if (isActionError(loaded)) return loaded;
+
+  const dead = new Set(effectiveEvents(loaded.map(toStored)).superseded);
+  const voidOf = new Map(loaded.filter((e) => e.voids_event_id).map((e) => [e.voids_event_id!, e]));
+  const entries = loaded.filter((e) => e.type === "PLAYER_POINTS");
+
+  const playerUsers = Object.values(row.context.sides ?? {}).flatMap((side) => side.players).filter((p) => p.userId);
+  const ids = [...new Set([...entries.map((e) => e.recorded_by).filter((x): x is string => !!x), ...playerUsers.map((p) => p.userId!)])];
+  const { data: people } = ids.length ? await sb.from("profiles").select("id, full_name, name, avatar_url").in("id", ids) : { data: [] as { id: string; full_name: string | null; name: string | null; avatar_url: string | null }[] };
+  const who = new Map((people ?? []).map((p) => [p.id, p]));
+  const photos: Record<string, string> = {};
+  for (const p of playerUsers) { const url = who.get(p.userId!)?.avatar_url; if (url) photos[p.id] = url; }
+
+  const byId = new Map(loaded.map((e) => [e.id, e]));
+  return {
+    photos,
+    entries: entries.map((e): PlayerPointsEntry => {
+      const by = e.recorded_by ? who.get(e.recorded_by) : undefined;
+      const undone = voidOf.get(e.id);
+      return {
+        id: e.id, player: String(e.payload.player), points: Number(e.payload.points), at: e.recorded_at ?? e.occurred_at, by: by?.full_name ?? by?.name ?? null,
+        state: !dead.has(e.id) ? "active" : undone ? "undone" : "replaced",
+        reason: undone?.reason ?? e.reason ?? null,
+        corrects: e.replaces_event_id ? Number(byId.get(e.replaces_event_id)?.payload.points ?? 0) || null : null,
+      };
+    }).reverse(),
+  };
+}
+
 export async function getVolleyballMatchFacts(tournamentId: string): Promise<VolleyballMatchFacts | ActionError> {
   const sb = await createClient();
   const { data, error } = await sb.from("si_contests").select("match_id, sets:state->sport->sets")

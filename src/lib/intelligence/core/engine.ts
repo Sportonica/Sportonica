@@ -131,6 +131,15 @@ export function applyEvent<R, S>(
   }
 
   if (!engine.eventTypes.includes(ev.type)) return `"${ev.type}" is not a ${engine.label} event`;
+  if (engine.statisticalEvents?.includes(ev.type)) {
+    if (st === "scheduled" || st === "postponed") return "Start the match before adding to a player's record";
+    if (st === "cancelled") return "This match was called off";
+    if (env.result?.method === "walkover") return "This match was a walkover: nobody played";
+    const refused = engine.validateEvent(env.sport, ev, ctx, rules);
+    if (refused) return refused;
+    env.sport = engine.updateScore(env.sport, ev, ctx, rules);
+    return null;
+  }
   if (st !== "live") {
     return st === "paused" ? "The match is paused. Resume it to keep scoring"
       : st === "scheduled" || st === "postponed" ? "Start the match before scoring"

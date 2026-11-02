@@ -1457,6 +1457,7 @@ function MatchRow({ match, teams, matches, teamName, sportKind, liveScoringHref,
               ) : basketball.mode === "none" && !done ? (
                 <button className="tc-btn" disabled={pending} style={{ padding: "8px 14px", fontSize: 12.5 }} onClick={onOpenScorer}>Live scoring</button>
               ) : null}
+              {basketball.scorerHref && match.status !== "walkover" && match.status !== "scheduled" ? <Link className="tc-btn" href={`${basketball.scorerHref}#player-points`} style={{ padding: "8px 14px", fontSize: 12.5, textDecoration: "none" }}>Player points</Link> : null}
               {basketball.centreHref ? <Link className="tc-btn" href={basketball.centreHref} style={{ padding: "8px 14px", fontSize: 12.5, textDecoration: "none" }}>Match page</Link> : null}
             </div>
             {!done && basketball.mode === "none" ? <span className="tc-dim" style={{ fontSize: 11 }}>Enter match result: the final set scores after the match. Live scoring: every rally as it happens.</span> : null}

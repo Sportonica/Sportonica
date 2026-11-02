@@ -148,7 +148,7 @@ export default function VolleyballClient({ data }: { data: VolleyballDiscovery }
 
       {filter === "All" && shown.players.length ? (
         <section className="vbp-sec"><h2>Top players</h2>
-          <p className="vbp-note">Points are kills + blocks + aces, from matches where player figures were recorded.</p>
+          <p className="vbp-note">Points are kills + blocks + aces + points added by the scorer, from matches where player figures were recorded.</p>
           <div className="vbp-list">{shown.players.slice(0, 6).map((p) => (
             <Link key={p.id} href={p.href ?? "#"} className="vbp-row">
               <span className="vbp-crest">{p.name.charAt(0).toUpperCase()}</span>

@@ -6,6 +6,7 @@ import { createAnonClient } from "@/lib/supabase/anonServer";
 import { createClient, getViewerId } from "@/lib/supabase/server";
 import type { MatchContext } from "./core/types";
 import { attackEfficiency, pointsScored, type SetScore } from "./sports/volleyballRules";
+import { IN_PLAY, LIVE_CONTEST_COLUMNS, livePlayerLines, type LiveContestRow } from "./volleyballLive";
 import type { Tournament, TournamentMatch, TournamentTeam } from "@/lib/tournaments/types";
 import { TEAM_PUBLIC_COLUMNS } from "@/lib/tournaments/columns";
 import { tournamentPath } from "@/lib/tournaments/types";
@@ -62,7 +63,8 @@ export async function getVolleyballDiscovery(): Promise<VolleyballDiscovery> {
   const matches = (matchRes.data ?? []) as unknown as TournamentMatch[];
   const teams = (teamRes.data ?? []) as unknown as TournamentTeam[];
   const contests = (contestRes.data ?? []) as unknown as ContestRow[];
-  const lines = (lineRes.data ?? []) as unknown as LineRow[];
+  const { data: inPlay } = await sb.from("si_contests").select(LIVE_CONTEST_COLUMNS).in("tournament_id", ids).in("status", IN_PLAY).limit(100);
+  const lines: LineRow[] = [...(lineRes.data ?? []) as unknown as LineRow[], ...livePlayerLines((inPlay ?? []) as unknown as LiveContestRow[])];
 
   const tournamentOf = new Map(list.map((t) => [t.id, t]));
   const venueOf = (t: Tournament & { venues: { name: string } | null }) => t.venues?.name ?? t.own_venue_name ?? "";
@@ -154,15 +156,17 @@ export async function getVolleyballTeamProfile(tournament: Tournament, teamId: s
 
   let roster: VolleyballRosterRow[] | null = null;
   if (viewer) {
-    const [{ data: people }, { data: lines }] = await Promise.all([
+    const [{ data: people }, { data: finished }, { data: inPlay }] = await Promise.all([
       sb.rpc("get_team_roster_public", { p_team_id: teamId }),
       sb.from("si_stat_lines").select("team_player_id, raw").eq("team_id", teamId).eq("subject", "player").limit(2000),
+      sb.from("si_contests").select(LIVE_CONTEST_COLUMNS).eq("tournament_id", tournament.id).in("status", IN_PLAY),
     ]);
+    const lines = [...(finished ?? []) as { team_player_id: string | null; raw: Raw }[], ...livePlayerLines((inPlay ?? []) as unknown as LiveContestRow[]).filter((l) => l.team_id === teamId)];
     // jersey and position come from the rosters frozen into the matches
     const details = new Map<string, { number: number | null; position: string | null }>();
     for (const c of contests) for (const side of Object.values(c.context?.sides ?? {})) if (side.teamId === teamId) for (const p of side.players) details.set(p.id, { number: p.number ?? null, position: p.position ?? null });
     const rawOf = new Map<string, Raw[]>();
-    for (const l of (lines ?? []) as { team_player_id: string | null; raw: Raw }[]) if (l.team_player_id) rawOf.set(l.team_player_id, [...(rawOf.get(l.team_player_id) ?? []), l.raw]);
+    for (const l of lines) if (l.team_player_id) rawOf.set(l.team_player_id, [...(rawOf.get(l.team_player_id) ?? []), l.raw]);
     roster = ((people ?? []) as { id: string; name: string; role: string }[]).map((p) => {
       const raw = rawOf.has(p.id) ? sum(rawOf.get(p.id)!) : null;
       return {
@@ -190,12 +194,16 @@ export interface VolleyballPlayerLine { matchId: string | null; contestId: strin
 /** A roster player's recorded figures, one line per match, and their totals. */
 export async function getVolleyballPlayerLines(tournamentId: string, teamPlayerId: string): Promise<{ lines: VolleyballPlayerLine[]; totals: Raw; attackPct: number | null }> {
   const sb = await createClient();
-  const [{ data }, { data: contests }] = await Promise.all([
+  const [{ data }, { data: contests }, { data: inPlay }] = await Promise.all([
     sb.from("si_stat_lines").select("contest_id, raw").eq("tournament_id", tournamentId).eq("team_player_id", teamPlayerId).eq("subject", "player").limit(500),
     sb.from("si_contests").select("id, match_id").eq("tournament_id", tournamentId).limit(1000),
+    sb.from("si_contests").select(LIVE_CONTEST_COLUMNS).eq("tournament_id", tournamentId).in("status", IN_PLAY),
   ]);
   const matchOf = new Map(((contests ?? []) as { id: string; match_id: string | null }[]).map((c) => [c.id, c.match_id]));
-  const lines = ((data ?? []) as { contest_id: string; raw: Raw }[]).map((l) => ({ matchId: matchOf.get(l.contest_id) ?? null, contestId: l.contest_id, raw: l.raw }));
+  const lines = [
+    ...((data ?? []) as { contest_id: string; raw: Raw }[]).map((l) => ({ matchId: matchOf.get(l.contest_id) ?? null, contestId: l.contest_id, raw: l.raw })),
+    ...livePlayerLines((inPlay ?? []) as unknown as LiveContestRow[]).filter((l) => l.team_player_id === teamPlayerId).map((l) => ({ matchId: l.match_id, contestId: l.contest_id, raw: l.raw })),
+  ];
   const totals = sum(lines.map((l) => l.raw));
   return { lines, totals, attackPct: attackEfficiency(totals) };
 }

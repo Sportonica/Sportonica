@@ -62,3 +62,29 @@
   .vb-line-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 48px; font-size: 14px; cursor: pointer; }
   .vb-line-name small { display: inline; flex: none; font-size: 12px; font-weight: 600; opacity: .7; }
 }
+
+/* Player points: the scorer's panel and the public list. */
+.vb-pts-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.vb-pts-note { font-size: 13px; color: var(--si-text-3); margin: 2px 0 0; }
+.vb-pts-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 18px; }
+.vb-pts-list { display: grid; gap: 8px; }
+.vb-pts-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 8px 10px; border-radius: 10px; background: var(--si-surface-2); }
+.vb-pts-photo { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 14px; background: var(--si-surface); border: 1px solid var(--si-line); }
+.vb-pts-who { flex: 1 1 120px; min-width: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.vb-pts-total { display: grid; justify-items: center; min-width: 44px; }
+.vb-pts-total b { font-size: 20px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.vb-pts-total small { font-size: 10.5px; color: var(--si-text-3); }
+.vb-pts-add { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.vb-pts-input { font: inherit; font-size: 16px; width: 64px; min-height: 44px; padding: 6px; text-align: center; border-radius: 8px; border: 1px solid var(--si-line); background: var(--si-surface); color: inherit; }
+.vb-pts-add .si-btn { min-height: 44px; }
+.vb-pts-history { margin-top: 14px; }
+.vb-pts-entry { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; padding: 8px 0; border-top: 1px solid var(--si-line); font-size: 13.5px; }
+.vb-pts-entry.off > div:first-child { opacity: .6; }
+.vb-pts-entry.off b { text-decoration: line-through; }
+.vb-pts-entry small { display: block; font-size: 12px; color: var(--si-text-3); }
+.vb-pts-fix { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; width: 100%; }
+.vb-pts-fix input[type="text"] { flex: 1 1 160px; }
+.vb-pts-reason { font: inherit; font-size: 16px; min-height: 44px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--si-line); background: var(--si-surface); color: inherit; }
+.vb-pts-public { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.vb-pts-public li { display: flex; justify-content: space-between; gap: 10px; }
+.vb-pts-public b { font-variant-numeric: tabular-nums; }

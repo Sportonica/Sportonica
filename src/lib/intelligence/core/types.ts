@@ -205,6 +205,11 @@ export interface SportIntelligenceEngine<R = any, S = any> {
   readonly sport: SportKey;
   readonly label: string;
   readonly eventTypes: readonly string[];
+  /**
+   * Events that only add to a player's record: they never touch the score, so
+   * they are also accepted while paused and once the match is over.
+   */
+  readonly statisticalEvents?: readonly string[];
   /** Rules whose value is one of a fixed set (preset, foul window ...), for the rules form. */
   readonly ruleChoices?: Record<string, readonly string[]>;
 
