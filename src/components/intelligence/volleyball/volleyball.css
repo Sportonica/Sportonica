@@ -61,6 +61,12 @@
   .vb-lines td input { width: 100% !important; min-height: 44px; box-sizing: border-box; text-align: center; }
   .vb-line-name { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 48px; font-size: 14px; cursor: pointer; }
   .vb-line-name small { display: inline; flex: none; font-size: 12px; font-weight: 600; opacity: .7; }
+  /* one box a player: nothing to open */
+  .vb-lines.points-only tr { grid-template-columns: minmax(0, 1fr) 88px; align-items: center; padding: 6px 10px; }
+  .vb-lines.points-only td { display: block; }
+  .vb-lines.points-only td:first-child { grid-column: auto; }
+  .vb-lines.points-only td[data-label]::before { display: none; }
+  .vb-lines.points-only .vb-line-name { pointer-events: none; }
 }
 
 /* Player points: the scorer's panel and the public list. */

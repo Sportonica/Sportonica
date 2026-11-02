@@ -14,7 +14,7 @@ import { VOLLEYBALL_LINE_KEYS, checkSetScores, type VolleyballLineKey } from "@/
 import type { TournamentMatch } from "@/lib/tournaments/types";
 
 const LINE_LABEL: Record<VolleyballLineKey, string> = {
-  attacks: "Attacks", kills: "Kills", attackErrors: "Attack errors", serves: "Serves", aces: "Aces", serviceErrors: "Service errors",
+  manualPoints: "Points", attacks: "Attacks", kills: "Kills", attackErrors: "Attack errors", serves: "Serves", aces: "Aces", serviceErrors: "Service errors",
   blocks: "Block points", blockErrors: "Block errors", digs: "Digs", receptions: "Receptions", receptionPositive: "Good receptions", receptionErrors: "Reception errors",
   assists: "Assists", settingErrors: "Setting errors", substitutions: "Substitutions", yellowCards: "Yellow cards", redCards: "Red cards",
 };
@@ -32,6 +32,8 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [detailed, setDetailed] = useState(false);
+  // how the scorer records players: one number each, or kills, aces and the rest
+  const [entryMode, setEntryMode] = useState<"points" | "full">("points");
   const [side, setSide] = useState<Side>("a");
   // phones: one player's figures open at a time, in place of the wide table
   const [openPlayer, setOpenPlayer] = useState<string | null>(null);
@@ -59,6 +61,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
       const saved = v.entry?.lines ?? [];
       if (saved.length) {
         setDetailed(true);
+        if (saved.some((l) => Object.keys(l).some((k) => k !== "player" && k !== "manualPoints"))) setEntryMode("full");
         setLines(Object.fromEntries(saved.map((l) => [String(l.player), Object.fromEntries(Object.entries(l).filter(([k]) => k !== "player").map(([k, x]) => [k, String(x)]))])));
       }
     }).catch(() => setLoadErr("No connection. Close this and try again."));
@@ -94,8 +97,15 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
   const editing = !!view.entry || view.status === "completed";
   const live = view.livePoints > 0 && !view.entry;
   const typed = lastFilled >= 0;
-  const needReason = editing && !reason.trim();
+  // only changed set scores need a reason: player figures can just be updated
+  const known = view.entry?.sets ?? null;
+  const setsChanged = !known || known.length !== sets.length || known.some((g, i) => g.a !== sets[i].a || g.b !== sets[i].b);
+  const askReason = editing && setsChanged;
+  const needReason = askReason && !reason.trim();
   const needLive = live && !confirmLive;
+
+  const shownKeys = VOLLEYBALL_LINE_KEYS.filter((k) => (entryMode === "points") === (k === "manualPoints"));
+  const otherModeCount = Object.values(lines).filter((l) => VOLLEYBALL_LINE_KEYS.some((k) => !shownKeys.includes(k) && Number(l[k]) > 0)).length;
 
   const toLines = () => Object.entries(lines).flatMap(([player, l]) => {
     const out: Record<string, unknown> = { player };
@@ -108,7 +118,8 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
     startTransition(async () => {
       try {
         const res = await saveVolleyballResult(match.id, {
-          sets, ...(detailed ? { lines: toLines(), mvp: mvp || null, notes } : {}),
+          // whether or not the section is open: hiding it must not wipe what is in it
+          sets, lines: toLines(), mvp: mvp || null, notes,
         }, { clientId, ...(reason.trim() ? { reason } : {}), confirmLive });
         if (isActionError(res)) { setErr(res.message); setConfirming(false); return; }
         onSaved(res.warning);
@@ -125,7 +136,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
           <div style={{ fontSize: 21, fontWeight: 800, margin: "12px 0" }}>{view.sides[w].name} defeated {view.sides[l].name}</div>
           <div style={{ fontSize: 15 }}>Final score: <b>{check.setsWon[w]}–{check.setsWon[l]}</b></div>
           <div style={{ fontSize: 15, margin: "8px 0 16px", fontVariantNumeric: "tabular-nums" }}>{sets.map((g) => `${g.a}–${g.b}`).join(" | ")}</div>
-          {editing ? <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 12 }}>Reason on the record: {reason}</div> : null}
+          {reason.trim() ? <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 12 }}>Reason on the record: {reason}</div> : null}
           <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 16 }}>Saving marks the match completed and updates the table and bracket.</div>
           <div style={{ display: "grid", gap: 8 }}>
             <button className="tc-btn primary" style={{ padding: 14, fontSize: 15 }} disabled={pending} onClick={save}>{pending ? "Saving…" : "Save result"}</button>
@@ -188,28 +199,40 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
         </div>
 
         <button className="tc-btn" style={{ marginTop: 12, padding: "8px 12px", fontSize: 12.5 }} aria-expanded={detailed} onClick={() => setDetailed(!detailed)}>
-          {detailed ? "Hide detailed result" : "Add player statistics, MVP and notes (optional)"}
+          {detailed ? "Hide player points and statistics" : "Add player points, statistics, MVP and notes (optional)"}
         </button>
 
         {detailed ? (
           <div style={{ marginTop: 12, display: "grid", gap: 12 }}>
-            <div className="tc-dim" style={{ fontSize: 12.5 }}>Only what you type is recorded. Leave anything you don&apos;t have empty.</div>
+            <div role="group" aria-label="How to record players" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button type="button" className={`tc-btn ${entryMode === "points" ? "primary" : ""}`} aria-pressed={entryMode === "points"} style={{ padding: "8px 14px", fontSize: 13 }} onClick={() => setEntryMode("points")}>Direct points</button>
+              <button type="button" className={`tc-btn ${entryMode === "full" ? "primary" : ""}`} aria-pressed={entryMode === "full"} style={{ padding: "8px 14px", fontSize: 13 }} onClick={() => setEntryMode("full")}>Kills and full stats</button>
+            </div>
+            <div className="tc-dim" style={{ fontSize: 12.5 }}>
+              {entryMode === "points" ? "Type each player's points. Nothing else is needed." : "Only what you type is recorded. Leave anything you don't have empty."} These never change the set scores.
+            </div>
+            {otherModeCount ? (
+              <div style={{ fontSize: 12.5, color: "#d97706" }}>
+                {otherModeCount} player{otherModeCount === 1 ? " has" : "s have"} {entryMode === "points" ? "kills or other stats" : "direct points"} entered too. Both count towards their points, so clear one if they are the same points.
+              </div>
+            ) : null}
             <div style={{ display: "flex", gap: 6 }}>
               {(["a", "b"] as Side[]).map((s) => <button key={s} className={`tc-btn ${side === s ? "primary" : ""}`} style={{ padding: "7px 12px", fontSize: 12.5 }} onClick={() => setSide(s)}>{view.sides[s].name}</button>)}
             </div>
             <div style={{ overflowX: "auto" }}>
-              <table className="tc-table vb-lines" style={{ minWidth: 1180 }}>
-                <thead><tr><th>Player</th>{VOLLEYBALL_LINE_KEYS.map((k) => <th key={k} style={{ fontSize: 10.5 }}>{LINE_LABEL[k]}</th>)}</tr></thead>
+              <table className={`tc-table vb-lines${entryMode === "points" ? " points-only" : ""}`} style={entryMode === "points" ? undefined : { minWidth: 1180 }}>
+                <thead><tr><th>Player</th>{shownKeys.map((k) => <th key={k} style={{ fontSize: 10.5 }}>{LINE_LABEL[k]}</th>)}</tr></thead>
                 <tbody>
                   {view.sides[side].players.map((p) => (
                     <tr key={p.id} className={openPlayer === p.id ? "open" : ""}>
                       <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>
                         <button type="button" className="vb-line-name" aria-expanded={openPlayer === p.id} onClick={() => setOpenPlayer(openPlayer === p.id ? null : p.id)}>
                           <span>{p.number != null ? `#${p.number} ` : ""}{p.name}</span>
+                          {view.addedPoints[p.id] ? <small style={{ display: "block", fontWeight: 500, opacity: 0.7 }}>+{view.addedPoints[p.id]} added from Player points</small> : null}
                           {lines[p.id] && Object.values(lines[p.id]).some(Boolean) ? <small>{Object.values(lines[p.id]).filter(Boolean).length} entered</small> : null}
                         </button>
                       </td>
-                      {VOLLEYBALL_LINE_KEYS.map((k) => (
+                      {shownKeys.map((k) => (
                         <td key={k} data-label={LINE_LABEL[k]}><input inputMode="numeric" aria-label={`${p.name} ${LINE_LABEL[k]}`} value={lines[p.id]?.[k] ?? ""} style={{ font: "inherit", width: 44, padding: "6px 3px", textAlign: "center", borderRadius: 6, border: "1px solid rgba(127,127,127,.35)", background: "transparent", color: "inherit" }}
                           onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 3); setLines((all) => ({ ...all, [p.id]: { ...all[p.id], [k]: v } })); }} /></td>
                       ))}
@@ -230,8 +253,8 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
           </div>
         ) : null}
 
-        {editing ? (
-          <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700, marginTop: 12 }}>Why is the result changing? (kept on the record)
+        {askReason ? (
+          <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700, marginTop: 12 }}>Why are the set scores changing? (kept on the record)
             <input style={field} value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
           </label>
         ) : null}
@@ -242,7 +265,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
             <ul style={{ margin: "8px 0 0", paddingLeft: 18, display: "grid", gap: 6 }}>
               {view.revisions.map((r, i) => (
                 <li key={i}>
-                  {r.from.map((g) => `${g.a}–${g.b}`).join(", ")} changed to {r.to.map((g) => `${g.a}–${g.b}`).join(", ")}. &ldquo;{r.reason}&rdquo;
+                  {r.from.map((g) => `${g.a}–${g.b}`).join(", ") === r.to.map((g) => `${g.a}–${g.b}`).join(", ") ? "Set scores unchanged" : <>{r.from.map((g) => `${g.a}–${g.b}`).join(", ")} changed to {r.to.map((g) => `${g.a}–${g.b}`).join(", ")}</>}. &ldquo;{r.reason}&rdquo;
                   <span className="tc-dim"> {r.by ?? "An organiser"}, {new Date(r.at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kathmandu" })}</span>
                 </li>
               ))}
@@ -251,6 +274,8 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
         ) : null}
 
         {err ? <div role="alert" style={{ color: "#ef4444", fontSize: 13, marginTop: 10 }}>{err}</div> : null}
+        {check.winner && needReason ? <div className="tc-dim" style={{ fontSize: 12.5, marginTop: 10 }}>Say why the set scores are changing to continue.</div> : null}
+        {check.winner && needLive ? <div className="tc-dim" style={{ fontSize: 12.5, marginTop: 10 }}>Tick the box at the top to replace the live score.</div> : null}
         <button className="tc-btn primary" style={{ width: "100%", padding: 14, fontSize: 15, marginTop: 14, justifyContent: "center", textAlign: "center" }} disabled={!check.winner || needReason || needLive} onClick={() => { setErr(null); setConfirming(true); }}>
           Review result
         </button>
