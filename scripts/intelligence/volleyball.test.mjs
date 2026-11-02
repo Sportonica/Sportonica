@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { volleyballEngine as E } from "../../src/lib/intelligence/sports/volleyball.ts";
 import { aggregate } from "../../src/lib/intelligence/aggregate.ts";
 import { RulesError } from "../../src/lib/intelligence/core/types.ts";
+import { reconstruct } from "../../src/lib/intelligence/core/engine.ts";
 import { checkSetScores, VOLLEYBALL_PRESETS, attackEfficiency, mvpRating, pointsScored } from "../../src/lib/intelligence/sports/volleyballRules.ts";
 import { computeVolleyballStandings, ratioText } from "../../src/lib/tournaments/standings.ts";
 import { makeContext, openMatch, section, cell } from "./harness.mjs";
@@ -445,4 +446,81 @@ section("volleyball league table: set and point ratios, deciding-set points, tie
   const grouped = [{ ...fx("g1", "x", "y", 3, 0), stage: "group", group_name: "A" }];
   const groupA = computeVolleyballStandings(grouped, teams, {}, "A", {});
   assert.deepEqual(groupA.map((r) => [r.team_id, r.played, r.points]), [["x", 1, 3], ["y", 1, 0]], "only the teams playing in the group");
+});
+
+section("volleyball: points added to a player never touch the team score", () => {
+  const m = openMatch(E, ctx, SHORT);
+  m.refuses("PLAYER_POINTS", { player: "a1", points: 3 }, /Start the match/, "before the match");
+  m.push("MATCH_START");
+  m.refuses("PLAYER_POINTS", { player: "a1", points: 0 }, /whole number/, "zero points");
+  m.refuses("PLAYER_POINTS", { player: "a1", points: -2 }, /whole number/, "negative points");
+  m.refuses("PLAYER_POINTS", { player: "a1", points: 1.5 }, /whole number/, "part of a point");
+  m.refuses("PLAYER_POINTS", { player: "a1", points: "3" }, /whole number/, "not a number");
+  m.refuses("PLAYER_POINTS", { player: "nobody", points: 3 }, /not in this match/, "someone else");
+
+  m.push("FIRST_SERVE", { side: "a" });
+  rally(m, "a");
+  const score = () => JSON.stringify([m.env.sport.sets, m.env.sport.setsWon, m.env.sport.serving, m.env.sport.rallies, m.env.sport.team]);
+  const before = score();
+  m.push("PLAYER_POINTS", { player: "a1", points: 3 });
+  m.push("PLAYER_POINTS", { player: "a1", points: 2 });
+  m.push("PLAYER_POINTS", { player: "b1", points: 12 });
+  assert.equal(score(), before, "the sets, the rallies, the serve and the team's figures are untouched");
+  assert.equal(m.env.sport.players.a1.manualPoints, 5, "the player's total adds up");
+  assert.equal(pointsScored(m.env.sport.players.a1), 5, "added points count towards the player's points");
+  assert.deepEqual(E.mirrorScore(m.env.sport), { scoreA: 0, scoreB: 0 }, "the fixture's score is untouched");
+
+  const teams = E.calculateTeamStatistics(m.env.sport, ctx, m.rules)[0];
+  assert.equal(teams.rows[0].values.points, 1, "the team's points are still only the rally it won");
+  assert.equal(teams.columns.some((c) => c.key === "manualPoints"), false, "no added points on the team table");
+});
+
+section("volleyball: player points while paused, after the match, on a quick result", () => {
+  const m = openMatch(E, ctx, SHORT);
+  m.push("MATCH_START");
+  m.push("MATCH_PAUSE", {});
+  m.push("PLAYER_POINTS", { player: "a2", points: 1 });
+  m.refuses("RALLY_WON", { winner: "a" }, /paused/, "rally scoring stays closed while paused");
+  m.push("MATCH_RESUME", {});
+  m.push("FINAL_SETS", { sets: [{ a: 5, b: 1 }, { a: 5, b: 2 }] });
+  m.push("PLAYER_POINTS", { player: "a2", points: 4 });
+  m.push("MATCH_COMPLETE", {});
+  const sets = JSON.stringify(m.env.sport.sets);
+  m.push("PLAYER_POINTS", { player: "b3", points: 7 });
+  assert.equal(m.env.status, "completed", "adding points does not reopen the match");
+  assert.equal(JSON.stringify(m.env.sport.sets), sets, "the entered set scores stand");
+  m.refuses("RALLY_WON", { winner: "a" }, /over/, "rally scoring stays closed once it is over");
+  const lines = E.calculateStatistics(m.env.sport, ctx, m.rules).lines.filter((l) => l.subject === "player");
+  assert.equal(lines.find((l) => l.subjectKey === "a2").raw.manualPoints, 5);
+  assert.equal(lines.find((l) => l.subjectKey === "b3").raw.manualPoints, 7);
+  assert.equal(lines.length, 2, "nobody gets a line they weren't given: no fabricated figures");
+});
+
+section("volleyball: player points are refused for a match nobody played", () => {
+  const w = openMatch(E, ctx, SHORT);
+  w.push("MATCH_FORFEIT", { side: "b" });
+  w.refuses("PLAYER_POINTS", { player: "a1", points: 2 }, /walkover/, "after a walkover");
+  const c = openMatch(E, ctx, SHORT);
+  c.push("MATCH_CANCEL", {});
+  c.refuses("PLAYER_POINTS", { player: "a1", points: 2 }, /called off/, "after a cancellation");
+});
+
+section("volleyball: undoing and correcting player points", () => {
+  const stored = (seq, type, payload, extra = {}) => ({ id: `e${seq}`, seq, type, payload, occurredAt: "2026-11-02T00:00:00.000Z", clientId: `c${seq}`, ...extra });
+  const base = [
+    stored(1, "MATCH_START", {}),
+    stored(2, "FINAL_SETS", { sets: [{ a: 5, b: 1 }, { a: 5, b: 2 }] }),
+    stored(3, "MATCH_COMPLETE", {}),
+    stored(4, "PLAYER_POINTS", { player: "a1", points: 3 }),
+    stored(5, "PLAYER_POINTS", { player: "a1", points: 2 }),
+  ];
+  const total = (events) => reconstruct(E, ctx, E.resolveRules(SHORT), events);
+  assert.equal(total(base).envelope.sport.players.a1.manualPoints, 5);
+  const undone = total([...base, stored(6, "CORRECTION_VOID", {}, { voidsEventId: "e5", reason: "Undone by the scorer" })]);
+  assert.equal(undone.envelope.sport.players.a1.manualPoints, 3, "undo takes the last adjustment off");
+  assert.equal(undone.envelope.status, "completed", "undo leaves the match finished");
+  const fixed = total([...base, stored(6, "PLAYER_POINTS", { player: "a1", points: 4 }, { replacesEventId: "e4", reason: "Misread the sheet" })]);
+  assert.equal(fixed.envelope.sport.players.a1.manualPoints, 6, "a correction replaces the amount");
+  assert.equal(fixed.issues.filter((i) => i.severity === "error").length, 0);
+  assert.deepEqual(E.mirrorScore(fixed.envelope.sport), { scoreA: 2, scoreB: 0 }, "the result stands through corrections");
 });

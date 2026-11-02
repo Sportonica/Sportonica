@@ -92,6 +92,9 @@ const RAW_COLUMNS: StatColumn[] = [
   { key: "redCards", label: "Red cards", kind: "raw" },
 ];
 
+// a player's own record only: points added by hand never reach a team's figures or score
+const PLAYER_POINTS_COLUMN: StatColumn = { key: "manualPoints", label: "Added points", kind: "raw" };
+
 const DERIVED_COLUMNS: StatColumn[] = [
   { key: "pointsScored", label: "Points won", kind: "derived", format: "int" },
   { key: "attackPct", label: "Attack %", kind: "derived", format: "pct" },
@@ -214,7 +217,8 @@ const hasPlayer = (ctx: MatchContext, id: unknown): boolean => typeof id === "st
 export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, VolleyballState> = {
   sport: "volleyball",
   label: "Volleyball",
-  eventTypes: ["FIRST_SERVE", "LINEUP", "RALLY_WON", "TOUCH", "SUBSTITUTION", "TIMEOUT", "LIBERO_SET", "LIBERO_IN", "LIBERO_OUT", "SANCTION", "MATCH_MVP", "OFFICIALS", "FINAL_SETS"],
+  eventTypes: ["FIRST_SERVE", "LINEUP", "RALLY_WON", "TOUCH", "SUBSTITUTION", "TIMEOUT", "LIBERO_SET", "LIBERO_IN", "LIBERO_OUT", "SANCTION", "MATCH_MVP", "OFFICIALS", "FINAL_SETS", "PLAYER_POINTS"],
+  statisticalEvents: ["PLAYER_POINTS"],
   ruleChoices: { preset: Object.keys(VOLLEYBALL_PRESETS) },
 
   answerQuestion(s, ctx, rules, question) { return askMatch(this, s, ctx, rules, question, VOLLEYBALL_KNOWLEDGE); },
@@ -251,6 +255,10 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
   validateEvent(s, ev, ctx, rules) {
     const p = ev.payload;
     const g = cur(s);
+    if (ev.type === "PLAYER_POINTS") {
+      if (!hasPlayer(ctx, p.player)) return "That player is not in this match";
+      return isPosInt(p.points) && Number.isSafeInteger(p.points) ? null : "Points must be a whole number, 1 or more";
+    }
     if (ev.type === "OFFICIALS") {
       const list = p.officials;
       if (!Array.isArray(list) || list.length > 8) return "List the match officials";
@@ -443,6 +451,7 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
         if (card === "red") awardPoint(s, ev.seq, ev.occurredAt, otherSide(side), "penalty", undefined, ctx, rules);
         return s;
       }
+      case "PLAYER_POINTS": add((s.players[p.player as string] ??= {}), "manualPoints", p.points as number); return s;
       case "MATCH_MVP": s.mvp = str(p.player); return s;
       case "OFFICIALS": s.officials = (p.officials as { role: string; name: string }[]).map((o) => ({ role: o.role, name: o.name.trim() })); return s;
       case "FINAL_SETS": {
@@ -574,11 +583,11 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
   },
 
   calculatePlayerStatistics(s, ctx) {
-    const columns = [...RAW_COLUMNS, ...DERIVED_COLUMNS];
+    const columns = [PLAYER_POINTS_COLUMN, ...RAW_COLUMNS, ...DERIVED_COLUMNS];
     const rows = SIDES.flatMap((side) => playersOf(ctx, side).map((pl) => {
       const raw = s.players[pl.id] ?? {};
       const d = derive(raw);
-      return { id: pl.id, name: pl.name, side, values: { ...Object.fromEntries(RAW_COLUMNS.map((c) => [c.key, raw[c.key] ?? 0])), ...Object.fromEntries(DERIVED_COLUMNS.map((c) => [c.key, d[c.key]])) } };
+      return { id: pl.id, name: pl.name, side, values: { ...Object.fromEntries([PLAYER_POINTS_COLUMN, ...RAW_COLUMNS].map((c) => [c.key, raw[c.key] ?? 0])), ...Object.fromEntries(DERIVED_COLUMNS.map((c) => [c.key, d[c.key]])) } };
     }));
     return [{ key: "players", title: "Players", columns, rows }];
   },
@@ -663,7 +672,7 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
     ];
     const columns = subject === "team"
       ? [{ key: "matches", label: "Matches", kind: "raw" as const }, { key: "wins", label: "Wins", kind: "raw" as const }, ...TEAM_EXTRA_RAW, ...RAW_COLUMNS, ...avg, ...DERIVED_COLUMNS, ...TEAM_EXTRA_DERIVED]
-      : [{ key: "matches", label: "Matches", kind: "raw" as const }, ...RAW_COLUMNS, ...avg, ...DERIVED_COLUMNS];
+      : [{ key: "matches", label: "Matches", kind: "raw" as const }, PLAYER_POINTS_COLUMN, ...RAW_COLUMNS, ...avg, ...DERIVED_COLUMNS];
     return { columns, values: { ...raw, ...d, killsPerMatch: perMatch("kills"), blocksPerMatch: perMatch("blocks"), digsPerMatch: perMatch("digs") } };
   },
 
@@ -682,6 +691,7 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
       case "LIBERO_OUT": return `${side}: Libero off`;
       case "SANCTION": return `${CARD_NAME[String(p.card)] ?? "Sanction"}: ${side}${who}`;
       case "MATCH_MVP": return str(p.player) ? `Match MVP: ${playerName(ctx, str(p.player))}` : "Match MVP cleared";
+      case "PLAYER_POINTS": return `+${String(p.points)} added to ${playerName(ctx, str(p.player))}'s points`;
       case "OFFICIALS": return "Match officials set";
       case "FINAL_SETS": return `Result entered: ${((p.sets as SetScore[]) ?? []).map((x) => `${x.a}-${x.b}`).join(", ")}`;
       case "SUBSTITUTION": return `${side}: ${playerName(ctx, str(p.in))} on for ${playerName(ctx, str(p.out))}`;

@@ -153,8 +153,11 @@ export type VolleyballLineKey = (typeof VOLLEYBALL_LINE_KEYS)[number];
 type Raw = Record<string, number | null | undefined>;
 const n = (r: Raw, k: string): number => r[k] ?? 0;
 
-/** Points a player won: kills, block points and aces. */
-export const pointsScored = (r: Raw): number => n(r, "kills") + n(r, "blocks") + n(r, "aces");
+/**
+ * A player's points: kills, block points and aces, plus points the scorer
+ * added to them by hand. These are the player's record, not the team's score.
+ */
+export const pointsScored = (r: Raw): number => n(r, "kills") + n(r, "blocks") + n(r, "aces") + n(r, "manualPoints");
 
 /** Attack efficiency: (kills - attack errors) / attack attempts x 100, or null with no attempts. */
 export function attackEfficiency(r: Raw): number | null {
@@ -186,7 +189,7 @@ export interface VolleyballLeaderboard {
 }
 
 export const VOLLEYBALL_LEADERBOARDS: VolleyballLeaderboard[] = [
-  { key: "scorer", title: "Top scorer", how: "Kills + block points + aces", value: pointsScored },
+  { key: "scorer", title: "Top scorer", how: "Kills + block points + aces + points added by the scorer", value: pointsScored },
   { key: "attacker", title: "Best attacker", how: "(Kills - attack errors) / attacks, at least 10 attacks", value: attackEfficiency, format: "pct", minKey: "attacks", min: 10, then: (r) => n(r, "kills") },
   { key: "server", title: "Best server", how: "Most aces, then fewest service errors", value: (r) => n(r, "aces"), then: (r) => -n(r, "serviceErrors") },
   { key: "blocker", title: "Best blocker", how: "Most block points", value: (r) => n(r, "blocks") },

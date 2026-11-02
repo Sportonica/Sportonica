@@ -36,11 +36,32 @@ export default function VolleyballMatchPanel({ contest, tournamentName, info }: 
   ];
   // starting order and who has been on court: from the rotation log, never from the roster alone
   const subs = s.rotationLog.filter((r) => r.why === "Substitution" || r.why.startsWith("Libero"));
+  // only what the scorer added: nobody appears here with a made-up figure
+  const added = sides.map((x) => ({
+    side: x,
+    rows: (ctx.sides?.[x].players ?? []).map((p) => ({ p, pts: s.players[p.id]?.manualPoints ?? 0 })).filter((r) => r.pts > 0).sort((u, v) => v.pts - u.pts),
+  }));
 
   return (
     <>
       <SetScorecard state={s} context={ctx} />
-      {s.manual ? <div className="si-info">The result was entered after the match{Object.keys(s.players).length ? ", with player statistics from the score sheet." : ". Player statistics were not recorded."}</div> : null}
+      {s.manual ? <div className="si-info">The result was entered after the match{Object.keys(s.players).length ? ", with player statistics." : ". Player statistics were not recorded."}</div> : null}
+      {added.some((x) => x.rows.length) ? (
+        <div className="si-card">
+          <h2 className="si-h2">Player points</h2>
+          <div className="vb-courts">
+            {added.filter((x) => x.rows.length).map((x) => (
+              <div key={x.side}>
+                <div className="vb-court-t">{ctx.sides?.[x.side].name}</div>
+                <ul className="vb-pts-public">
+                  {x.rows.map(({ p, pts }) => <li key={p.id}><span>{shortName(p)}</span><b>{pts}</b></li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <div className="si-muted" style={{ fontSize: 12.5, marginTop: 10 }}>Entered by the scorer for each player. These are separate from the team score above.</div>
+        </div>
+      ) : null}
       {anyCourt && !s.decided ? (
         <div className="si-card">
           <h2 className="si-h2">On court</h2>

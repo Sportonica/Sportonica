@@ -67,7 +67,7 @@ export default async function TournamentPlayerPage({ params }: { params: Promise
     const [{ lines, totals: v, attackPct }, teamPage] = await Promise.all([getVolleyballPlayerLines(tournament.id, playerId), getVolleyballTeamProfile(tournament, player.team_id)]);
     const played = [...(teamPage?.results ?? []), ...(teamPage?.upcoming ?? []).filter((m) => m.status === "live")];
     const figures: [string, number | string][] = [
-      ["Points", pointsScored(v)], ["Kills", v.kills ?? 0], ["Aces", v.aces ?? 0], ["Blocks", v.blocks ?? 0], ["Digs", v.digs ?? 0], ["Assists", v.assists ?? 0],
+      ["Points", pointsScored(v)], ...(v.manualPoints ? [["Added points", v.manualPoints] as [string, number]] : []), ["Kills", v.kills ?? 0], ["Aces", v.aces ?? 0], ["Blocks", v.blocks ?? 0], ["Digs", v.digs ?? 0], ["Assists", v.assists ?? 0],
       ...(attackPct !== null ? [["Attack efficiency", `${attackPct}%`] as [string, string]] : []),
     ];
     const lineOf = new Map(lines.map((l) => [l.matchId, l]));
@@ -97,7 +97,7 @@ export default async function TournamentPlayerPage({ params }: { params: Promise
             <div className="pf-sec-head"><span className="pf-sec-num">01</span><h2 className="pf-sec-t">Match by match</h2></div>
             {played.length === 0 ? <div className="pf-empty">{player.team_name} hasn&apos;t played yet.</div> : played.map((m) => {
               const raw = lineOf.get(m.id)?.raw;
-              const line = raw ? [`${raw.kills ?? 0} kills`, `${raw.aces ?? 0} aces`, `${raw.blocks ?? 0} blocks`, `${raw.digs ?? 0} digs`, `${raw.assists ?? 0} assists`].join(" · ") : null;
+              const line = raw ? [...(raw.manualPoints ? [`${raw.manualPoints} added`] : []), `${raw.kills ?? 0} kills`, `${raw.aces ?? 0} aces`, `${raw.blocks ?? 0} blocks`, `${raw.digs ?? 0} digs`, `${raw.assists ?? 0} assists`].join(" · ") : null;
               const result = m.status === "walkover" ? "Walkover" : m.mine !== null && m.theirs !== null ? `${m.won === null ? "" : m.won ? "W " : "L "}${m.mine}–${m.theirs}` : null;
               return (
                 <div key={m.id} className="pf-game">

@@ -21,6 +21,7 @@ import type { ContestView, TimelineEntry } from "@/lib/intelligence/types";
 import { useLiveContest } from "./useLiveContest";
 import { ScoreCard, Timeline } from "./views";
 import { PADS } from "./pads";
+import PlayerPointsPanel from "./volleyball/PlayerPointsPanel";
 import { CricketScorerHeader, CricketScorerSide, EndMatchEarly } from "./cricket/scorer";
 import { getEngine } from "@/lib/intelligence/registry";
 import { SIDE_KEYS } from "./pads/shared";
@@ -130,7 +131,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
     return () => window.removeEventListener("online", retry);
   }, []);
 
-  const correct = async (target: TimelineEntry, reason: string, replacement?: { type: string; payload: Record<string, unknown> }) => {
+  const correct = async (target: Pick<TimelineEntry, "id">, reason: string, replacement?: { type: string; payload: Record<string, unknown> }) => {
     setBusy(true);
     try {
       const res = await correctContestEvent(initial.id, target.id, reason, newId(), replacement);
@@ -265,6 +266,7 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
               {inPlay && contest.sport !== "basketball" && !undecided ? <button type="button" className="si-btn primary" onClick={() => { if (window.confirm("Complete the match? The result becomes final.")) send("MATCH_COMPLETE"); }}>Complete match</button> : null}
               {/* cricket's pad has its own "Undo last ball" by the run keys */}
               {cricket && st === "live" ? null : <button type="button" className="si-btn" disabled={busy || queue.length > 0 || contest.lastSeq === 0} onClick={() => void undo()}>Undo last</button>}
+              {contest.sport === "volleyball" ? <a className="si-btn" href="#player-points" style={{ textDecoration: "none" }}>Player points</a> : null}
             </div>
 
             {st === "live" || (replacing && inPlay) ? <Pad contest={shown} send={send} undo={padUndo} />
@@ -347,6 +349,8 @@ export default function ScorerConsole({ initial, tournamentName }: { initial: Co
           </div>
           )}
         </div>
+
+        {contest.sport === "volleyball" ? <PlayerPointsPanel contest={shown} waiting={queue.length} busy={busy} send={send} correct={correct} /> : null}
       </div>
     </div>
   );

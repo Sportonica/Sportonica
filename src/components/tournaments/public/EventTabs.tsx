@@ -17,7 +17,7 @@ import { CricketLeaders, CricketTablePublic, rankPlayers, type CricketTournament
 import { CricketCrest, CricketStatus } from "./CricketArt";
 import { BasketballCrest, BasketballStatus } from "./BasketballArt";
 import { BracketIcon, ClipboardIcon, HoopIcon, PlayerAvatar, StumpsIcon } from "./SportIcons";
-import type { MatchHighlight } from "@/lib/intelligence/actions";
+import { getTournamentLeaders, type MatchHighlight } from "@/lib/intelligence/actions";
 import { diffText, isVolleyball, ratioText, standingsScheme, type VolleyballStanding } from "@/lib/tournaments/standings";
 import { VOLLEYBALL_LEADERBOARDS } from "@/lib/intelligence/sports/volleyballRules";
 import {
@@ -255,7 +255,7 @@ export default function EventTabs({
       {activeTab === "Player Stats" && (
         authLoading ? null : !user ? <SignInGate what="the player stats" pathname={pathname} />
           : isBasketballSport ? <BasketballLeadersTab leaders={leaders} />
-          : isVolleyball(tournament.sport) ? <VolleyballLeadersTab leaders={leaders} />
+          : isVolleyball(tournament.sport) ? <VolleyballLeadersTab initial={leaders} tournamentId={tournament.id} live={tournament.status === "live"} />
           : isCricketSport ? (cricket?.players.length ? <CricketLeaders data={cricket} /> : <div className="ev2-empty">Player stats appear here once match figures are entered.</div>)
           : <PlayerStatsTab rows={playerStats} teams={teams} basePath={tournamentPath(tournament)} />
       )}
@@ -984,8 +984,18 @@ const BB_STATS = [
 ] as const;
 
 // Volleyball leaders: one award at a time, each with how it is worked out.
-function VolleyballLeadersTab({ leaders }: { leaders: TournamentLeaders | null }) {
+function VolleyballLeadersTab({ initial, tournamentId, live }: { initial: TournamentLeaders | null; tournamentId: string; live: boolean }) {
   const [board, setBoard] = useState(VOLLEYBALL_LEADERBOARDS[0]);
+  const [leaders, setLeaders] = useState(initial);
+  // only this tab, only while someone is looking at it, only while there is something to follow
+  useEffect(() => {
+    if (!live) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      getTournamentLeaders(tournamentId).then((res) => { if (!isActionError(res)) setLeaders(res); }).catch(() => { /* the next tick tries again */ });
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, [live, tournamentId]);
   if (!leaders?.rows.length) return <div className="ev2-empty">Player stats appear here once matches have player figures. Results entered without them don&apos;t count towards these.</div>;
   const raw = (r: (typeof leaders.rows)[number]) => r.values as Record<string, number | null>;
   const sorted = leaders.rows
