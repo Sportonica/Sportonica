@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { postTournamentAnnouncement } from "@/lib/tournaments/actions";
+import { deleteTournamentAnnouncement, postTournamentAnnouncement, updateTournamentAnnouncement } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
 import type { TournamentAnnouncement } from "@/lib/tournaments/types";
 
@@ -20,6 +20,34 @@ export default function AnnouncementsTab({ tournamentId, announcements }: {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [rowErr, setRowErr] = useState<string | null>(null);
+
+  function startEdit(a: TournamentAnnouncement) {
+    setEditingId(a.id); setEditTitle(a.title); setEditBody(a.body ?? ""); setRowErr(null);
+  }
+
+  function saveEdit(id: string) {
+    setRowErr(null);
+    startTransition(async () => {
+      const res = await updateTournamentAnnouncement(id, editTitle, editBody);
+      if (isActionError(res)) { setRowErr(res.message); return; }
+      setEditingId(null);
+      router.refresh();
+    });
+  }
+
+  function remove(a: TournamentAnnouncement) {
+    if (!window.confirm(`Delete "${a.title}"? It disappears from the tournament page. Notifications already sent stay with the captains.`)) return;
+    setRowErr(null);
+    startTransition(async () => {
+      const res = await deleteTournamentAnnouncement(a.id, tournamentId);
+      if (isActionError(res)) { setRowErr(res.message); return; }
+      router.refresh();
+    });
+  }
 
   function post() {
     setErr(null);
@@ -54,11 +82,31 @@ export default function AnnouncementsTab({ tournamentId, announcements }: {
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {announcements.map((a) => (
             <div key={a.id} style={{ borderBottom: "1px solid rgba(242,237,230,0.08)", paddingBottom: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 13.5 }}>{a.title}</div>
-              {a.body && <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{a.body}</div>}
-              <div className="tc-dim" style={{ fontSize: 11.5, marginTop: 6 }}>
-                {new Date(a.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kathmandu" })}
-              </div>
+              {editingId === a.id ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Title" aria-label="Title" style={inputStyle} />
+                  <textarea value={editBody} onChange={(e) => setEditBody(e.target.value)} placeholder="Details (optional)" aria-label="Details" rows={3} style={{ ...inputStyle, resize: "vertical" }} />
+                  <div className="tc-dim" style={{ fontSize: 11.5 }}>Captains are not notified again about an edit.</div>
+                  {rowErr && <div className="tc-err">{rowErr}</div>}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button className="tc-btn primary" disabled={pending || !editTitle.trim()} onClick={() => saveEdit(a.id)} style={{ padding: "6px 10px", fontSize: 12 }}>Save</button>
+                    <button className="tc-btn" disabled={pending} onClick={() => setEditingId(null)} style={{ padding: "6px 10px", fontSize: 12 }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontWeight: 700, fontSize: 13.5 }}>{a.title}</div>
+                  {a.body && <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4, whiteSpace: "pre-wrap" }}>{a.body}</div>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                    <span className="tc-dim" style={{ fontSize: 11.5 }}>
+                      {new Date(a.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Kathmandu" })}
+                    </span>
+                    <button className="tc-btn" disabled={pending} onClick={() => startEdit(a)} style={{ padding: "4px 8px", fontSize: 11.5 }}>Edit</button>
+                    <button className="tc-btn" disabled={pending} onClick={() => remove(a)} style={{ padding: "4px 8px", fontSize: 11.5, color: "#ef4444" }}>Delete</button>
+                  </div>
+                  {rowErr && editingId === null && <div className="tc-err" style={{ marginTop: 6 }}>{rowErr}</div>}
+                </>
+              )}
             </div>
           ))}
         </div>

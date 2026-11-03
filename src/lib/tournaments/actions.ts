@@ -650,6 +650,44 @@ export async function updateTeamDetails(
   return data as TournamentTeam;
 }
 
+/** The team profile an organiser can change any time; "" clears a field. See db/tournament_admin_edits.sql. */
+export interface TeamProfileInput {
+  club_name?: string; club_address?: string; contact_person_name?: string;
+  contact_phone?: string; contact_email?: string; logo_url?: string;
+}
+
+export async function adminUpdateTeamProfile(teamId: string, input: TeamProfileInput): Promise<TournamentTeam | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const email = input.contact_email?.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return actionError("Enter a valid contact email, or leave it empty.");
+  const { data, error } = await sb.rpc("admin_update_team_profile", { p_team_id: teamId, p: input });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  const team = data as TournamentTeam;
+  revalidatePath(`/tournaments/${team.tournament_id}`);
+  return team;
+}
+
+/** Move a team to a group (or none) at any stage. Fixtures already made keep their group. */
+export async function setTeamGroup(teamId: string, groupName: string | null): Promise<TournamentTeam | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("set_team_group", { p_team_id: teamId, p_group_name: groupName?.trim() || null });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  const team = data as TournamentTeam;
+  revalidatePath(`/tournaments/${team.tournament_id}`);
+  return team;
+}
+
+/** Switch a roster member between player and substitute (not the captain). */
+export async function setTeamPlayerRole(teamPlayerId: string, role: "player" | "substitute"): Promise<TournamentTeamPlayer | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("set_team_player_role", { p_team_player_id: teamPlayerId, p_role: role });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  return data as TournamentTeamPlayer;
+}
+
 // Team logo upload — same shape as uploadTournamentQr (uploader-keyed
 // path, public 'team-logos' bucket).
 export async function uploadTeamLogo(file: File): Promise<string | ActionError> {
@@ -1312,6 +1350,25 @@ export async function postTournamentAnnouncement(tournamentId: string, title: st
   const { data, error } = await sb.rpc("post_tournament_announcement", { p_tournament_id: tournamentId, p_title: title, p_body: body ?? null });
   if (error) return actionError(friendlyTournamentError(error.message));
   return data as TournamentAnnouncement;
+}
+
+/** Edit a posted announcement. Captains are not notified again. */
+export async function updateTournamentAnnouncement(id: string, title: string, body?: string): Promise<TournamentAnnouncement | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { data, error } = await sb.rpc("update_tournament_announcement", { p_id: id, p_title: title, p_body: body ?? null });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  const row = data as TournamentAnnouncement;
+  revalidatePath(`/tournaments/${row.tournament_id}`);
+  return row;
+}
+
+export async function deleteTournamentAnnouncement(id: string, tournamentId: string): Promise<void | ActionError> {
+  const { sb, user } = await requireUser();
+  if (!user) return actionError("UNAUTHORIZED");
+  const { error } = await sb.rpc("delete_tournament_announcement", { p_id: id });
+  if (error) return actionError(friendlyTournamentError(error.message));
+  revalidatePath(`/tournaments/${tournamentId}`);
 }
 
 // ── Cricket (see RUN_ME_cricket_scoring.sql) ────────────────────────
