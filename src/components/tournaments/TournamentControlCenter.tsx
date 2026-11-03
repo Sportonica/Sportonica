@@ -8,7 +8,7 @@ import {
   openTournamentRegistration, closeTournamentRegistration, reopenTournamentRegistration, cancelTournament, approveTournament, completeTournament,
   startSingleEvent, createWalkinTeam, markWalkinTeamPaid,
   getTeamRoster, searchPlayersForTeam, addTeamPlayer, removeTeamPlayerAdmin, setTeamCaptain,
-  addWalkinTeamPlayer, updateTeamPlayerGuest, updateTeamManager, updateTeamName, setTeamPlayerJerseyNumber, setTeamPlayerPosition,
+  addWalkinTeamPlayer, updateTeamPlayerGuest, updateTeamManager, updateTeamName, setTeamPlayerJerseyNumber, setTeamPlayerPosition, setTeamPlayerRole,
   deleteTournamentTeam,
 } from "@/lib/tournaments/actions";
 import { isActionError } from "@/lib/actionError";
@@ -21,6 +21,7 @@ import { getSportKind, sportPositions } from "@/lib/sports";
 import { sportKeyFor } from "@/lib/intelligence/registry";
 import type { Payment } from "@/lib/payments/types";
 import TournamentForm from "./TournamentForm";
+import TeamProfileEditor from "./TeamProfileEditor";
 import FixturesTab from "./FixturesTab";
 import BracketView from "./BracketView";
 import StandingsTab from "./StandingsTab";
@@ -442,6 +443,8 @@ export default function TournamentControlCenter({
           {managingRoster && (
             <TeamRosterModal
               team={managingRoster}
+              showGroup={tournament.format === "group_knockout" || !!managingRoster.group_name}
+              groups={[...new Set(teams.map((x) => x.group_name).filter((g): g is string => !!g))].sort()}
               onClose={() => setManagingRoster(null)}
               onChanged={() => router.refresh()}
             />
@@ -768,8 +771,10 @@ const modalInputStyle: React.CSSProperties = {
 // Add/remove players on an already-confirmed team, any time — not just
 // the captain, not just during the registration window. See
 // tournament_admin_roster.sql for the backend side of this.
-function TeamRosterModal({ team, onClose, onChanged }: {
+function TeamRosterModal({ team, showGroup, groups, onClose, onChanged }: {
   team: TeamRow;
+  showGroup: boolean;
+  groups: string[];
   onClose: () => void;
   onChanged: () => void;
 }) {
@@ -854,6 +859,16 @@ function TeamRosterModal({ team, onClose, onChanged }: {
     setErr(null);
     startTransition(async () => {
       const res = await setTeamCaptain(playerId, team.tournament_id);
+      if (isActionError(res)) { setErr(res.message); return; }
+      load();
+      onChanged();
+    });
+  }
+
+  function changeRole(playerId: string, role: "player" | "substitute") {
+    setErr(null);
+    startTransition(async () => {
+      const res = await setTeamPlayerRole(playerId, role);
       if (isActionError(res)) { setErr(res.message); return; }
       load();
       onChanged();
@@ -971,6 +986,8 @@ function TeamRosterModal({ team, onClose, onChanged }: {
           <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", color: "inherit", opacity: 0.6, cursor: "pointer", width: 36, height: 36, display: "grid", placeItems: "center" }}><X size={18} /></button>
         </div>
 
+        <TeamProfileEditor team={team} showGroup={showGroup} groups={groups} onChanged={onChanged} />
+
         {editingManager ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: 10, borderRadius: 10, background: "rgba(0,98,65,0.06)", marginBottom: 16 }}>
             <input value={managerName} onChange={(e) => setManagerName(e.target.value)} placeholder="Team manager's name" style={modalInputStyle} />
@@ -1043,7 +1060,18 @@ function TeamRosterModal({ team, onClose, onChanged }: {
                     {p.name}
                     {!p.user_id && <span className="tc-dim" style={{ marginLeft: 6, fontSize: 11 }}>Walk-in</span>}
                   </span>
-                  <span className="tc-dim" style={{ fontSize: 11.5, textTransform: "capitalize" }}>{p.role}</span>
+                  {p.role === "captain" ? (
+                    <span className="tc-dim" style={{ fontSize: 11.5 }}>Captain</span>
+                  ) : (
+                    <select
+                      aria-label={`${p.name}'s role`} value={p.role} disabled={pending}
+                      onChange={(e) => changeRole(p.id, e.target.value as "player" | "substitute")}
+                      style={{ ...modalInputStyle, padding: "5px 6px", fontSize: 11.5 }}
+                    >
+                      <option value="player">Player</option>
+                      <option value="substitute">Substitute</option>
+                    </select>
+                  )}
                   <input
                     type="number" min={0} aria-label={`${p.name}'s jersey number`}
                     value={jerseyDrafts[p.id] ?? (p.jersey_number != null ? String(p.jersey_number) : "")}
