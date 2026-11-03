@@ -23,7 +23,8 @@ Everything is an event in `si_events`; the engine rebuilds the match from them.
 
 - Player figures are only what was typed. A quick result creates no player lines.
 - Over live scoring it needs confirming (`overrideLive`); the live events stay.
-- Changing it replaces the event with a required reason. The old event, who changed it and when stay on record.
+- The format's set rules don't apply. Up to 15 sets with any whole scores: the side with more points takes a set, the side with more sets wins. Only a level set or level sets are refused. Live scoring still follows the format.
+- Changing it replaces the event, as often as the organiser likes. A reason is optional (default "Result changed by the organiser"). The old event, who changed it and when stay on record.
 - If the winner changes, the bracket moves first, so the match and fixture never disagree. A later round with a result or a scoring record is frozen to the old winner's roster, so that change is refused and nothing is stored.
 
 ## Player points

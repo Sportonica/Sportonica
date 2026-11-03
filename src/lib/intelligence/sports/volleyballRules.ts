@@ -83,60 +83,40 @@ export interface SetCheck {
   winner: Side | null;
 }
 
-/** Every rule a list of final set scores must satisfy. */
-export function checkSetScores(
-  sets: readonly SetScore[],
-  rules: Pick<VolleyballRules, "bestOf" | "setPoints" | "decidingSetPoints" | "winBy" | "pointCap">,
-): SetCheck {
+/** Most sets an entered result can hold. */
+export const MAX_ENTERED_SETS = 15;
+
+/**
+ * What an entered result must satisfy. The organiser decides how many sets
+ * were played and what they ended at: no set target, winning margin or
+ * best-of limit applies. A set goes to the side with more points, and the
+ * match to the side that won more sets, so neither can be level.
+ */
+export function checkSetScores(sets: readonly SetScore[]): SetCheck {
   const errors: string[] = [];
   const winners: (Side | null)[] = [];
   const setsWon: Record<Side, number> = { a: 0, b: 0 };
-  const need = Math.ceil(rules.bestOf / 2);
-  let decidedAt: number | null = null;
 
+  if (sets.length > MAX_ENTERED_SETS) errors.push(`A match can have up to ${MAX_ENTERED_SETS} sets.`);
   sets.forEach((g, i) => {
     const n = i + 1;
-    if (decidedAt !== null) {
-      errors.push(`Set ${n} can't be played: the match was already decided in set ${decidedAt}.`);
-      winners.push(null);
-      return;
-    }
-    if (n > rules.bestOf) {
-      errors.push(`Set ${n} can't be played: this match is best of ${rules.bestOf}.`);
-      winners.push(null);
-      return;
-    }
     if (!Number.isInteger(g.a) || !Number.isInteger(g.b) || g.a < 0 || g.b < 0) {
       errors.push(`Set ${n}: scores must be whole numbers, 0 or more.`);
       winners.push(null);
       return;
     }
-    const deciding = rules.bestOf > 1 && n === rules.bestOf;
-    const target = deciding ? rules.decidingSetPoints : rules.setPoints;
-    const won = setWinner(g, target, rules.winBy, rules.pointCap);
-    winners.push(won);
-    if (!won) {
-      const top = Math.max(g.a, g.b);
-      errors.push(top < target
-        ? `Set ${n}: ${g.a}-${g.b} is not finished. A team must reach ${target}.`
-        : `Set ${n}: ${g.a}-${g.b} is not finished. A team must win by ${rules.winBy}.`);
+    if (g.a === g.b) {
+      errors.push(`Set ${n}: ${g.a}-${g.b} is level. One team must have more points.`);
+      winners.push(null);
       return;
     }
-    // the set would have ended earlier: 30-20 is impossible when the first to 25 by 2 wins
-    const loser = won === "a" ? g.b : g.a, winnerScore = won === "a" ? g.a : g.b;
-    const shouldEndAt = rules.pointCap !== null && loser + rules.winBy > rules.pointCap
-      ? rules.pointCap
-      : Math.max(target, loser + rules.winBy);
-    if (winnerScore > shouldEndAt) errors.push(`Set ${n}: ${g.a}-${g.b} is impossible. The set ends at ${shouldEndAt}-${loser}.`);
+    const won: Side = g.a > g.b ? "a" : "b";
+    winners.push(won);
     setsWon[won] += 1;
-    if (setsWon[won] >= need) decidedAt = n;
   });
 
-  if (!errors.length && decidedAt === null) {
-    errors.push(sets.length
-      ? `The match isn't decided yet: a team must win ${need} sets.`
-      : "Enter the set scores.");
-  }
+  if (!sets.length) errors.push("Enter the set scores.");
+  else if (!errors.length && setsWon.a === setsWon.b) errors.push(`Sets are level at ${setsWon.a}-${setsWon.b}. One team must win more sets.`);
   const winner = !errors.length ? (setsWon.a > setsWon.b ? "a" : "b") : null;
   return { errors, winners, setsWon, winner };
 }
