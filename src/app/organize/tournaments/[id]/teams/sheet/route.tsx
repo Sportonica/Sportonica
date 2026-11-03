@@ -42,6 +42,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   }
 
   const wantTeam = new URL(req.url).searchParams.get("team");
+  // The site's CSP (src/lib/security/csp.ts) runs only scripts carrying the
+  // request's nonce, and never inline onclick handlers, so the print button
+  // is wired up by a script with the nonce src/proxy.ts set.
+  const nonce = req.headers.get("x-nonce");
 
   const [venueName, teamsRes] = await Promise.all([
     getDisplayVenueName(tournament),
@@ -192,13 +196,16 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 </head>
 <body>
   <div class="toolbar">
-    <button onclick="window.print()">Print / Save as PDF</button>
-    <span class="hint">Use your browser's “Save as PDF” for a file. Generated ${esc(generated)} (NPT).</span>
+    <button type="button" id="print-sheet">Download PDF</button>
+    <span class="hint">In the print window, choose “Save as PDF” as the printer. Generated ${esc(generated)} (NPT).</span>
   </div>
   <div class="wrap">
     ${index}
     ${body}
   </div>
+  <script${nonce ? ` nonce="${esc(nonce)}"` : ""}>
+    document.getElementById("print-sheet").addEventListener("click", function () { window.print(); });
+  </script>
 </body>
 </html>`;
 
