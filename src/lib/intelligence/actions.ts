@@ -1358,7 +1358,7 @@ export async function getVolleyballResult(matchId: string): Promise<VolleyballRe
  * Save the final set scores and finish the match. `clientId` comes from the
  * form, so a second tap or a retried request stores one result. Entering a
  * result over live scoring needs `confirmLive`; the live history stays.
- * Changing a saved result needs a `reason`.
+ * Changing a saved result takes an optional `reason`.
  */
 export async function saveVolleyballResult(
   matchId: string, input: VolleyballEntry, opts: { clientId: string; reason?: string; confirmLive?: boolean },
@@ -1385,7 +1385,7 @@ export async function saveVolleyballResult(
   }
   const rules = getEngine("volleyball").resolveRules(row.rules) as VolleyballRules;
   const sets = (input.sets ?? []).map((g) => ({ a: g.a, b: g.b }));
-  const check = checkSetScores(sets, rules);
+  const check = checkSetScores(sets);
   if (check.errors.length) return actionError(check.errors.join(" "));
 
   const loaded = await loadEvents(sb, contestId);
@@ -1415,8 +1415,8 @@ export async function saveVolleyballResult(
     // only the set scores need a reason from the organiser: stats can simply be updated
     const before = (current.payload.sets ?? []) as SetScore[];
     const sameSets = before.length === sets.length && before.every((g, i) => g.a === sets[i].a && g.b === sets[i].b);
-    const reason = opts.reason?.trim() || (sameSets ? "Player statistics updated" : "");
-    if (!reason) return actionError("Say why the result is changing.");
+    // the organiser may change the result as often as they like; a reason is optional
+    const reason = opts.reason?.trim() || (sameSets ? "Player statistics updated" : "Result changed by the organiser");
     const moved = await moveVolleyballWinner(sb, m, sets, check.winner!);
     if (moved) return moved;
     const res = await correctContestEvent(contestId, current.id, reason, opts.clientId, { type: "FINAL_SETS", payload });
@@ -1442,10 +1442,9 @@ export async function saveVolleyballResult(
   if (row.status === "scheduled" || row.status === "postponed") { const err = await record("MATCH_START", {}); if (err) return err; }
   if (row.status === "paused") { const err = await record("MATCH_RESUME", {}); if (err) return err; }
   if (row.status === "completed") {
-    if (!opts.reason?.trim()) return actionError("Say why the result is changing.");
     const moved = await moveVolleyballWinner(sb, m, sets, check.winner!);
     if (moved) return moved;
-    const err = await record("MATCH_REOPEN", { reason: opts.reason.trim() });
+    const err = await record("MATCH_REOPEN", { reason: opts.reason?.trim() || "Result changed by the organiser" });
     if (err) return err;
   }
   const saved = await record("FINAL_SETS", payload, opts.clientId);

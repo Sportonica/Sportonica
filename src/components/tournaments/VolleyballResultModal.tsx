@@ -10,7 +10,7 @@ import "@/components/intelligence/volleyball/volleyball.css";
 import { getVolleyballResult, saveVolleyballResult, type VolleyballResultView } from "@/lib/intelligence/actions";
 import { isActionError } from "@/lib/actionError";
 import type { Side } from "@/lib/intelligence/core/types";
-import { VOLLEYBALL_LINE_KEYS, checkSetScores, type VolleyballLineKey } from "@/lib/intelligence/sports/volleyballRules";
+import { MAX_ENTERED_SETS, VOLLEYBALL_LINE_KEYS, checkSetScores, type VolleyballLineKey } from "@/lib/intelligence/sports/volleyballRules";
 import type { TournamentMatch } from "@/lib/tournaments/types";
 
 const LINE_LABEL: Record<VolleyballLineKey, string> = {
@@ -55,7 +55,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
       if (isActionError(v)) { setLoadErr(v.message); return; }
       setView(v);
       const known = v.entry?.sets ?? [];
-      setRows(Array.from({ length: v.rules.bestOf }, (_, i) => ({ a: known[i] ? String(known[i].a) : "", b: known[i] ? String(known[i].b) : "" })));
+      setRows(Array.from({ length: Math.max(v.rules.bestOf, known.length) }, (_, i) => ({ a: known[i] ? String(known[i].a) : "", b: known[i] ? String(known[i].b) : "" })));
       setMvp(v.entry?.mvp ?? "");
       setNotes(v.entry?.notes ?? "");
       const saved = v.entry?.lines ?? [];
@@ -71,16 +71,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
   // the rows filled in so far; a row half filled still counts, so it is reported
   const lastFilled = rows.reduce((last, r, i) => (r.a !== "" || r.b !== "" ? i : last), -1);
   const sets = useMemo(() => rows.slice(0, lastFilled + 1).map((r) => ({ a: r.a === "" ? NaN : Number(r.a), b: r.b === "" ? NaN : Number(r.b) })), [rows, lastFilled]);
-  const check = view ? checkSetScores(sets, view.rules) : null;
-  const decidedAt = check ? (() => {
-    const tally = { a: 0, b: 0 };
-    for (let i = 0; i < check.winners.length; i++) {
-      const w = check.winners[i];
-      if (w) tally[w] += 1;
-      if (view && (tally.a >= Math.ceil(view.rules.bestOf / 2) || tally.b >= Math.ceil(view.rules.bestOf / 2))) return i;
-    }
-    return null;
-  })() : null;
+  const check = view ? checkSetScores(sets) : null;
 
   if (loadErr || !view || !check) {
     return (
@@ -101,7 +92,6 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
   const known = view.entry?.sets ?? null;
   const setsChanged = !known || known.length !== sets.length || known.some((g, i) => g.a !== sets[i].a || g.b !== sets[i].b);
   const askReason = editing && setsChanged;
-  const needReason = askReason && !reason.trim();
   const needLive = live && !confirmLive;
 
   const shownKeys = VOLLEYBALL_LINE_KEYS.filter((k) => (entryMode === "points") === (k === "manualPoints"));
@@ -156,7 +146,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
           <button aria-label="Close" onClick={onClose} style={{ background: "none", border: "none", color: "inherit", opacity: 0.6, cursor: "pointer", width: 36, height: 36, fontSize: 18 }}>×</button>
         </div>
         <div className="tc-dim" style={{ fontSize: 12.5, marginBottom: 12 }}>
-          Best of {view.rules.bestOf}. Sets to {view.rules.setPoints}{view.rules.bestOf > 1 ? `, deciding set to ${view.rules.decidingSetPoints}` : ""}, win by {view.rules.winBy}.
+          Usual format: best of {view.rules.bestOf}, sets to {view.rules.setPoints}. Enter the scores as played: any number of sets, any points. The team with more points takes a set, and the team with more sets wins.
         </div>
 
         {live ? (
@@ -171,18 +161,23 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
           <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13.5, overflowWrap: "anywhere" }}>{nameA}</div>
           <div style={{ textAlign: "center", fontWeight: 800, fontSize: 13.5, overflowWrap: "anywhere" }}>{nameB}</div>
           {rows.map((r, i) => {
-            const off = decidedAt !== null && i > decidedAt && r.a === "" && r.b === "";
             return (
               <div key={i} style={{ display: "contents" }}>
-                <div className="tc-dim" style={{ fontSize: 13, fontWeight: 700, opacity: off ? 0.35 : undefined }}>Set {i + 1}</div>
+                <div className="tc-dim" style={{ fontSize: 13, fontWeight: 700 }}>Set {i + 1}</div>
                 {(["a", "b"] as Side[]).map((s) => (
-                  <input key={s} style={{ ...score, opacity: off ? 0.35 : 1, borderColor: check.winners[i] === s ? "#00a86b" : undefined }} inputMode="numeric" pattern="[0-9]*" disabled={off} value={r[s]}
+                  <input key={s} style={{ ...score, borderColor: check.winners[i] === s ? "#00a86b" : undefined }} inputMode="numeric" pattern="[0-9]*" value={r[s]}
                     aria-label={`Set ${i + 1} ${s === "a" ? nameA : nameB}`}
                     onChange={(e) => { const v = e.target.value.replace(/\D/g, "").slice(0, 3); setRows((all) => all.map((x, k) => (k === i ? { ...x, [s]: v } : x))); }} />
                 ))}
               </div>
             );
           })}
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <button type="button" className="tc-btn" style={{ flex: 1, justifyContent: "center", minHeight: 40 }} disabled={rows.length >= MAX_ENTERED_SETS}
+            onClick={() => setRows((all) => [...all, { a: "", b: "" }])}>+ Add set</button>
+          <button type="button" className="tc-btn" style={{ flex: 1, justifyContent: "center", minHeight: 40 }} disabled={rows.length <= 1}
+            onClick={() => setRows((all) => all.slice(0, -1))}>Remove last set</button>
         </div>
 
         <div style={{ marginTop: 14, minHeight: 44 }}>
@@ -254,7 +249,7 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
         ) : null}
 
         {askReason ? (
-          <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700, marginTop: 12 }}>Why are the set scores changing? (kept on the record)
+          <label style={{ display: "grid", gap: 6, fontSize: 13, fontWeight: 700, marginTop: 12 }}>Why are the set scores changing? (optional, kept on the record)
             <input style={field} value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} />
           </label>
         ) : null}
@@ -274,9 +269,8 @@ export default function VolleyballResultModal({ match, onClose, onSaved }: {
         ) : null}
 
         {err ? <div role="alert" style={{ color: "#ef4444", fontSize: 13, marginTop: 10 }}>{err}</div> : null}
-        {check.winner && needReason ? <div className="tc-dim" style={{ fontSize: 12.5, marginTop: 10 }}>Say why the set scores are changing to continue.</div> : null}
         {check.winner && needLive ? <div className="tc-dim" style={{ fontSize: 12.5, marginTop: 10 }}>Tick the box at the top to replace the live score.</div> : null}
-        <button className="tc-btn primary" style={{ width: "100%", padding: 14, fontSize: 15, marginTop: 14, justifyContent: "center", textAlign: "center" }} disabled={!check.winner || needReason || needLive} onClick={() => { setErr(null); setConfirming(true); }}>
+        <button className="tc-btn primary" style={{ width: "100%", padding: 14, fontSize: 15, marginTop: 14, justifyContent: "center", textAlign: "center" }} disabled={!check.winner || needLive} onClick={() => { setErr(null); setConfirming(true); }}>
           Review result
         </button>
       </div>

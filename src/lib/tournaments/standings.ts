@@ -253,7 +253,8 @@ export function computeVolleyballStandings(
       }
       a.sw += m.score_a; a.sl += m.score_b; b.sw += m.score_b; b.sl += m.score_a;
       for (const g of facts[m.id]?.sets ?? []) { a.pf += g.a; a.pa += g.b; b.pf += g.b; b.pa += g.a; }
-      const deciding = need > 1 && Math.min(m.score_a, m.score_b) === need - 1;
+      // entered results can run past the format, so only the format's own full-length score counts
+      const deciding = need > 1 && Math.min(m.score_a, m.score_b) === need - 1 && Math.max(m.score_a, m.score_b) === need;
       winner.points += deciding ? rules.tableDecidingWinPoints : rules.tableWinPoints;
       loser.points += deciding ? rules.tableDecidingLossPoints : rules.tableLossPoints;
     }

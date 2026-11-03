@@ -277,7 +277,7 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
       if (s.rallies.length && p.overrideLive !== true) return "This match has been scored live. Confirm that the entered result replaces the live score";
       const list = p.sets;
       if (!Array.isArray(list) || list.some((x) => !x || typeof x !== "object")) return "Enter the set scores";
-      const check = checkSetScores(list as SetScore[], rules);
+      const check = checkSetScores(list as SetScore[]);
       if (check.errors.length) return check.errors[0];
       if (p.mvp != null && !hasPlayer(ctx, p.mvp)) return "The MVP is not in this match";
       if (p.notes != null && (typeof p.notes !== "string" || p.notes.length > 500)) return "Match notes can be up to 500 characters";
@@ -456,7 +456,7 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
       case "OFFICIALS": s.officials = (p.officials as { role: string; name: string }[]).map((o) => ({ role: o.role, name: o.name.trim() })); return s;
       case "FINAL_SETS": {
         const list = (p.sets as SetScore[]).map((x) => ({ a: x.a, b: x.b }));
-        const check = checkSetScores(list, rules);
+        const check = checkSetScores(list);
         s.sets = list.map((x, i) => ({ ...x, winner: check.winners[i] }));
         s.setsWon = check.setsWon;
         s.decided = check.winner;
@@ -533,6 +533,8 @@ export const volleyballEngine: SportIntelligenceEngine<VolleyballRules, Volleyba
 
   validateScore(s, _ctx, rules) {
     const issues: Issue[] = [];
+    // an entered result follows no format: the organiser set the scores
+    if (s.manual) return issues;
     s.sets.forEach((g, i) => {
       const t = rules.bestOf > 1 && i === rules.bestOf - 1 ? rules.decidingSetPoints : rules.setPoints;
       if (g.winner !== gameWonBy(g, t, rules.winBy, rules.pointCap)) {

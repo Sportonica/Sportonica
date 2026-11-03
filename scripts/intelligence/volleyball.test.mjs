@@ -3,7 +3,7 @@ import { volleyballEngine as E } from "../../src/lib/intelligence/sports/volleyb
 import { aggregate } from "../../src/lib/intelligence/aggregate.ts";
 import { RulesError } from "../../src/lib/intelligence/core/types.ts";
 import { reconstruct } from "../../src/lib/intelligence/core/engine.ts";
-import { checkSetScores, VOLLEYBALL_PRESETS, attackEfficiency, mvpRating, pointsScored } from "../../src/lib/intelligence/sports/volleyballRules.ts";
+import { checkSetScores, MAX_ENTERED_SETS, attackEfficiency, mvpRating, pointsScored } from "../../src/lib/intelligence/sports/volleyballRules.ts";
 import { computeVolleyballStandings, ratioText } from "../../src/lib/tournaments/standings.ts";
 import { makeContext, openMatch, section, cell } from "./harness.mjs";
 
@@ -310,35 +310,46 @@ section("volleyball statistics: from recorded events only, using the stated form
   assert.ok(!lines.some((l) => l.subjectKey === "a8"), "a bench player who never played has no line");
 });
 
-section("set score validation: what the result form and the server accept", () => {
-  const five = VOLLEYBALL_PRESETS.indoor, three = VOLLEYBALL_PRESETS.indoor3;
-  const ok = (sets, rules, won) => { const c = checkSetScores(sets, rules); assert.deepEqual(c.errors, []); assert.equal(c.winner, won); };
-  const bad = (sets, rules, pattern) => assert.match(checkSetScores(sets, rules).errors.join(" "), pattern);
-  ok([{ a: 25, b: 21 }, { a: 22, b: 25 }, { a: 25, b: 19 }, { a: 18, b: 25 }, { a: 15, b: 12 }], five, "a");
-  ok([{ a: 25, b: 0 }, { a: 25, b: 0 }, { a: 25, b: 0 }], five, "a");
-  ok([{ a: 21, b: 25 }, { a: 25, b: 23 }, { a: 13, b: 15 }], three, "b");
-  ok([{ a: 26, b: 24 }, { a: 31, b: 29 }, { a: 40, b: 38 }], five, "a");
-  ok([{ a: 25, b: 20 }, { a: 20, b: 25 }, { a: 17, b: 15 }], three, "a");
-  bad([{ a: 24, b: 20 }], five, /not finished. A team must reach 25/);
-  bad([{ a: 25, b: 24 }], five, /must win by 2/);
-  bad([{ a: 30, b: 20 }, { a: 25, b: 20 }, { a: 25, b: 20 }], five, /impossible. The set ends at 25-20/);
-  bad([{ a: -1, b: 25 }], five, /whole numbers/);
-  bad([{ a: NaN, b: 25 }], five, /whole numbers/);
-  bad([{ a: 25, b: 20 }, { a: 25, b: 20 }], five, /must win 3 sets/);
-  bad([{ a: 25, b: 20 }, { a: 25, b: 20 }, { a: 25, b: 20 }, { a: 25, b: 20 }], five, /already decided in set 3/);
-  bad([{ a: 25, b: 20 }, { a: 20, b: 25 }, { a: 25, b: 20 }, { a: 25, b: 20 }], three, /already decided in set 3|best of 3/);
-  bad([{ a: 25, b: 20 }, { a: 20, b: 25 }, { a: 15, b: 10 }, { a: 25, b: 20 }, { a: 15, b: 10 }], five, /Set 3/);
-  bad([{ a: 25, b: 20 }, { a: 20, b: 25 }, { a: 25, b: 20 }, { a: 20, b: 25 }, { a: 25, b: 10 }], five, /impossible. The set ends at 15-10/);
-  bad([], five, /Enter the set scores/);
+section("set score validation: entered results follow no format", () => {
+  const ok = (sets, won) => { const c = checkSetScores(sets); assert.deepEqual(c.errors, []); assert.equal(c.winner, won); };
+  const bad = (sets, pattern) => assert.match(checkSetScores(sets).errors.join(" "), pattern);
+  ok([{ a: 25, b: 21 }, { a: 22, b: 25 }, { a: 25, b: 19 }, { a: 18, b: 25 }, { a: 15, b: 12 }], "a");
+  ok([{ a: 24, b: 20 }], "a");
+  ok([{ a: 25, b: 24 }, { a: 3, b: 1 }, { a: 2, b: 9 }], "a");
+  ok([{ a: 30, b: 20 }, { a: 25, b: 20 }, { a: 25, b: 20 }, { a: 25, b: 20 }], "a");
+  ok([{ a: 0, b: 7 }, { a: 99, b: 100 }, { a: 25, b: 20 }, { a: 20, b: 25 }, { a: 25, b: 20 }, { a: 1, b: 2 }, { a: 5, b: 4 }], "b");
+  bad([{ a: 20, b: 20 }], /level. One team must have more points/);
+  bad([{ a: 25, b: 20 }, { a: 20, b: 25 }], /Sets are level at 1-1/);
+  bad([{ a: -1, b: 25 }], /whole numbers/);
+  bad([{ a: NaN, b: 25 }], /whole numbers/);
+  bad(Array.from({ length: MAX_ENTERED_SETS + 1 }, () => ({ a: 2, b: 1 })), /up to 15 sets/);
+  bad([], /Enter the set scores/);
 });
 
 const RESULT = { sets: [{ a: 25, b: 21 }, { a: 22, b: 25 }, { a: 25, b: 19 }, { a: 18, b: 25 }, { a: 15, b: 12 }] };
+
+section("quick result entry: the organiser's own scores, past the format, finish the match", () => {
+  const c = makeContext("volleyball", 7);
+  const m = openMatch(E, c, {});
+  m.push("MATCH_START");
+  const sets = [{ a: 12, b: 10 }, { a: 40, b: 2 }, { a: 7, b: 9 }, { a: 25, b: 26 }, { a: 3, b: 1 }, { a: 0, b: 1 }, { a: 11, b: 10 }];
+  const saved = m.push("FINAL_SETS", { sets });
+  m.push("MATCH_COMPLETE");
+  assert.equal(m.env.status, "completed");
+  assert.equal(m.env.result.winner, "a");
+  assert.deepEqual(E.mirrorScore(m.env.sport, c, m.rules), { scoreA: 4, scoreB: 3 });
+  assert.deepEqual(E.validateScore(m.env.sport, c, m.rules), [], "an entered result is not held to the format");
+  m.assertReconstructs("free result");
+  m.correct("replace", saved.id, "Result changed by the organiser", "FINAL_SETS", { sets: [{ a: 1, b: 30 }] });
+  assert.equal(m.env.result.winner, "b", "changed again, with the default reason");
+  m.assertReconstructs("free result changed");
+});
 
 section("quick result entry: final sets finish the match without inventing anything", () => {
   const c = makeContext("volleyball", 7);
   const m = openMatch(E, c, {});
   m.push("MATCH_START");
-  m.refuses("FINAL_SETS", { sets: [{ a: 25, b: 24 }] }, /must win by 2/, "invalid score");
+  m.refuses("FINAL_SETS", { sets: [{ a: 25, b: 25 }] }, /level/, "a level set");
   m.refuses("FINAL_SETS", { sets: RESULT.sets, lines: [{ player: "zz", kills: 1 }] }, /not in this match/, "unknown player");
   m.refuses("FINAL_SETS", { sets: RESULT.sets, lines: [{ player: "a1", attacks: 1, kills: 4 }] }, /can't be more than attacks/, "impossible figures");
   const saved = m.push("FINAL_SETS", RESULT);
