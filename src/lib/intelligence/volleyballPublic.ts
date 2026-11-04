@@ -21,6 +21,8 @@ interface LineRow { team_player_id: string | null; team_id: string | null; tourn
 export interface VolleyballTournamentCard {
   id: string; href: string; name: string; bannerUrl: string | null; organizer: string | null; venue: string;
   startsAt: string | null; status: string; maxTeams: number | null; fee: number;
+  // "live" arrives with the fixtures, often days early: happening now only from the start time
+  live: boolean;
 }
 export interface VolleyballMatchCard {
   id: string; tournamentName: string; venue: string; href: string; round: string | null; status: string; startsAt: string | null;
@@ -81,7 +83,7 @@ export async function getVolleyballDiscovery(): Promise<VolleyballDiscovery> {
   return {
     tournaments: list.map((t) => ({
       id: t.id, href: tournamentPath(t), name: t.name, bannerUrl: t.banner_url ?? null, organizer: t.organizer_name ?? null, venue: venueOf(t) || "To be announced",
-      startsAt: t.starts_at, status: t.status, maxTeams: t.max_teams ?? null, fee: Number(t.fee) || 0,
+      startsAt: t.starts_at, status: t.status, live: t.status === "live" && (!t.starts_at || Date.parse(t.starts_at) <= Date.now()), maxTeams: t.max_teams ?? null, fee: Number(t.fee) || 0,
     })),
     matches: matches.filter((m) => m.team_a_id && m.team_b_id && m.status !== "cancelled").map((m) => {
       const t = tournamentOf.get(m.tournament_id)!;

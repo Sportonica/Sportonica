@@ -45,7 +45,7 @@ function MatchRow({ m }: { m: VolleyballMatchCard }) {
 }
 
 function TournamentCard({ t }: { t: VolleyballTournamentCard }) {
-  const live = t.status === "live", completed = t.status === "completed";
+  const live = t.live, completed = t.status === "completed";
   const hasImg = t.bannerUrl && /^https?:\/\//i.test(t.bannerUrl);
   return (
     <Link href={t.href} className="tc-card" data-completed={completed} data-live={live} style={{ ["--tc-accent" as string]: "#3b82f6" }}>
