@@ -11,6 +11,7 @@
     "mailcheck": "node scripts/mailcheck.mjs",
     "test:validation": "node --experimental-strip-types scripts/validate-identity.mjs",
     "test:bulk": "node --experimental-strip-types scripts/validate-team-bulk.mjs",
+    "test:daily-news": "node --experimental-strip-types --no-warnings scripts/validate-daily-news.mjs",
     "test:intelligence": "node --experimental-strip-types --no-warnings --import ./scripts/intelligence/register.mjs scripts/intelligence/run-all.mjs"
   },
   "dependencies": {

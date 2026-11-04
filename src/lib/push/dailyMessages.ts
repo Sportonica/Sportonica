@@ -1,6 +1,7 @@
 // The one notification everyone gets each day. To run an offer or announce
 // a new feature on a given day, add it to DATED under that Kathmandu date;
-// it replaces the rotation for that day only.
+// it wins over everything that day. Otherwise the cron sends tournament
+// news (dailyNews.ts), and on a day with no news, the rotation below.
 
 export type DailyMessage = { title: string; body: string; url: string };
 
@@ -20,8 +21,12 @@ const ROTATION: DailyMessage[] = [
 
 const KTM_OFFSET_MS = (5 * 60 + 45) * 60 * 1000;
 
-export function dailyMessage(now = new Date()): DailyMessage {
-  const ktm = now.getTime() + KTM_OFFSET_MS;
-  const date = new Date(ktm).toISOString().slice(0, 10);
-  return DATED[date] ?? ROTATION[Math.floor(ktm / 86_400_000) % ROTATION.length];
+/** A message pinned to today's Kathmandu date, if any. */
+export function datedMessage(now = new Date()): DailyMessage | null {
+  return DATED[new Date(now.getTime() + KTM_OFFSET_MS).toISOString().slice(0, 10)] ?? null;
+}
+
+/** The app tip for a day with nothing else to say. */
+export function rotationMessage(now = new Date()): DailyMessage {
+  return ROTATION[Math.floor((now.getTime() + KTM_OFFSET_MS) / 86_400_000) % ROTATION.length];
 }
