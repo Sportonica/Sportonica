@@ -51,8 +51,9 @@ function tabFromParam(raw: string | null | undefined): Tab | null {
   return TABS.find((t) => t.toLowerCase().replace(/[\s_-]+/g, "") === norm) ?? null;
 }
 
-function statusInfo(status: Tournament["status"]): { label: string; cls: string } {
-  if (status === "live") return { label: "Ongoing", cls: "ongoing" };
+function statusInfo(status: Tournament["status"], startsAt: string | null): { label: string; cls: string } {
+  // fixtures make a tournament "live" before its first day: still upcoming until it starts
+  if (status === "live") return startsAt && Date.parse(startsAt) > Date.now() ? { label: "Upcoming", cls: "upcoming" } : { label: "Ongoing", cls: "ongoing" };
   if (status === "completed") return { label: "Completed", cls: "completed" };
   if (status === "cancelled") return { label: "Cancelled", cls: "cancelled" };
   return { label: "Upcoming", cls: "upcoming" };
@@ -310,7 +311,7 @@ function OverviewTab({ tournament, teams, matches, awards, sportBoard = null }: 
 }) {
   const confirmed = teams.filter((t) => t.status === "confirmed");
   const groups = [...new Set(teams.map((t) => t.group_name).filter((g): g is string => !!g))].sort();
-  const st = statusInfo(tournament.status);
+  const st = statusInfo(tournament.status, tournament.starts_at);
   const hasAwards = awards.winner || awards.runnerUp || awards.semifinalists.length > 0;
 
   return (

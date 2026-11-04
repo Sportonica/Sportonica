@@ -65,7 +65,9 @@ export async function listTournaments(): Promise<TournamentBrowseItem[]> {
     kind: "tournament", id: t.id, slug: t.slug ?? null, sport: t.sport, sportColor: sportColor(t.sport),
     title: t.name, organizerName: t.organizer_name, venue: t.venue_name, when: t.starts_at,
     maxTeams: t.max_teams, fee: Number(t.fee), bannerUrl: t.banner_url ?? null,
-    completed: t.status === "completed", live: t.status === "live",
+    // "live" is also the status once fixtures exist, often days early: it
+    // only reads as happening now from the start time on
+    completed: t.status === "completed", live: t.status === "live" && (!t.starts_at || Date.parse(t.starts_at) <= Date.now()),
   }));
 
   // Upcoming/live first (soonest first); completed tournaments sink to
