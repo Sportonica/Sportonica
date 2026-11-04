@@ -714,11 +714,44 @@
 
 /* Volleyball fixtures: filters, and the set scores under a played match */
 .ev2-fixture-filters { margin-bottom: 14px; }
-.ev2-fixture-selects { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.ev2-fixture-selects select { min-height: 40px; padding: 0 10px; border: 1px solid rgba(128,128,128,0.3); border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 13.5px; }
+/* Pool / Round filter: a labelled row of pills, each with its match
+   count. Scrolls sideways on a phone instead of wrapping. */
+.ev2-chiprow { display: flex; align-items: center; gap: 12px; margin-top: 10px; min-width: 0; }
+.ev2-chiprow-lbl {
+  flex-shrink: 0; width: 46px; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; opacity: 0.45;
+}
+.ev2-chips {
+  display: flex; gap: 6px; min-width: 0; overflow-x: auto; padding: 2px; margin: -2px;
+  -ms-overflow-style: none; scrollbar-width: none; scroll-snap-type: x proximity;
+}
+.ev2-chips::-webkit-scrollbar { display: none; }
+.ev2-chip {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px;
+  border: 1px solid rgba(242,237,230,0.14); border-radius: 999px; background: rgba(242,237,230,0.04); color: inherit;
+  font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; cursor: pointer; scroll-snap-align: start;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, transform .1s ease;
+}
+.ev2-chip:hover { border-color: rgba(242,237,230,0.3); }
+.ev2-chip:active { transform: scale(.96); }
+.ev2-chip:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+.ev2-chip-n {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-grid; place-items: center;
+  font-size: 10.5px; font-weight: 800; font-variant-numeric: tabular-nums; background: rgba(242,237,230,0.1); opacity: 0.8;
+}
+.ev2-chip.empty { opacity: 0.4; }
+.ev2-chip.on { background: #3b82f6; border-color: #3b82f6; color: #fff; box-shadow: 0 4px 14px -6px rgba(59,130,246,0.7); opacity: 1; }
+.ev2-chip.on .ev2-chip-n { background: rgba(255,255,255,0.22); opacity: 1; }
+[data-theme="paper"] .ev2-chip { border-color: rgba(20,23,30,0.12); background: rgba(20,23,30,0.025); }
+[data-theme="paper"] .ev2-chip:hover { border-color: rgba(20,23,30,0.28); }
+[data-theme="paper"] .ev2-chip-n { background: rgba(20,23,30,0.07); }
+[data-theme="paper"] .ev2-chip.on { background: #3b82f6; border-color: #3b82f6; color: #fff; }
+[data-theme="paper"] .ev2-chip.on .ev2-chip-n { background: rgba(255,255,255,0.22); }
 .ev2-fixture-sets { grid-column: 1 / -1; padding-top: 4px; text-align: center; font-size: 12px; opacity: 0.65; font-variant-numeric: tabular-nums; }
 .ev2-fixture-filters .ev2-subtab { min-height: 44px; }
 @media (max-width: 760px) {
-  .ev2-fixture-selects select { flex: 1; min-width: 0; min-height: 44px; font-size: 16px; }
+  .ev2-chiprow { gap: 8px; }
+  .ev2-chiprow-lbl { width: 40px; font-size: 10px; letter-spacing: .06em; }
+  .ev2-chips { gap: 5px; }
+  .ev2-chip { height: 36px; padding: 0 10px; gap: 5px; }
   .ev2-fixture.stack .ev2-fixture-sets { grid-area: x; text-align: left; }
 }

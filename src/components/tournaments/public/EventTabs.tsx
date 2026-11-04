@@ -639,7 +639,39 @@ function TeamCrest({ name, logoUrl, size = "md" }: { name: string; logoUrl?: str
 }
 
 const FIXTURE_STATUS = ["All", "Live", "Upcoming", "Completed"] as const;
-const FIXTURE_STAGE: Record<string, string> = { group: "Group stage", league: "League", knockout: "Knockout" };
+
+// A fixture's round without its pool prefix ("A · Round 1" -> "Round 1"),
+// so one chip covers that round in every pool. Knockout rounds keep their
+// own names ("Semi Final", "Final").
+function fixtureRound(m: TournamentMatch): { key: string; label: string } {
+  const raw = m.round_label || `Round ${m.round}`;
+  const prefix = m.group_name ? `${m.group_name} · ` : "";
+  const label = prefix && raw.startsWith(prefix) ? raw.slice(prefix.length) : raw;
+  return { key: `${m.stage}:${label}`, label };
+}
+
+function FilterChips({ label, options, value, onChange }: {
+  label: string;
+  options: { key: string; label: string; title?: string; count: number }[];
+  value: string | null;
+  onChange: (v: string | null) => void;
+}) {
+  return (
+    <div className="ev2-chiprow" role="group" aria-label={label}>
+      <span className="ev2-chiprow-lbl">{label}</span>
+      <div className="ev2-chips">
+        <button type="button" className={`ev2-chip${value === null ? " on" : ""}`} aria-pressed={value === null} onClick={() => onChange(null)}>All</button>
+        {options.map((o) => (
+          <button key={o.key} type="button" title={o.title} aria-pressed={value === o.key}
+            className={`ev2-chip${value === o.key ? " on" : ""}${o.count === 0 ? " empty" : ""}`}
+            onClick={() => onChange(value === o.key ? null : o.key)}>
+            {o.label}<span className="ev2-chip-n">{o.count}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function FixturesPublicTab({ tournamentId, matches: allMatches, teams, intel, highlights = {}, scorers = {}, basePath, stacked = false, filterable = false }: {
   tournamentId: string; matches: TournamentMatch[]; teams: TournamentTeam[]; intel: Record<string, MatchIntel>;
@@ -648,22 +680,27 @@ function FixturesPublicTab({ tournamentId, matches: allMatches, teams, intel, hi
   basePath: string;
   // cricket's and basketball's scores ("180/4 – 156/2", "114 – 113") are too wide to share a phone's line with two names, and volleyball's set scores need the width: there the teams stack
   stacked?: boolean;
-  // volleyball: filter by status, stage and round
+  // volleyball: filter by status, pool and round
   filterable?: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState<(typeof FIXTURE_STATUS)[number]>("All");
-  const [stageFilter, setStageFilter] = useState<string>("All");
-  const [roundFilter, setRoundFilter] = useState<string>("");
-  const stages = [...new Set(allMatches.map((m) => FIXTURE_STAGE[m.stage]).filter(Boolean))];
-  const rounds = [...new Set(allMatches.map((m) => m.round_label).filter((r): r is string => !!r))];
-  const matches = !filterable ? allMatches : allMatches.filter((m) => {
+  const [poolFilter, setPoolFilter] = useState<string | null>(null);
+  const [roundFilter, setRoundFilter] = useState<string | null>(null);
+  const byStatus = (m: TournamentMatch) => {
     const done = m.status === "completed" || m.status === "walkover";
-    if (statusFilter === "Live" && m.status !== "live") return false;
-    if (statusFilter === "Upcoming" && (done || m.status === "live" || m.status === "cancelled")) return false;
-    if (statusFilter === "Completed" && !done) return false;
-    if (stageFilter !== "All" && FIXTURE_STAGE[m.stage] !== stageFilter) return false;
-    return !roundFilter || m.round_label === roundFilter;
-  });
+    if (statusFilter === "Live") return m.status === "live";
+    if (statusFilter === "Upcoming") return !done && m.status !== "live" && m.status !== "cancelled";
+    if (statusFilter === "Completed") return done;
+    return true;
+  };
+  const byPool = (m: TournamentMatch) => !poolFilter || m.group_name === poolFilter;
+  const byRound = (m: TournamentMatch) => !roundFilter || fixtureRound(m).key === roundFilter;
+  const pools = [...new Set(allMatches.map((m) => m.group_name).filter((g): g is string => !!g))].sort();
+  const rounds = [...new Map([...allMatches].sort(compareStageRound).map((m) => [fixtureRound(m).key, fixtureRound(m).label])).entries()];
+  // each chip counts what it would show alongside the other filters
+  const poolCount = (g: string) => allMatches.filter((m) => m.group_name === g && byStatus(m) && byRound(m)).length;
+  const roundCount = (k: string) => allMatches.filter((m) => fixtureRound(m).key === k && byStatus(m) && byPool(m)).length;
+  const matches = !filterable ? allMatches : allMatches.filter((m) => byStatus(m) && byPool(m) && byRound(m));
   // a played game's detail (innings, result, top performers) opens on tap, one game at a time or several
   const [open, setOpen] = useState<Set<string>>(new Set());
   const toggle = (id: string) => setOpen((cur) => { const next = new Set(cur); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -702,21 +739,13 @@ function FixturesPublicTab({ tournamentId, matches: allMatches, teams, intel, hi
           <div className="ev2-subtabs">
             {FIXTURE_STATUS.map((f) => <button key={f} className={`ev2-subtab ${statusFilter === f ? "on" : ""}`} onClick={() => setStatusFilter(f)}>{f}</button>)}
           </div>
-          {stages.length > 1 || rounds.length > 1 ? (
-            <div className="ev2-fixture-selects">
-              {stages.length > 1 ? (
-                <select aria-label="Stage" value={stageFilter} onChange={(e) => setStageFilter(e.target.value)}>
-                  <option value="All">All stages</option>
-                  {stages.map((x) => <option key={x} value={x}>{x}</option>)}
-                </select>
-              ) : null}
-              {rounds.length > 1 ? (
-                <select aria-label="Round" value={roundFilter} onChange={(e) => setRoundFilter(e.target.value)}>
-                  <option value="">All rounds</option>
-                  {rounds.map((x) => <option key={x} value={x}>{x}</option>)}
-                </select>
-              ) : null}
-            </div>
+          {pools.length > 1 ? (
+            <FilterChips label="Pool" value={poolFilter} onChange={setPoolFilter}
+              options={pools.map((g) => ({ key: g, label: g, count: poolCount(g) }))} />
+          ) : null}
+          {rounds.length > 1 ? (
+            <FilterChips label="Round" value={roundFilter} onChange={setRoundFilter}
+              options={rounds.map(([k, label]) => ({ key: k, label: label.replace(/^Round /, ""), title: label, count: roundCount(k) }))} />
           ) : null}
         </div>
       ) : null}
