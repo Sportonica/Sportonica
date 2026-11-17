@@ -4,18 +4,27 @@ import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import { MapPin, X, Clock, Users, Loader2 } from "lucide-react";
 import { nearbyVenuesAndGames, type NearbyResult } from "@/lib/play/nearby";
-import { sportColor } from "@/lib/sports";
+import { sportColor, SPORT_NAMES } from "@/lib/sports";
 
 const KTM = "Asia/Kathmandu";
 
-// A floating "Near me" button that opens a popup with the closest
-// bookable venues and the closest upcoming games.
+// A floating "Near me" button that opens a popup with the bookable
+// venues and upcoming games within 5 km, filterable by sport.
 export default function NearbyPopup() {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<NearbyResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [tab, setTab] = useState<"venues" | "games">("venues");
+  const [sport, setSport] = useState<string | null>(null);
+
+  const venues = (data?.venues ?? []).filter((v) => !sport || (v.sports ?? []).includes(sport));
+  const games = (data?.games ?? []).filter((g) => !sport || g.sport === sport);
+  // How many of the current tab's rows each sport chip would show.
+  const countFor = (name: string) =>
+    tab === "venues"
+      ? (data?.venues ?? []).filter((v) => (v.sports ?? []).includes(name)).length
+      : (data?.games ?? []).filter((g) => g.sport === name).length;
 
   useEffect(() => {
     if (!open || data || pending) return;
@@ -50,7 +59,7 @@ export default function NearbyPopup() {
           <div className="nb-sheet" onClick={(e) => e.stopPropagation()}>
             <div className="nb-head">
               <div>
-                <div className="nb-eyebrow">Around you</div>
+                <div className="nb-eyebrow">Around you · within 5 km</div>
                 <h3 className="nb-title">What&apos;s close</h3>
               </div>
               <button className="nb-x" onClick={() => setOpen(false)}><X size={18} /></button>
@@ -58,11 +67,28 @@ export default function NearbyPopup() {
 
             <div className="nb-tabs">
               <button className={tab === "venues" ? "on" : ""} onClick={() => setTab("venues")}>
-                Courts {data && `(${data.venues.length})`}
+                Courts {data && `(${venues.length})`}
               </button>
               <button className={tab === "games" ? "on" : ""} onClick={() => setTab("games")}>
-                Games {data && `(${data.games.length})`}
+                Games {data && `(${games.length})`}
               </button>
+            </div>
+
+            <div className="nb-sports" role="group" aria-label="Filter by sport">
+              <button className={!sport ? "on" : ""} onClick={() => setSport(null)}>All</button>
+              {SPORT_NAMES.map((name) => {
+                const n = data ? countFor(name) : null;
+                return (
+                  <button
+                    key={name}
+                    className={`${sport === name ? "on" : ""}${n === 0 ? " empty" : ""}`}
+                    onClick={() => setSport(sport === name ? null : name)}
+                  >
+                    <span className="nb-sdot" style={{ background: sportColor(name) }} />
+                    {name}{n !== null && ` ${n}`}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="nb-body">
@@ -71,11 +97,13 @@ export default function NearbyPopup() {
               ) : !data ? (
                 <div className="nb-msg"><Loader2 size={18} className="nb-spin" /> Finding what&apos;s near you…</div>
               ) : tab === "venues" ? (
-                data.venues.length === 0 ? (
-                  <div className="nb-msg">No approved venues near you yet.</div>
-                ) : data.venues.map((v) => (
+                venues.length === 0 ? (
+                  <div className="nb-msg">
+                    {sport ? `No ${sport.toLowerCase()} courts within 5 km yet.` : "No approved venues within 5 km yet."}
+                  </div>
+                ) : venues.map((v) => (
                   <Link key={v.id} href={`/create/${v.id}`} className="nb-row" onClick={() => setOpen(false)}>
-                    <div className="nb-dot" style={{ background: sportColor(v.sports?.[0]) }} />
+                    <div className="nb-dot" style={{ background: sportColor(sport ?? v.sports?.[0]) }} />
                     <div className="nb-row-main">
                       <div className="nb-row-t">{v.name}</div>
                       <div className="nb-row-s">
@@ -86,9 +114,11 @@ export default function NearbyPopup() {
                   </Link>
                 ))
               ) : (
-                data.games.length === 0 ? (
-                  <div className="nb-msg">No upcoming games near you. Host one?</div>
-                ) : data.games.map((g) => (
+                games.length === 0 ? (
+                  <div className="nb-msg">
+                    {sport ? `No upcoming ${sport.toLowerCase()} games within 5 km. Host one?` : "No upcoming games within 5 km. Host one?"}
+                  </div>
+                ) : games.map((g) => (
                   <Link key={g.id} href={`/game/${g.id}`} className="nb-row" onClick={() => setOpen(false)}>
                     <div className="nb-dot" style={{ background: sportColor(g.sport) }} />
                     <div className="nb-row-main">
@@ -171,6 +201,21 @@ export default function NearbyPopup() {
           border: 1px solid rgba(128,128,128,0.25); opacity: 0.7;
         }
         .nb-tabs button.on { opacity: 1; border-color: rgba(0,98,65,0.5); background: rgba(0,98,65,0.12); color: #006241; }
+
+        .nb-sports {
+          display: flex; gap: 6px; padding: 0 18px 12px; overflow-x: auto;
+          scrollbar-width: none; -webkit-overflow-scrolling: touch;
+        }
+        .nb-sports::-webkit-scrollbar { display: none; }
+        .nb-sports button {
+          flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;
+          padding: 6px 11px; border-radius: 999px; font-size: 12px; font-weight: 600;
+          background: transparent; color: inherit; cursor: pointer; font-family: inherit;
+          border: 1px solid rgba(128,128,128,0.25); white-space: nowrap;
+        }
+        .nb-sports button.empty { opacity: 0.45; }
+        .nb-sports button.on { opacity: 1; border-color: rgba(0,98,65,0.5); background: rgba(0,98,65,0.12); color: #006241; }
+        .nb-sdot { width: 7px; height: 7px; border-radius: 99px; flex-shrink: 0; }
 
         .nb-body { overflow-y: auto; padding: 0 8px; flex: 1; }
         .nb-row {
