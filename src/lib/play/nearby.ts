@@ -67,7 +67,7 @@ export async function nearbyVenuesAndGames(lat: number, lng: number): Promise<Ne
       .map((v) => ({
         id: v.id, name: v.name, venue_type: v.venue_type,
         sports: v.sports
-          ? [...new Set(v.sports.map((s: string) => resolveSportParam(s) ?? s))]
+          ? [...new Set<string>((v.sports as string[]).map((s) => resolveSportParam(s) ?? s))]
           : null,
         km: km(lat, lng, v.lat as number, v.lng as number),
       }))
