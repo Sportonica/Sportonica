@@ -204,6 +204,8 @@ export async function editBookingAsPlatform(input: {
   if (readError) return dbActionError(readError);
   if (!current) return actionError("This booking no longer exists.");
   // e.g. the venue checked the player in, or a payment was approved, while the form was open
+  // "paid" is no longer offered; an old row may keep it, nothing new gets it
+  if (input.state === "paid" && current.state !== "paid") return actionError("Pick what happened with this booking.");
   if (current.updated_at !== input.loaded_updated_at) {
     return actionError("This booking changed while you were editing. Close this form, refresh the page and try again.");
   }
