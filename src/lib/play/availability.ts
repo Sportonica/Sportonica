@@ -8,14 +8,17 @@ type BusyRow = { starts_at: string; ends_at: string };
 // A raw court_bookings row → is this slot actually BOOKED? A row that's
 // still waiting on payment (reserved / unpaid / pending_verification /
 // rejected) does NOT count — the slot stays open until payment is
-// approved. Mirrors court_booking_slot_state() in
-// supabase/booking_payment_gated.sql.
+// approved. Mirrors court_booking_slot_state() as it is live:
+// RUN_ME_advance_payment.sql added partial, db/booking_refunded_frees_slot.sql
+// added refunded.
 function isBookedRow(r: Record<string, unknown>): boolean {
   const state = String(r.state ?? "").toLowerCase();
   const pay = String(r.payment_status ?? "").toLowerCase();
   const source = String(r.source ?? "").toLowerCase();
 
-  if (pay === "paid") return true;
+  // refunded gives the slot back, whatever payment_status still says
+  if (state === "refunded") return false;
+  if (pay === "paid" || pay === "partial") return true;
   if (["confirmed", "checked_in", "played", "paid"].includes(state)) return true;
   if (["walk_in", "phone"].includes(source) && state === "confirmed") return true;
   return false;

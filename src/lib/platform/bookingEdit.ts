@@ -15,11 +15,17 @@ export const BOOKING_STATE_LABELS: Record<string, string> = {
   refunded: "Refunded",
 };
 
+// What the edit form offers. "paid" is left out: whether money came in is the
+// Amount paid box, and "Booked, not played yet" covers the rest. Old rows that
+// still say "paid" keep their label above.
+export const BOOKING_STATE_CHOICES = Object.keys(BOOKING_STATE_LABELS).filter((s) => s !== "paid");
+
 // Bookings that are really happening, so any unpaid part is owed.
 const OWING_STATES = new Set(["paid", "confirmed", "checked_in", "played"]);
 
 // Money recorded on these keeps the slot blocked (court_booking_slot_state()
-// treats paid or partial as booked whatever the state says).
+// treats paid or partial as booked whatever the state says). Refunded is not
+// here: a refunded booking always frees its slot.
 export const CLOSED_STATES = new Set(["cancelled", "dropped", "no_show"]);
 
 interface MoneyState {

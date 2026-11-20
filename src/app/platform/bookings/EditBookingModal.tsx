@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { editBookingAsPlatform } from "@/lib/platform/actions";
 import { isActionError } from "@/lib/actionError";
-import { BOOKING_STATE_LABELS, CLOSED_STATES, nepalParts } from "@/lib/platform/bookingEdit";
+import { BOOKING_STATE_CHOICES, BOOKING_STATE_LABELS, CLOSED_STATES, nepalParts } from "@/lib/platform/bookingEdit";
 
 export interface EditableBooking {
   id: string;
@@ -99,14 +99,14 @@ export default function EditBookingModal({ booking, onClose }: { booking: Editab
           </label>
         </div>
         {moneyLocked ? <div style={hint}>A payment is waiting for review. Approve or reject it on the Payments page to change these.</div>
-          : refunded ? <div style={hint}>Marked as refunded, so nothing counts as paid.</div>
+          : refunded ? <div style={hint}>Marked as refunded, so nothing counts as paid and the slot opens for others to book.</div>
           : left < 0 ? <div style={{ ...hint, color: "#ef4444", opacity: 1 }}>Amount paid is more than the price.</div>
           : <div style={{ fontWeight: 700, fontSize: 14 }}>{left === 0 ? "Fully paid" : `Still to pay: ${money(left)}`}</div>}
 
         <div style={{ fontWeight: 800, fontSize: 14, marginTop: 4 }}>What happened</div>
         <label style={label}>Did they play?
           <select style={field} value={state} onChange={(e) => setState(e.target.value)}>
-            {Object.entries(BOOKING_STATE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+            {(booking.state === "paid" ? ["paid", ...BOOKING_STATE_CHOICES] : BOOKING_STATE_CHOICES).map((value) => <option key={value} value={value}>{BOOKING_STATE_LABELS[value]}</option>)}
           </select>
         </label>
         {CLOSED_STATES.has(state) && paidNow > 0 ? (
