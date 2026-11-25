@@ -9,6 +9,10 @@ One list, all repos. Tag each entry with the area in brackets: `[web]`,
 ## [Unreleased]
 
 ### Added
+- `[db]` `booking_refunded_frees_slot.sql` — `court_booking_slot_state()`
+  returns `free` for a refunded booking, so its court slot can be booked again;
+  rebuilds the `court_bookings_no_overlap` constraint on the new rule. Pairs
+  with app PR #172. Applied to production 2026-11-25.
 - `[db]` `bracket_cascade_guard.sql` — `record_match_result()` only clears
   later rounds when the winner actually changes, and `reset_downstream_from()`
   refuses on a completed tournament (`TOURNAMENT_COMPLETED`) unless a super
